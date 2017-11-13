@@ -19,7 +19,7 @@ else
         if ~exist(original_fid_tag_path,'file')
             log_mode = 3;
             error_flag = 1;
-            log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
+            log_msg =sprintf('Original fid_tag path (''%s'') does not exist. Dying now.\n',original_fid_tag_path);
             yet_another_logger(log_msg,log_mode,'',error_flag);
             quit force
         end

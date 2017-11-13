@@ -65,12 +65,20 @@ if isempty(cs_full_volume_queue)
     cs_full_volume_queue = 'high_priority';
 end
 
+fid_splitter_exec = getenv('CS_FID_SPLITTER_EXEC');
+if isempty(fid_splitter_exec)
+    %fid_splitter_exec = '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/20171026_1718/run_fid_splitter_exec.sh';   
+    fid_splitter_exec = '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/latest/run_fid_splitter_exec.sh';
+
+    setenv('CS_FID_SPLITTER_EXEC',fid_splitter_exec);
+end
 
 volume_manager_exec = getenv('CS_VOLUME_MANAGER_EXEC');
 if isempty(volume_manager_exec)
     %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_1013/run_volume_manager_exec.sh';
-    volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171023_1647//run_volume_manager_exec.sh';   
-    %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/latest/run_volume_manager_exec.sh';
+    %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171023_1647//run_volume_manager_exec.sh'; % Sills version
+    %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171031_1006/run_volume_manager_exec.sh'; % Sills version
+    volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/latest/run_volume_manager_exec.sh';
 
     setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec);
 end
@@ -334,6 +342,7 @@ if ~exist(study_flag,'file')
         
         
         m = matfile(recon_file,'Writable',true);
+        m.study_workdir = workdir;
         m.scale_file = [workdir '/' runno '_4D_scaling_factor.float'];
         m.fid_tag_file = [workdir '/.' runno '.fid_tag'];
         m.dim_x = dim_x;
@@ -397,7 +406,7 @@ if ~exist(study_flag,'file')
         % For single-block fids, wait for completion and then slice as
         % necessary.
         
-        if (nblocks == 1)
+        if (nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
             if ~exist('local_or_streaming_or_static','var')
                 [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
             end
@@ -466,6 +475,23 @@ if ~exist(study_flag,'file')
             end
             
             % Run splitter, using job_dependencies if necessary
+            fs_slurm_options=struct;
+            fs_slurm_options.v=''; % verbose
+            fs_slurm_options.s=''; % shared; volume setup should to share resources.
+            fs_slurm_options.mem=50000; % memory requested; fs needs a significant amount; could do this smarter, though.
+            fs_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+            fs_slurm_options.job_name = [runno '_fid_splitter_recon'];
+            fs_slurm_options.reservation = active_reservation;
+            
+            or_dependency = '';
+            if ~isempty(running_jobs)
+                or_dependency='afterok-or';
+            end
+                      
+            fid_splitter_batch = [workdir 'sbatch/' runno '_fid_splitter_CS_recon.bash'];
+            fs_cmd = sprintf('%s %s %s %s', fid_splitter_exec,matlab_path, local_fid,recon_file);
+            batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
+            fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
             
         end % End of single volume and MGRE preprocessing.
         

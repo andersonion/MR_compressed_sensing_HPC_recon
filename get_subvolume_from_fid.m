@@ -49,7 +49,7 @@ if for_locals_only
     system(dd_cmd);
 else
     % runs dd command remotely.
-    pre_clean_cmd = 'find /tmp/ -mmin +120 -name "*.fid" -exec rm {} \;';
+    pre_clean_cmd = 'find /tmp/ -maxdepth 1 -mmin +120 -iregex ".*\.fid" -exec rm {} \;';
     ssh_pre_clean=sprintf('ssh %s@%s "%s"',user,scanner,pre_clean_cmd);  
     
     system(ssh_pre_clean);
@@ -77,7 +77,7 @@ else
     if ~for_locals_only
         % removes temp fid remotly.
         ssh_rm_cmd=sprintf('ssh %s@%s rm %s',user,scanner,remote_temp_fidpath);
-        disp(shh_rm_cmd)
+        disp(ssh_rm_cmd)
         system(ssh_rm_cmd);
     end
 end

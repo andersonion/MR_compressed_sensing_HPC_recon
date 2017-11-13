@@ -86,8 +86,9 @@ end
 volume_setup_exec_path = getenv('CS_VOLUME_SETUP_EXEC'); % Error check for isempty?
 
 if isempty(volume_setup_exec_path)
-    %volume_setup_exec_path = '/cm/shared/workstation_c ode_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171004_1753/run_setup_volume_work_for_CSrecon_exec.sh';
-    volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/stable/run_setup_volume_work_for_CSrecon_exec.sh';
+    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171026_1816/run_setup_volume_work_for_CSrecon_exec.sh';
+    volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171030_1349/run_setup_volume_work_for_CSrecon_exec.sh';
+    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/stable/run_setup_volume_work_for_CSrecon_exec.sh';
     setenv('CS_VOLUME_SETUP_EXEC',volume_setup_exec_path);
 end
 
@@ -296,12 +297,12 @@ if ~exist(local_archive_tag,'file')
 end
     
 if isdeployed
-    p_time = 5*(volume_number-1);
+    p_time = 30*(volume_number-1);
     
     pause(p_time);
 end
 
-if ~starting_point
+if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
     gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
@@ -363,16 +364,18 @@ else
         end
         
         if fid_consistency
+            if ~exist(procpar_file,'file')
+                datapath=['/home/mrraw/' study '/' series '.fid'];
+                mode =2; % Only pull procpar file
+                puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
+            end
+            
             if (local_or_streaming_or_static == 1)
                 get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
             else
                 user='omega';
                 get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes,scanner,user);
             end
-            
-            datapath=['/home/mrraw/' study '/' series '.fid'];
-            mode =2; % Only pull procpar file
-            puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
             
         else
             log_mode = 1;

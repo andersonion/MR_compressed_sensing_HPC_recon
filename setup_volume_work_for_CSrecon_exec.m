@@ -99,7 +99,7 @@ if (make_workspace)
     only_non_zeros = 1;
     max_blocks = 1;
     
-    data = load_fidCS(volume_fid,max_blocks,ntraces,npoints,bitdepth,fid_volume_number,original_dims,only_non_zeros,double_down);
+    data = load_fidCS(volume_fid,max_blocks,ntraces/nechoes,npoints,bitdepth,fid_volume_number,original_dims,only_non_zeros,double_down);
     %data = double(data); %This should be replaced by setting double_down to 1.
     fid_load_time = toc;
     
@@ -134,7 +134,7 @@ if (make_workspace)
             scaling = double(scaling);
         %}
         
-        log_msg =sprintf('Volume %s: volume scaling calculated in %0.2f seconds.\n',volume_runno,scaling_time);
+        log_msg =sprintf('Volume %s: volume scaling (%f) calculated in %0.2f seconds\n',volume_runno,scaling,scaling_time);
         yet_another_logger(log_msg,log_mode,log_file);
         m = matfile(recon_file,'Writable',true);
         m.scaling = scaling;
