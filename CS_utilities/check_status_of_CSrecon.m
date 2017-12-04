@@ -57,7 +57,7 @@ if ~exist(volume_flag,'file')
         
         work_subfolder = [workdir '/work/'];
         if ~exist(work_subfolder,'dir')
-            system(['mkdir -m 777 ' work_subfolder]);
+            system(['mkdir -m 775 ' work_subfolder]);
         end
         
         temp_file = [work_subfolder '/' volume_runno '.tmp'];
