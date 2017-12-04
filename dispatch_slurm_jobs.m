@@ -22,6 +22,7 @@ end
 
 or_flag = 0;
 old_slurm = 0;
+% {
 if exist('optional_dependency_type','var') && ~isempty(strfind(optional_dependency_type,'-or'))
     
     [~,s_version]=system('scontrol version');
@@ -32,7 +33,7 @@ if exist('optional_dependency_type','var') && ~isempty(strfind(optional_dependen
     optional_dependency_type((end-2):end) = [];
     or_flag = 1;
 end
-
+%}
 
 if exist('optional_dependencies','var') && ~isempty(optional_dependencies)
     
