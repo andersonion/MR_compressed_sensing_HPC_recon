@@ -8,7 +8,7 @@ main_dir = [master_dir script_name '_executable/'];
 %main_dir = '/nas4/rja20/CS_recon_setup_executable/'
 latest_path_link = [main_dir 'latest'];
 
-original_builtin_dir='/cm/shared/workstation_code_dev/matlab_execs/streaming_CS_recon_main_executable/20171019_1703/';
+original_builtin_dir='/cm/shared/workstation_code_dev/recon/CS_v2/';
 original_builtin_script = 'run_streaming_CS_recon_main_exec_builtin_path.sh';
 original_builtin_path=[original_builtin_dir original_builtin_script];
 bin_path = '/cm/shared/workstation_code_dev/bin/streaming_CS_recon';
