@@ -12,7 +12,7 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable
 
 misguided_status_code = 0;
 if ~isdeployed
-    volume_variable_file = '/glusterspace/S67710.work/S67710_m00/work/S67710_m00_setup_variables.mat';
+    volume_variable_file = '/nas4/bj/N55024.work//N55024_m00///work/N55024_m00_setup_variables.mat';
     %volume_scale = 1.4493;
     %addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/'); 
     %addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
@@ -187,6 +187,27 @@ header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
 
+minimal_memory=getenv('CS_minimize_memory')
+if isempty(minimal_memory)
+    minimal_memory=1;
+end
+    
+    
+if minimal_memory
+    %double_down=1
+    %if double_down
+        lil_dummy = zeros([1,1],'double');
+    %else
+    %   lil_dummy = zeros([1,1],'single');
+    %end
+    lil_dummy =complex(lil_dummy,lil_dummy);
+    
+    c_data_out=zeros(recon_dims,'like',lil_dummy);
+   data_in=typecast(fread(fid,inf,'*uint8'),'double'); 
+    
+    
+    
+else
 if ~continue_recon_enabled
     data_in=typecast(fread(fid,inf,'*uint8'),'single');
     %data_in=typecast(fread(fid,2*dims(1)*dims(2)*dims(3),'*uint8'),'single');
@@ -241,7 +262,7 @@ else
     if sum(original_dims == recon_dims) ~= 3
         c_data_out = fftshift(fftn(fftshift(c_data_out)));
         data_out = c_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
-            (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2);
+            (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2,:);
         clear c_data_out
         if (fermi_filter && ~qsm_fermi_filter)
             if exist('w1','var')
