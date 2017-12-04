@@ -1,4 +1,4 @@
-function streaming_CS_recon_main_exec(scanner,runno,study,series, CS_table, varargin )
+function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, CS_table, varargin )
 %  Initially created on 14 September 2017, BJ Anderson, CIVM
 %% SUMMARY
 %  Main code for compressed sensing reconstruction on a computing cluster
@@ -50,7 +50,8 @@ matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC');
 if isempty(gatekeeper_exec)
     %gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/20171004_1111/run_gatekeeper_exec.sh';
-    gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/stable/run_gatekeeper_exec.sh';
+    %gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/stable/run_gatekeeper_exec.sh';
+    gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/latest/run_gatekeeper_exec.sh';
     setenv('CS_GATEKEEPER_EXEC',gatekeeper_exec);
 end
 
@@ -124,9 +125,19 @@ options = struct;% options_handler(varargin{:}); % Check name and syntax later.
 
 % TEMPORARY, until options are fully implemented
 if exist('CS_table','var')
-    options.CS_table=CS_table;
+    if length(CS_table)>4
+        options.CS_table=CS_table;
+        if exist('varargin','var') && numel(varargin)>=1
+            Itnlim=str2double(varargin{1});
+        else
+            Itnlim = 98;
+        end
+    else
+        Itnlim=str2double(CS_table);
+    end
 else
     options.CS_table=0;
+    Itnlim = 98;
 end
 options.verbose=1;
 %
@@ -137,12 +148,12 @@ if options.verbose
 end
 
 
-if ~ischar(series)
-    series = num2str(series);
-    if length(series) < 2
-        series = ['0' series];
+if ~ischar(agilent_series)
+    agilent_series = num2str(agilent_series);
+    if length(agilent_series) < 2
+        agilent_series = ['0' agilent_series];
     end
-    series = ['ser' series];
+    agilent_series = ['ser' agilent_series];
 end
 
 
@@ -187,7 +198,7 @@ start_time=sprintf('%02i:%02i',ts(4:5));
 
 user = getenv('USER');
 
-log_msg =sprintf('\n----------\nCompressed sensing reconstruction initialized on: %s at %s.\n----------\nScanner runno: %s.\nScanner series: %s\nUser: %s\n',start_date, start_time, study, series,user);
+log_msg =sprintf('\n----------\nCompressed sensing reconstruction initialized on: %s at %s.\n----------\nScanner runno: %s.\nScanner series: %s\nUser: %s\n',start_date, start_time, study, agilent_series,user);
 yet_another_logger(log_msg,log_mode,log_file);
 
 local_fid=[workdir runno '.fid'];
@@ -222,7 +233,7 @@ if ~exist(study_flag,'file')
     %}
     
     if ~exist(local_hdr,'file');
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
+        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         
         if (local_or_streaming_or_static == 2)
             log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
@@ -245,15 +256,45 @@ if ~exist(study_flag,'file')
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
         if ~exist('local_or_streaming_or_static','var')
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
+            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         end
         if (local_or_streaming_or_static == 2)
             tables_in_workdir=dir([workdir '/CS*_*x*_*']);
             if (isempty(tables_in_workdir))
                 if (~options.CS_table)
                     %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
-                    pull_table_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];   
-                    [~,available_tables]=system(pull_table_cmd);
+                    pull_table_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
+                    
+                    status = 1;
+                    logged=0;
+                    for tt = 1:50
+                        if status
+                            [status,available_tables]=system(pull_table_cmd);
+                        else
+                            if ~logged
+                                if tt > 1
+                                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                                    disp(log_msg)
+                                    %log_mode = 1;
+                                    %yet_another_logger(log_msg,log_mode,log_file);
+                                end
+                                logged=1;
+                            end
+                        end
+                    end
+                    
+                    if status
+                        %error_flag=1;
+                        log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+                        %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+                        disp(log_msg)
+                        error_due_to_network_issues
+                        %quit
+                    end
+
+                    
+                    %[~,available_tables]=system(pull_table_cmd);
+                    
                     log_msg = sprintf('Please rerun this code and specify the CS_table to run in streaming mode (otherwise you will need to wait until the entire scan completes).\nAvailable tables:\n%s\n',available_tables);
                     %procpar_or_CStable=[workdir options.CS_table];        
                     yet_another_logger(log_msg,log_mode,log_file,1);
@@ -270,7 +311,7 @@ if ~exist(study_flag,'file')
             yet_another_logger(log_msg,log_mode,log_file);
             
         else
-            datapath=['/home/mrraw/' study '/' series '.fid'];
+            datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
             mode =2; % Only pull procpar file
             puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
         end
@@ -349,9 +390,18 @@ if ~exist(study_flag,'file')
         m.dim_y = dim_y;
         m.dim_z = dim_z;
         m.runno = runno;
-        m.scanner = scanner;
+        
+        if ~exist('scanner_host_name','var')
+            aa=load_scanner_dependency(scanner);
+            scanner_host_name=aa.scanner_host_name;  
+        end
+        scanner_name = scanner;
+        m.scanner_name=scanner_name;
+        scanner=scanner_host_name;
+        
+        m.scanner = scanner; 
         m.study = study;
-        m.series = series;
+        m.agilent_series = agilent_series;
         m.procpar_file = procpar_file;
         m.n_volumes = n_volumes;
         m.nechoes = nechoes;
@@ -386,7 +436,10 @@ if ~exist(study_flag,'file')
         
         m.xfmWeight = xfmWeight;
 
-        Itnlim = 98; %%98 is default
+        if ~exist('Itnlim','var')
+            Itnlim = 98; %%98 is default
+        end
+        
         m.Itnlim = Itnlim;
         
         OuterIt = 1;
@@ -408,13 +461,13 @@ if ~exist(study_flag,'file')
         
         if (nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
             if ~exist('local_or_streaming_or_static','var')
-                [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
+                [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
             end
             
             if (local_or_streaming_or_static == 2)
                 log_msg =sprintf('WARNING: Unable to stream recon for this type of scan (single-block fid); will wait for scan to complete.\n');
                 yet_another_logger(log_msg,log_mode,log_file);   
-                input_fid = ['/home/mrraw/' study '/' series '.fid/fid'];   
+                input_fid = ['/home/mrraw/' study '/' agilent_series '.fid/fid'];   
             end
             
             if ~exist(local_fid,'file') % If local_fid exists, then it will also be input_fid.
@@ -443,7 +496,7 @@ if ~exist(study_flag,'file')
                     
                 if ready
                     if ~exist('datapath','var')
-                        datapath=['/home/mrraw/' study '/' series '.fid'];
+                        datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
                     end              
                     
                     puller_glusterspaceCS_2(runno,datapath,scanner,workdir,3);
@@ -504,12 +557,12 @@ if ~exist(study_flag,'file')
             volume_number = unreconned_volumes(vs);
             volume_dir = [ workdir volume_runno '/'];
             if ~exist(volume_dir,'dir')
-                system(['mkdir -m 777 ' volume_dir]);
+                system(['mkdir -m 775 ' volume_dir]);
             end
             
             vol_sbatch_dir = [volume_dir 'sbatch'];
             if ~exist(vol_sbatch_dir,'dir')
-                system(['mkdir -m 777 ' vol_sbatch_dir]);
+                system(['mkdir -m 775 ' vol_sbatch_dir]);
             end
             
             
@@ -517,12 +570,16 @@ if ~exist(study_flag,'file')
             vm_slurm_options.v=''; % verbose
             vm_slurm_options.s=''; % shared; volume manager needs to share resources.
             vm_slurm_options.mem=512; % memory requested; vm only needs a miniscule amount.
-            vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+            vm_slurm_options.p=gatekeeper_queue;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vm_slurm_options.job_name = [volume_runno '_volume_manager'];
             %vm_slurm_options.reservation = active_reservation;
             
             volume_manager_batch = [volume_dir 'sbatch/' volume_runno '_volume_manager.bash'];
             vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec, matlab_path, recon_file,volume_runno, volume_number,workdir);
+            %%% James's happy delay patch
+            delay_unit=5;
+            vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
+            
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
             
             or_dependency = '';
