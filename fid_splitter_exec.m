@@ -19,11 +19,12 @@ for nn = 1:nechoes
     end
 end
 
+% I <3 this variable construct.
 if sum(work_to_do) > 0
-    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
-    datapath=['/home/mrraw/' study '/' series '.fid'];
+    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+    datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
     if ~exist(local_fid,'file')
-        mode =3; %
+        mode = 3;
         puller_glusterspaceCS_2(runno,datapath,scanner,study_workdir,mode);
     end
     tic
