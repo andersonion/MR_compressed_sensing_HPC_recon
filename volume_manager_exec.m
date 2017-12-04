@@ -12,7 +12,13 @@ if ~isdeployed
     base_workdir='/glusterspace/S67710.work/';
 end
 
-series=''; % This may seem stupid, but I need to let Matlab know that I'm going need series to be a variable, and not the builtin function 'series'
+%%% ORIGINAL COMMENT
+% This may seem stupid, but I need to let Matlab know that I'm going need 
+% series to be a variable, and not the builtin function 'series'
+%%%%
+% In fact this is stupid, overloading code generates incredible
+% headaches.The variale has been renamed agilent_series. -James.
+agilent_series=''; 
 workdir=[base_workdir '/' volume_runno '/'];
 % Need to figure out how to pass reconfile, scale_file --> just use recon_file!
 load(recon_file);
@@ -87,8 +93,9 @@ volume_setup_exec_path = getenv('CS_VOLUME_SETUP_EXEC'); % Error check for isemp
 
 if isempty(volume_setup_exec_path)
     %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171026_1816/run_setup_volume_work_for_CSrecon_exec.sh';
-    volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171030_1349/run_setup_volume_work_for_CSrecon_exec.sh';
+    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171030_1349/run_setup_volume_work_for_CSrecon_exec.sh';
     %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/stable/run_setup_volume_work_for_CSrecon_exec.sh';
+    volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/latest/run_setup_volume_work_for_CSrecon_exec.sh';
     setenv('CS_VOLUME_SETUP_EXEC',volume_setup_exec_path);
 end
 
@@ -97,7 +104,9 @@ slicewise_recon_exec_path = getenv('CS_SLICEWISE_RECON_EXEC'); % Error check for
 
 if isempty(slicewise_recon_exec_path)
     %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/20171002_1551/run_slicewise_CSrecon_exec.sh';
-    slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/stable/run_slicewise_CSrecon_exec.sh';
+    %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/stable/run_slicewise_CSrecon_exec.sh';
+    slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/latest/run_slicewise_CSrecon_exec.sh';
+    
     setenv('CS_SLICEWISE_RECON_EXEC',slicewise_recon_exec_path);
 end
 
@@ -106,6 +115,7 @@ volume_cleanup_exec_path = getenv('CS_VOLUME_CLEANUP_EXEC'); % Error check for i
 if isempty(volume_cleanup_exec_path)
     %volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/20171005_1536/run_volume_cleanup_for_CSrecon_exec.sh';
     volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/stable/run_volume_cleanup_for_CSrecon_exec.sh';
+    %volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/latest/run_volume_cleanup_for_CSrecon_exec.sh';
     setenv('CS_VOLUME_CLEANUP_EXEC',volume_cleanup_exec_path);
 end
 
@@ -113,7 +123,9 @@ procpar_gatekeeper_exec_path = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); % Error che
 
 if isempty(procpar_gatekeeper_exec_path)
     %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/20171004_1110//run_local_file_gatekeeper_exec.sh';
-    procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/stable/run_local_file_gatekeeper_exec.sh';
+    %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/stable/run_local_file_gatekeeper_exec.sh';
+    procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/latest/run_local_file_gatekeeper_exec.sh';
+    
     setenv('CS_PROCPAR_GATEKEEPER_EXEC',procpar_gatekeeper_exec_path);
     
 end
@@ -121,7 +133,9 @@ end
 procpar_cleanup_exec_path = getenv('CS_PROCPAR_CLEANUP_EXEC');
 if isempty(procpar_cleanup_exec_path)
     %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/20171010_1529/run_process_headfile_CS.sh';
-    procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/stable/run_process_headfile_CS.sh';
+    %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/stable/run_process_headfile_CS.sh';
+    procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/latest/run_process_headfile_CS.sh';
+
     setenv('CS_PROCPAR_CLEANUP_EXEC',procpar_cleanup_exec_path);
 end
 
@@ -224,7 +238,7 @@ if ~exist(volume_flag,'file')
 end
 %}
 
-[starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,series,bbytes);
+[starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,agilent_series,bbytes);
 
 log_mode = 1;
 %log_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
@@ -297,9 +311,14 @@ if ~exist(local_archive_tag,'file')
 end
     
 if isdeployed
+    % This is murderous when testing!!!!! This delay should be done in the
+    % dispatch, otherwise these sit and waste time every time.
+    % Removing per BJ's permission and adding a sleep * dispactched volN in
+    % the main exec.
+    %{
     p_time = 30*(volume_number-1);
-    
     pause(p_time);
+    %}
 end
 
 if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
@@ -315,7 +334,7 @@ if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     %gk_slurm_options.reservation = active_reservation;
     
     study_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_gatekeeper.bash'];
-    [input_fid,~] =find_input_fidCS(scanner,runno,study,series);% hint: ~ ==> local_or_streaming_or_static
+    [input_fid,~] =find_input_fidCS(scanner,runno,study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', gatekeeper_exec, matlab_path,volume_fid,input_fid,scanner,log_file,volume_number,bbytes);
     batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
     running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
@@ -353,7 +372,7 @@ else
     stage_5_running_jobs='';
     
     if (starting_point <= 1)
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
+        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         volume_fid = [work_subfolder '/' volume_runno '.fid'];
         
         if (local_or_streaming_or_static == 1)
@@ -364,11 +383,15 @@ else
         end
         
         if fid_consistency
+            %{ 
+            % James commented this out because it was killing streaming CS,
+            % when streaming data.
             if ~exist(procpar_file,'file')
-                datapath=['/home/mrraw/' study '/' series '.fid'];
+                datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
                 mode =2; % Only pull procpar file
                 puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
             end
+            %}
             
             if (local_or_streaming_or_static == 1)
                 get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
@@ -496,7 +519,7 @@ else
         swr_slurm_options.v=''; % verbose
         
         if single_threaded_recon
-            swr_slurm_options.c=2; % shared; volume setup should to share resources.
+            swr_slurm_options.c=1; % was previously 2...also need to investigate binding
             swr_slurm_options.hint='nomultithread';
         else
             swr_slurm_options.s='';
@@ -712,7 +735,7 @@ else
         shipper_slurm_options.v=''; % verbose
         shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
         shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
-        shipper_slurm_options.p='slow_master'; % For now, will use gatekeeper queue for volume manager as well
+        shipper_slurm_options.p=gatekeeper_queue; % For now, will use gatekeeper queue for volume manager as well
         shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
         %shipper_slurm_options.reservation = active_reservation;
         
