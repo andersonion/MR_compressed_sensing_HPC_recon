@@ -26,8 +26,34 @@ out_code = 1; % Default is failure.
 user='omega';
 most_recent_fid_cmd='ls -tr /home/mrraw/*/*.fid/fid | tail -n1';
 remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',user,scanner,most_recent_fid_cmd);
-[~,most_recent_fid] = system(remote_most_recent_fid_cmd);
+status = 1;
+logged=0;
+[status,most_recent_fid] = system(remote_most_recent_fid_cmd);
+%{
+%James commented this out becuase it wasnt working, well one of these multi-ssh calls wasnt, and this is the first try.
+for tt = 1:50
+    if status
+        [status,most_recent_fid] = system(remote_most_recent_fid_cmd);
+    else
+        if ~logged
+            if tt > 1
+                log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                log_mode = 1;
+                yet_another_logger(log_msg,log_mode,log_file);
+            end
+            logged=1;
+        end
+    end
+end
 
+if status
+    error_flag=1;
+    log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+    yet_another_logger(log_msg,log_mode,log_file,error_flag);
+    error_due_to_network_issues
+    %quit
+end
+%}
 fid_check=0;
 if strcmp(remote_file((end-2):end),'fid')
     fid_check=1;
@@ -103,8 +129,32 @@ for tt = 1:max_checks
     else
         most_recent_fid_cmd='ls -tr /home/mrraw/*/*.fid/fid | tail -n1';
         remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',user,scanner,most_recent_fid_cmd);
-        [~,c_most_recent_fid] = system(remote_most_recent_fid_cmd);
         
+        status = 1;
+        logged=0;
+        for tt = 1:50
+            if status
+                [status,c_most_recent_fid] = system(remote_most_recent_fid_cmd);
+            else
+                if ~logged
+                    if tt > 1
+                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                        log_mode = 1;
+                        yet_another_logger(log_msg,log_mode,log_file);
+                    end
+                    logged=1;
+                end
+            end
+        end
+        
+        if status
+            error_flag=1;
+            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+            yet_another_logger(log_msg,log_mode,log_file,error_flag);
+            error_due_to_network_issues
+            %quit
+        end
+
         if ~strcmp(c_most_recent_fid,most_recent_fid)
             wait_time = floor(toc/60);
             error_flag=0;
