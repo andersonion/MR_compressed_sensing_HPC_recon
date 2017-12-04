@@ -29,6 +29,7 @@ my_dir = [main_dir compile_time '/']
 
 %my_dir =  '/glusterspace/BJ/EK'
 addpath('/cm/shared/workstation_code_dev/recon/CS_v2/');
+addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
 
 version = 1;
 
@@ -57,7 +58,8 @@ include_files = {'/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/sparseMRI_v
 %}
 %'/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/Wavelab850/Orthogonal/'...
 
-include_files = {'/cm/shared/apps/MATLAB/R2015b/toolbox/stats/stats/quantile.m'};
+include_files = {'/cm/shared/apps/MATLAB/R2015b/toolbox/stats/stats/quantile.m'};% ...
+    %'/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/@Wavelet/Wavelet.m' };
 
 
 for ff = 1:length(include_files)
@@ -87,3 +89,13 @@ first_run_cmd(end)=[];
 first_run_cmd = [first_run_cmd 'sh ' matlab_path];
 system(first_run_cmd);
 eval(['!chmod a+rwx -R ' my_dir '/*'])
+
+
+latest_path_link = [main_dir 'latest'];
+if exist(latest_path_link,'dir')
+    rm_ln_cmd = sprintf('rm %s',latest_path_link);
+    system(rm_ln_cmd)
+end
+
+ln_cmd = sprintf('ln -s %s %s',my_dir,latest_path_link);
+system(ln_cmd);
