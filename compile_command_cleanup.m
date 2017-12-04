@@ -30,6 +30,7 @@ my_dir = [main_dir compile_time '/']
 
 %my_dir =  '/glusterspace/BJ/EK'
 addpath('/cm/shared/workstation_code_dev/recon/CS_v2/');
+addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
 version = 1;
 
 if (version == 1)
@@ -37,6 +38,7 @@ if (version == 1)
 elseif (version > 1)
     v_string = ['_v' num2str(version)];
 end
+
 
 mkdir(my_dir)
 eval(['!chmod a+rwx ' my_dir])
@@ -80,3 +82,15 @@ first_run_cmd(end)=[];
 first_run_cmd = [first_run_cmd 'sh ' matlab_path];
 system(first_run_cmd);
 eval(['!chmod a+rwx -R ' my_dir '/*'])
+
+
+latest_path_link = [main_dir 'latest'];
+
+if exist(latest_path_link,'dir')
+    rm_ln_cmd = sprintf('rm %s',latest_path_link);
+    system(rm_ln_cmd)
+end
+
+
+ln_cmd = sprintf('ln -s %s %s',my_dir,latest_path_link);
+system(ln_cmd);
