@@ -1,4 +1,4 @@
-function [ input_fid, local_or_streaming_or_static ] = find_input_fidCS( scanner,runno,study,series,user )
+function [ input_fid, local_or_streaming_or_static ] = find_input_fidCS( scanner,runno,study,agilent_series,user )
 %
 % local_or_streaming_or_static: 1 => local fid found, 2 -> using fid of in-progress scan, 3 -> using fid in its remote static location;
 
@@ -16,12 +16,39 @@ if exist(local_fid,'file')
     input_fid = local_fid;
     local_or_streaming_or_static = 1;
 else
-    datapath=['/home/mrraw/' study '/' series '.fid/fid'];
+    datapath=['/home/mrraw/' study '/' agilent_series '.fid/fid'];
     current_fid_size=get_remote_filesize(datapath,scanner);
     
     if (current_fid_size == 0)
         find_file_cmd=['ssh ' user '@' scanner ' "ls -tr /home/vnmr1/vnmrsys/exp*/acqfil/fid | tail -n1"'];
-        [~,result]=system(find_file_cmd);
+        [status,result]=system(find_file_cmd);
+        %{
+        %James commented this out becuase it wasnt working, well one of these multi-ssh calls wasnt, and this is the first try.
+        logged = 0;
+        for tt = 2:50
+            if status
+                [status,result]=system(find_file_cmd);
+            else
+                if ~logged
+                    if tt > 1
+                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                        disp(log_msg)
+                        %log_mode = 1;
+                        %yet_another_logger(log_msg,log_mode,log_file);
+                    end
+                end
+            end
+        end
+        
+        if status
+            %error_flag=1;
+            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+            disp(log_msg)
+            error_due_to_network_issues
+            %quit
+        end
+        %}
         latest_fid=result(1:end-1);
         input_fid=latest_fid;
         local_or_streaming_or_static = 2;
