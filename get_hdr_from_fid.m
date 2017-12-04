@@ -34,24 +34,7 @@ else
     % fetches the fid file
     scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,remote_temp_fidpath,local_fidpath);    
 
-    status = 1;
-    logged=0;
-    for tt = 1:50
-        if status
-            [status,~]=system(ssh_dd);
-        else
-            if ~logged
-                if tt > 1
-                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                    disp(log_msg)
-                    %log_mode = 1;
-                    %yet_another_logger(log_msg,log_mode,log_file);
-                end
-                logged=1;
-            end
-        end
-    end
-    
+    [status,~]=system(ssh_dd);
     if status
         %error_flag=1;
         log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
@@ -61,24 +44,7 @@ else
         %quit
     end
     %system(ssh_dd); %run remote dd
-        status = 1;
-    logged=0;
-    for tt = 1:50
-        if status
-            [status,~]=system(scp_fid);
-        else
-            if ~logged
-                if tt > 1
-                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                    disp(log_msg)
-                    %log_mode = 1;
-                    %yet_another_logger(log_msg,log_mode,log_file);
-                end
-                logged=1;
-            end
-        end
-    end
-    
+    [status,~]=system(scp_fid);
     if status
         %error_flag=1;
         log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);

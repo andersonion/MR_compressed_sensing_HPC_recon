@@ -54,23 +54,6 @@ else
     ssh_grab=sprintf('ssh %s@%s "%s"',user,scanner,header_grab);
     [status,ready_1]=system(ssh_grab); %run remotely
     logged=0;
-    %{
-    for tt = 2:5
-        if status
-            [status,ready_1]=system(ssh_grab); %run remotely
-        else
-            if ~logged
-                if tt > 1
-                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                    %log_mode = 1;
-                    %yet_another_logger(log_msg,log_mode,log_file);
-                    disp(log_msg);
-                end
-                logged=1;
-            end
-        end
-    end
-    
     if status
         %error_flag=1;
         log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
@@ -79,7 +62,6 @@ else
         error_due_to_network_issues
         %quit
     end
-    %}
 end
 
 %ready_1=str2double(ready_1(1));

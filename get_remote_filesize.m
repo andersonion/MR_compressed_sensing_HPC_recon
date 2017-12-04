@@ -28,24 +28,6 @@ end
 if exist('remote_machine','var')
         logged=0;
         [status,file_size_in_bytes] = system(remote_cmd);
-        %{
-        %James commented this out becuase it wasnt working, well one of these multi-ssh calls wasnt, and this is the first try.
-        for tt = 1:50
-            if status
-                [status,file_size_in_bytes] = system(remote_cmd);
-            else
-                if ~logged
-                    if tt > 1
-                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                        disp(log_msg)
-                        %log_mode = 1;
-                        %yet_another_logger(log_msg,log_mode,log_file);
-                    end
-                    logged=1;
-                end
-            end
-        end
-        
         if status
             %error_flag=1;
             log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
@@ -54,7 +36,7 @@ if exist('remote_machine','var')
             error_due_to_network_issues
             %quit
         end
-        %}
+        
 end
 
 

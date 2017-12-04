@@ -264,25 +264,8 @@ if ~exist(study_flag,'file')
                 if (~options.CS_table)
                     %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
                     pull_table_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
-                    
                     status = 1;
-                    logged=0;
-                    for tt = 1:50
-                        if status
-                            [status,available_tables]=system(pull_table_cmd);
-                        else
-                            if ~logged
-                                if tt > 1
-                                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                                    disp(log_msg)
-                                    %log_mode = 1;
-                                    %yet_another_logger(log_msg,log_mode,log_file);
-                                end
-                                logged=1;
-                            end
-                        end
-                    end
-                    
+                    [status,available_tables]=system(pull_table_cmd);
                     if status
                         %error_flag=1;
                         log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);

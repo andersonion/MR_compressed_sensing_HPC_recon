@@ -22,24 +22,6 @@ else
     if (current_fid_size == 0)
         find_file_cmd=['ssh ' user '@' scanner ' "ls -tr /home/vnmr1/vnmrsys/exp*/acqfil/fid | tail -n1"'];
         [status,result]=system(find_file_cmd);
-        %{
-        %James commented this out becuase it wasnt working, well one of these multi-ssh calls wasnt, and this is the first try.
-        logged = 0;
-        for tt = 2:50
-            if status
-                [status,result]=system(find_file_cmd);
-            else
-                if ~logged
-                    if tt > 1
-                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                        disp(log_msg)
-                        %log_mode = 1;
-                        %yet_another_logger(log_msg,log_mode,log_file);
-                    end
-                end
-            end
-        end
-        
         if status
             %error_flag=1;
             log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
@@ -48,7 +30,6 @@ else
             error_due_to_network_issues
             %quit
         end
-        %}
         latest_fid=result(1:end-1);
         input_fid=latest_fid;
         local_or_streaming_or_static = 2;

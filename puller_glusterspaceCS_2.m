@@ -36,23 +36,6 @@ if (mode == 1) || (mode == 3)
         logged=0;
         
         [status,~] = system(fid_pull_cmd);
-        %{
-        for tt = 1:50
-            if status
-                [status,~] = system(fid_pull_cmd);
-            else
-                if ~logged
-                    if tt > 1
-                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                        %log_mode = 1;
-                        %yet_another_logger(log_msg,log_mode,log_file);
-                        disp(log_msg)
-                    end
-                    logged=1;
-                end
-            end
-        end
-        %}
         if status
             %error_flag=1;
             log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,fid_pull_cmd);
@@ -69,24 +52,7 @@ if (mode == 2) || (mode == 3)
         %system(procpar_pull_cmd);
         status = 1;
         logged=0;
-        [status,~] = system(procpar_pull_cmd);  
-        %{
-        for tt = 1:50
-            if status
-                [status,~] = system(procpar_pull_cmd);
-            else
-                if ~logged
-                    if tt > 1
-                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
-                        %log_mode = 1;
-                        %yet_another_logger(log_msg,log_mode,log_file);
-                        disp(log_msg)
-                    end
-                    logged=1;
-                end
-            end
-        end
-        %}
+        [status,~] = system(procpar_pull_cmd);
         if status
             %error_flag=1;
             log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,procpar_pull_cmd);
