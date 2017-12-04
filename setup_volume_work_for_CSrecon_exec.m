@@ -6,9 +6,9 @@ function setup_volume_work_for_CSrecon_exec(variables_file,volume_number)
 %% Update of original version (implied _v1)
 
 if ~isdeployed
-    variables_file = '/glusterspace/S67841.work/S67841_m00/work/S67841_m00_setup_variables.mat';
+    variables_file = '/nas4/bj/N55055.work//N55055_m0///work/N55055_m0_setup_variables.mat';
     volume_number = '1';
-    
+    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities');
 end
 
 make_tmp = 0;
@@ -63,6 +63,9 @@ volume_number=str2double(volume_number);
 
 make_workspace = 0;
 make_tmp = 0;
+if ~isdeployed
+   starting_point = 2; 
+end
 if (starting_point == 2)
 
     
@@ -89,6 +92,10 @@ else
         log_msg =sprintf('Volume %s: Setup work appears to have been previously completed; skipping.\n',volume_runno);
         yet_another_logger(log_msg,log_mode,log_file);
     end
+end
+
+if ~isdeployed
+   make_workspace=1; 
 end
 
 if (make_workspace)
@@ -143,7 +150,7 @@ if (make_workspace)
         fid = fopen(scale_file,'w');
         fwrite(fid,scaling,'float');
         fclose(fid);
-    end
+     end
     
     
     
@@ -236,7 +243,7 @@ if (make_tmp)
     %% Create temporary volume for intermediate work
     
     header_size = (original_dims(1))*2; % Header data should be uint16, with the very first value telling how long the rest of the header is.
-    header_length = uint16(original_dims(1))
+    header_length = uint16(original_dims(1));
     
     header_byte_size = (2 + header_size);
     data_byte_size =  8*2*recon_dims(2)*recon_dims(3)*recon_dims(1); % 8 [bytes for double], factor of 2 for complex
@@ -260,9 +267,17 @@ if (make_tmp)
         
         fallocate_cmd = sprintf('%s fallocate -l %i %s',host_str,file_size,temp_file);
         [status,~]=system(fallocate_cmd);
+        pause(2); % We seem to be having problems with dir not seeing the temp_file.
+        
         fmeta=dir(temp_file);
         
-        if status || (fmeta.bytes ~=file_size)
+        if isempty(fmeta)
+            m_file_size = 0;
+        else
+            m_file_size = fmeta.bytes;
+        end
+        
+        if status || (m_file_size ~= file_size)
             fprintf(1,'AAAAAAHHHHH!!! fallocate command failed!  Using dd command instead to initialize .tmp file');
             preallocate=sprintf('dd if=/dev/zero of=%s count=1 bs=1 seek=%i',temp_file,file_size-1);
             system(preallocate)
