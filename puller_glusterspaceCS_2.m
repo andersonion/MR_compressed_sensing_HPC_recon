@@ -1,6 +1,8 @@
 function puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
-
+% puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
 % mode: 1 -> pull fid, 2 -> pull procpar, 3 -> pull both.
+% This function name is terrible, and only marginally connects to its
+% purpose. -James 20171204
 
 %check arguments
 if nargin<5
@@ -28,13 +30,71 @@ procpar_pull_cmd=['scp omega@' scanner ':' datapath '/procpar ' workpath '/' run
 %if they do exist check filesize
 if (mode == 1) || (mode == 3)
     if ~exist([workpath '/' runno '.fid'],'file')
-        system(fid_pull_cmd);
+        
+        %system(fid_pull_cmd);
+        status = 1;
+        logged=0;
+        
+        [status,~] = system(fid_pull_cmd);
+        %{
+        for tt = 1:50
+            if status
+                [status,~] = system(fid_pull_cmd);
+            else
+                if ~logged
+                    if tt > 1
+                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                        %log_mode = 1;
+                        %yet_another_logger(log_msg,log_mode,log_file);
+                        disp(log_msg)
+                    end
+                    logged=1;
+                end
+            end
+        end
+        %}
+        if status
+            %error_flag=1;
+            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,fid_pull_cmd);
+            disp(log_msg)
+            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+            error_due_to_network_issues
+            %quit
+        end        
     end
 end
 
 if (mode == 2) || (mode == 3)
     if ~exist([workpath '/' runno '.procpar'],'file')
-        system(procpar_pull_cmd);
+        %system(procpar_pull_cmd);
+        status = 1;
+        logged=0;
+        [status,~] = system(procpar_pull_cmd);  
+        %{
+        for tt = 1:50
+            if status
+                [status,~] = system(procpar_pull_cmd);
+            else
+                if ~logged
+                    if tt > 1
+                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                        %log_mode = 1;
+                        %yet_another_logger(log_msg,log_mode,log_file);
+                        disp(log_msg)
+                    end
+                    logged=1;
+                end
+            end
+        end
+        %}
+        if status
+            %error_flag=1;
+            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,procpar_pull_cmd);
+            disp(log_msg)
+            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+            error_due_to_network_issues
+            %quit
+        end     
     end
 end
 
