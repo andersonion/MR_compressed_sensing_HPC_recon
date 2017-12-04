@@ -16,16 +16,47 @@ if exist('remote_machine','var')
     if ~exist(sprintf('/home/%s/.ssh/id_rsa.pub',getenv('USER')),'file')
         system('ssh-keygen -q');
     end
-
-    [~,~]=system(['ssh-copy-id omega@' remote_machine]);
+    
     remote_cmd = ['ssh omega@' remote_machine ' ' main_cmd];
 
 else
     remote_cmd = main_cmd;
 end
 
+[status,file_size_in_bytes] = system(remote_cmd);
 
-[~,file_size_in_bytes] = system(remote_cmd);
+if exist('remote_machine','var')
+        logged=0;
+        [status,file_size_in_bytes] = system(remote_cmd);
+        %{
+        %James commented this out becuase it wasnt working, well one of these multi-ssh calls wasnt, and this is the first try.
+        for tt = 1:50
+            if status
+                [status,file_size_in_bytes] = system(remote_cmd);
+            else
+                if ~logged
+                    if tt > 1
+                        log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                        disp(log_msg)
+                        %log_mode = 1;
+                        %yet_another_logger(log_msg,log_mode,log_file);
+                    end
+                    logged=1;
+                end
+            end
+        end
+        
+        if status
+            %error_flag=1;
+            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+            disp(log_msg)
+            error_due_to_network_issues
+            %quit
+        end
+        %}
+end
+
 
 file_size_in_bytes = strtrim(file_size_in_bytes);
 if isstrprop(file_size_in_bytes,'digit')
