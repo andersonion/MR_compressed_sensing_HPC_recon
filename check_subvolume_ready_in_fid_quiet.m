@@ -22,7 +22,9 @@ test=opt_s.test;
 if test
     for_locals_only=1; % This can run locally just as well, though it is designed for remote deployment (when scanner is specified).
     if ~exist('scanner','var')
-        scanner='kamy';
+        scanner_name='kamy';
+        aa=load_scanner_dependency(scanner_name);
+        scanner=aa.scanner_host_name;   
     end
 
     if ~exist('user','var')
@@ -50,7 +52,34 @@ if for_locals_only
 else
     % runs header scrape command remotely.
     ssh_grab=sprintf('ssh %s@%s "%s"',user,scanner,header_grab);
-    [~,ready_1]=system(ssh_grab); %run remotely
+    [status,ready_1]=system(ssh_grab); %run remotely
+    logged=0;
+    %{
+    for tt = 2:5
+        if status
+            [status,ready_1]=system(ssh_grab); %run remotely
+        else
+            if ~logged
+                if tt > 1
+                    log_msg = sprintf('NOTE: Potential network issues encountered: it has taken %i tries to get a successful response from %s.\n',tt,scanner);
+                    %log_mode = 1;
+                    %yet_another_logger(log_msg,log_mode,log_file);
+                    disp(log_msg);
+                end
+                logged=1;
+            end
+        end
+    end
+    
+    if status
+        %error_flag=1;
+        log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
+        %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+        disp(log_msg)
+        error_due_to_network_issues
+        %quit
+    end
+    %}
 end
 
 %ready_1=str2double(ready_1(1));
