@@ -8,13 +8,15 @@ function [slices_remaining, slices_completed, full_header ] = read_header_of_CSt
 %    header_size = dims(1); 
 %end
 quick_check=0;
-if iscell(header_size_or_quick_check)
-    quick_check=header_size_or_quick_check{2};
-    if ~isempty(header_size_or_quick_check{1})
-        header_size=header_size_or_quick_check{1};
+if exist('header_size_or_quick_check','var')
+    if iscell(header_size_or_quick_check)
+        quick_check=header_size_or_quick_check{2};
+        if ~isempty(header_size_or_quick_check{1})
+            header_size=header_size_or_quick_check{1};
+        end
+    else
+        header_size=header_size_or_quick_check;
     end
-else
-    header_size=header_size_or_quick_check;
 end
 
 fid=fopen(temp_file,'r');
@@ -32,7 +34,7 @@ if (header_size == 0)
     header_size = fread(fid,1,'uint16');
     if (header_size == 0)
         fclose(fid);
-        % Why not just use the "error" function instead of a fprintf and a
+        % Why not just use the "error" function insteexad of a fprintf and a
         % broken status?
         fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
         status=this_undefined_variable_will_return_a_goddamn_error_code;
