@@ -1,7 +1,5 @@
 function process_headfile_CS(reconmat_file,partial_headfile,procpar_path,recon_type )
 
-
-
 %{
 if exist('procpar_path','var')
 
@@ -18,21 +16,16 @@ end
 %procpar = readprocparCS(procpar_path);
 load(reconmat_file);
 
-
 % DTI volume-specific header data
 partial_info = read_headfile(partial_headfile,true);
-
 if exist(procpar_path,'file')
     [p,~,~]=fileparts(procpar_path);
     cmd = sprintf('ln -s %s %s/procpar',procpar_path,p);
     system(cmd);
-    
-    
     a_file = sprintf('%s/agilent.headfile',p);
     if ~exist(a_file,'file') 
         dump_cmd = sprintf('dumpHeader -o %s %s',partial_info.U_scanner,p);
         system(dump_cmd)
-        
     else
         size_test_cmd = sprintf('wc -c %s | cut -d '' '' -f1',a_file);
         [~,size_test]=system(size_test_cmd);
@@ -40,16 +33,13 @@ if exist(procpar_path,'file')
         	dump_cmd = sprintf('dumpHeader -o %s %s',partial_info.U_scanner,p);
             system(dump_cmd)
         end
-        
     end
-    
-    
+        
     procpar = read_headfile(a_file,true);
     output_headfile = combine_struct(procpar,partial_info);
     %output_headfile.state = output_headfile.U_state;
     %output_headfile.bw = procpar.sw/2;
-    
-    
+        
     if ~exist('recon_type','var')
         recon_type = 'cluster_matlab';
     end
