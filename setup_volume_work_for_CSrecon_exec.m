@@ -17,46 +17,37 @@ load(variables_file);
 
 log_file=volume_log_file;
 log_mode=1;
-
 %recon_file = variables.recon_file;
 %procpar_path = variables.procparpath;
 %outpath = variables.outpath;
 %scale_file = variables.scale_file;
 %target_machine = variables.target_machine;
-
 if ~exist('TVWeight','var')
     TVWeight = 0.0012;
 end
-
 if ~exist('xfmWeight','var')
     xfmWeight = 0.006;
 end
-
 if ~exist('Itnlim','var')
     Itnlim = 98;
 end
-
 if ~exist('wavelet_dims','var')
     wavelet_dims = [12 12]; % check this default
 end
-
 if ~exist('wavelet_type','var')
     wavelet_type = 'Daubechies';
 end
-
 
 %% Load data
 load(recon_file);
 
 % mask should already be processed -- one  of the very first things done!
-
 %if ~exist('procpar_path','file')
 %    procpar_path = ;
 %end
 %mask = skipint2skiptable(procpar_path); %sampling mask
 
 volume_number=str2double(volume_number);
-
 
 %% Immediately check to see if we still need to set up the work (a la volume manager)
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno);
@@ -67,18 +58,24 @@ if ~isdeployed
    starting_point = 2; 
 end
 if (starting_point == 2)
-
-    
-    work_subfolder = [workdir '/work/'];
-    
-    workspace_file = [work_subfolder '/' volume_runno '_workspace.mat'];
+    work_subfolder = fullfile(workdir,'work');
+    %%% mkdir pulled into here from check_status
+    if ~exist(work_subfolder,'dir')
+        system(['mkdir -m 775 ' work_subfolder]);
+    end
+    %%% mkdir pulled into here from check status, 
+    %%% This images mkdir should probably happen some where else.
+    images_dir = fullfile(workdir,[volume_runno 'images']);
+    if ~exist(images_dir,'dir')
+        system(['mkdir -m 775 ' images_dir]);
+    end
+    workspace_file = fullfile(work_subfolder,[volume_runno '_workspace.mat']);
     try
         dummy_mf = matfile(workspace_file,'Writable',false);
         tmp_param = dummy_mf.param;
     catch
         make_workspace =1;
     end
-    
     temp_file = [work_subfolder '/' volume_runno '.tmp'];
     if ~exist(temp_file,'file')
         make_tmp = 1;
@@ -120,12 +117,9 @@ if (make_workspace)
     log_msg =sprintf('Volume %s: Fourier transform along fully sampled dimension completed in %0.2f seconds.\n',volume_runno,fft_time);
     yet_another_logger(log_msg,log_mode,log_file);
     
-    
     %% Calculate group scaling from first b0 image
     if (~exist(scale_file,'file') && (volume_number==1))
-        
         [scaling, scaling_time] = calculate_CS_scaling(original_mask,data,original_pdf,original_dims(1));
-        
         %{
             tic
             current_slice=zeros([size(mask0)],'like',current_data);
@@ -155,12 +149,10 @@ if (make_workspace)
     
     
     %% Prep data for reconstruction
-    
     % Calculate scaling
     if (exist('scaling','var') && (volume_number == 1) && ~(sum((recon_dims - original_dims))))
         volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling; % We've already done the heavy lifting for this calculation, if array size doesn't change.
     else
-        
         tic
         current_slice=zeros([size(mask)],'like',data);
         qq=zeros([1 recon_dims(1)]);
@@ -181,7 +173,6 @@ if (make_workspace)
         log_msg =sprintf('Volume %s: volume scaling calculated in %0.2f seconds.\n',volume_runno,optimized_for_memory_time);
         yet_another_logger(log_msg,log_mode,log_file);
     end
-    
     
     % scale data such that the maximum image pixel in zf-w/dc is around 1
     % this way, we can use similar lambda for different problems
