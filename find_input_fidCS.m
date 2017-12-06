@@ -16,8 +16,8 @@ if exist(local_fid,'file')
     input_fid = local_fid;
     local_or_streaming_or_static = 1;
 else
-    datapath=['/home/mrraw/' study '/' agilent_series '.fid/fid'];
-    current_fid_size=get_remote_filesize(datapath,scanner);
+    finished_acq_path=['/home/mrraw/' study '/' agilent_series '.fid/fid'];
+    current_fid_size=get_remote_filesize(finished_acq_path,scanner);% check final destination
     
     if (current_fid_size == 0)
         find_file_cmd=['ssh ' user '@' scanner ' "ls -tr /home/vnmr1/vnmrsys/exp*/acqfil/fid | tail -n1"'];
@@ -34,7 +34,7 @@ else
         input_fid=latest_fid;
         local_or_streaming_or_static = 2;
     else
-        input_fid=datapath;
+        input_fid=finished_acq_path;
     end
     
 end
