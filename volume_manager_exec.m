@@ -243,14 +243,11 @@ end
 log_mode = 1;
 %log_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
 yet_another_logger(log_msg,log_mode,log_file);
-
-
 % Initialize a log file if it doesn't exist yet.
 volume_log_file = [workdir '/' volume_runno '.recon_log'];
 if ~exist(volume_log_file,'file')
     system(['touch ' volume_log_file]);
 end
-
 
 work_subfolder = [workdir '/work/'];
 variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
@@ -498,7 +495,6 @@ else
     if (starting_point <= 3)
         volume_variable_file = [work_subfolder volume_runno '_workspace.mat'];
         % Schedule slice jobs
-        
         if ~exist('variables_file','var')
             variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
         end
@@ -556,13 +552,10 @@ else
         else
             slices_to_process = 1:1:original_dims(1);
         end
-        
-        
+                
         zero_width = ceil(log10((original_dims(1)+1)));
-        
         num_chunks = ceil(length(slices_to_process)/chunk_size);
-        
-        
+                
         log_msg =sprintf('Volume %s: Number of chunks (independent jobs): %i.\n',volume_runno,num_chunks);
         yet_another_logger(log_msg,log_mode,log_file);
         
@@ -576,7 +569,6 @@ else
             slices_to_process = [slices_to_process NaN];
             temp_size = size(slices_to_process);
         end
-        
         slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
         
         for slice = slices_to_process
