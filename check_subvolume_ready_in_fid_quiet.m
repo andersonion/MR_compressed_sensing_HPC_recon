@@ -39,34 +39,44 @@ else
         end
      end
 end
-
-
 header_size=32; %agilent file headers are always 32 bytes big.
-
 byte_position = header_size+bbytes*(volume_number-1)+4;
-header_grab = [ 'tail -q -c +' num2str(byte_position) ' ' input_fid ' | head -c 1 | xxd -b - | tail -c +17 | head -c 1' ];
 
+header_grab = [ 'tail -q -c +' num2str(byte_position) ' ' input_fid ' | head -c 1 | xxd -b - | tail -c +17 | head -c 1' ];
 if for_locals_only 
     % runs header scrape command locally
     [~,ready_1] = system(header_grab);
 else
-    % runs header scrape command remotely.
-    ssh_grab=sprintf('ssh %s@%s "%s"',user,scanner,header_grab);
-    [status,ready_1]=system(ssh_grab); %run remotely
-    logged=0;
-    if status
-        %error_flag=1;
-        log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
-        %yet_another_logger(log_msg,log_mode,log_file,error_flag);
+    % Remote run routinely fails!, probably due to the compilcated nature
+    % of stringing 5 commands together. 
+    % Easiest solution is to dump that to a script, send the script, and
+    % run the script remotely. 
+    scrname=sprintf('get_vol_%i_status.sh',volume_number);
+    scr_f=fullfile('/tmp',scrname);
+    %% scp and run
+    fileID = fopen(scr_f,'w');
+    if fileID == -1
+        log_msg=sprintf('Failure to open /tmp script %s for writing',scr_f);
         disp(log_msg)
         error_due_to_network_issues
-        %quit
     end
+    fprintf(fileID, '#!/bin/bash\n');
+    fprintf(fileID, '%s\n',header_grab);
+    fprintf(fileID, 'rm $0');% WARNING.... This will remove the script on run. Might be bad idea.
+    fclose(fileID);
+    system(sprintf('chmod u+x %s',scr_f));
+    % runs header scrape command remotely.
+    % ssh_grab=sprintf('ssh %s@%s "%s"',user,scanner,header_grab);
+    % scps minimalist script, and runs it, removes local copy
+    ssh_grab=sprintf(['scp -q %s %s@%s:~/ ' ...
+        '&& ssh %s@%s "~/%s" '...
+        '&& rm %s'],...
+        scr_f,user,scanner,...
+        user,scanner,scrname,...
+        scr_f);
+    [~,ready_1]=ssh_call(ssh_grab); %run remotely
 end
-
-%ready_1=str2double(ready_1(1));
-ready_1=str2num(ready_1(1));
-
+ready_1=str2num(ready_1(1)); % was str2double, but str2num does a better job failing when given text.
 %if isnumeric(ready_1)
 if ~isempty(ready_1)
     ready= ready_1;
