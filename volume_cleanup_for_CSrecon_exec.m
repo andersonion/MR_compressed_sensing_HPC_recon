@@ -154,9 +154,11 @@ fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
 minimal_memory=getenv('CS_minimize_memory')
 if isempty(minimal_memory)
-    minimal_memory=1;
+    minimal_memory=0;
 end
 if minimal_memory
+    log_msg =sprintf('%s operating in minimal memory mode',mfilename);
+    yet_another_logger(log_msg,log_mode,log_file);
     %double_down=1
     %if double_down
     lil_dummy = zeros([1,1],'double');
