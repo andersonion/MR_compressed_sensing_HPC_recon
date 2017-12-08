@@ -1,4 +1,5 @@
 %compile me
+function compile_command_cleanup
 script_name = 'volume_cleanup_for_CSrecon';
 
 setenv('CS_VOLUME_CLEANUP_EXEC','')
@@ -51,8 +52,7 @@ source_file = [source_dir source_filename]
 
 include_string =[];
 %include_files = {'/cm/shared/workstation_code_dev/shared/civm_matlab_common_utils/write_archive_tag_nodev.m'};
-include_files = {};
-
+include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/read_header_of_CStmp_file.m'};
 for ff = 1:length(include_files)
     include_string = [include_string ' -a ' include_files{ff} ' '];
     %system(cp_cmd);
