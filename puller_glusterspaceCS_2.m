@@ -25,33 +25,11 @@ procpar_pull_cmd=['scp omega@' scanner ':' datapath '/procpar ' workpath '/' run
 %if they do exist check filesize
 if (mode == 1) || (mode == 3)
     if ~exist([workpath '/' runno '.fid'],'file')
-        %system(fid_pull_cmd);
-        status = 1;
-        logged=0;
-        [status,~] = system(fid_pull_cmd);
-        if status
-            %error_flag=1;
-            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,fid_pull_cmd);
-            disp(log_msg)
-            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
-            error_due_to_network_issues
-            %quit
-        end
+        ssh_call(fid_pull_cmd);
     end
 end
 if (mode == 2) || (mode == 3)
     if ~exist([workpath '/' runno '.procpar'],'file')
-        %system(procpar_pull_cmd);
-        status = 1;
-        logged=0;
-        [status,~] = system(procpar_pull_cmd);
-        if status
-            %error_flag=1;
-            log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\ncmd = %s\n',scanner,procpar_pull_cmd);
-            disp(log_msg)
-            %yet_another_logger(log_msg,log_mode,log_file,error_flag);
-            error_due_to_network_issues
-            %quit
-        end
+        ssh_call(procpar_pull_cmd);
     end
 end
