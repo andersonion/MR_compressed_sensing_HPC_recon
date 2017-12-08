@@ -16,17 +16,7 @@ if exist('remote_machine','var')
 else
     remote_cmd = main_cmd;
 end
-
-[status,file_size_in_bytes] = system(remote_cmd);
-if status
-    %error_flag=1;
-    log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
-    %yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    disp(log_msg)
-    error_due_to_network_issues
-    %quit
-end
-
+[~,file_size_in_bytes]=ssh_call(remote_cmd);
 file_size_in_bytes = strtrim(file_size_in_bytes);
 if isstrprop(file_size_in_bytes,'digit')
     file_size_in_bytes = str2double(file_size_in_bytes);
