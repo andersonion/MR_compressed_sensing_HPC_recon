@@ -1,5 +1,5 @@
-function write_or_compare_fid_tag(input_fid,local_fidpath,scanner,user)
-
+function write_fid_tag(input_fid,local_fidpath,scanner,user)
+exit;
 for_locals_only=1; % This can run locally just as well, though it is designed for remote deployment (when scanner is specified).
 
 
