@@ -15,6 +15,7 @@ else
     finished_acq_path=['/home/mrraw/' study '/' agilent_series '.fid/fid'];
     current_fid_size=get_remote_filesize(finished_acq_path,scanner);% check final destination
     if (current_fid_size == 0)
+        local_or_streaming_or_static = 2;
         % I think using tail in ssh call is generating bogus status codes.
         % Will approximate this behavior inside matlab by taking last item.
         find_file_cmd=['ssh ' user '@' scanner ' "ls -tr /home/vnmr1/vnmrsys/exp*/acqfil/fid | tail -n1"'];
@@ -29,7 +30,6 @@ else
         [~,inprogress_fids]=ssh_call(inprogress_fid_cmd);
         inprogress_fids=strsplit(inprogress_fids);
         input_fid=inprogress_fids{end-1};
-        local_or_streaming_or_static = 2;
         %}
         %{
         find_file_cmd=['ssh ' user '@' scanner ' "$(find  /home/vnmr1/vnmrsys/ -type d -maxdepth 1 -name \"exp*\") | tail -n1"'];
