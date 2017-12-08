@@ -1,4 +1,5 @@
 %compile me
+function compile_command_slicewise_recon
 script_name = 'slicewise_CSrecon';
 
 

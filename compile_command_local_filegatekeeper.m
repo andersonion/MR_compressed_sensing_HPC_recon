@@ -1,4 +1,5 @@
 %compile me
+function compile_command_local_filegatekeeper
 script_name = 'local_file_gatekeeper';
 
 

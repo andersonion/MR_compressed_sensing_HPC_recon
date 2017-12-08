@@ -1,4 +1,5 @@
 %compile me
+function compile_command_gui_test
 script_name = 'gui_test';
 
 

@@ -1,4 +1,5 @@
 %compile me
+function compile_command_fid_splitter
 script_name = 'fid_splitter';
 
 

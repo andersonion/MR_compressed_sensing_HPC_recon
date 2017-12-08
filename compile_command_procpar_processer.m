@@ -1,4 +1,5 @@
 %compile me
+function compile_command_procpar_processor
 script_name = 'process_headfile_CS';
 
 

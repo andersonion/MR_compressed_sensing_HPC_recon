@@ -1,4 +1,5 @@
 %compile me
+function compile_command_volume_manager
 script_name = 'volume_manager';
 
 setenv('CS_VOLUME_MANAGER_EXEC','')
@@ -47,7 +48,9 @@ source_filename = ['volume_manager_exec' v_string '.m'];
 source_file = [source_dir source_filename]
 
 include_string =[];
-include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/read_header_of_CStmp_file.m'};
+include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/read_header_of_CStmp_file.m'
+  '/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/ssh_call.m'
+  };
 
 for ff = 1:length(include_files)
     include_string = [include_string ' -a ' include_files{ff} ' '];

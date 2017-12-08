@@ -1,4 +1,5 @@
 %compile me
+function compile_command_gatekeeper
 script_name = 'gatekeeper';
 
 
