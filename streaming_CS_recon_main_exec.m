@@ -43,15 +43,18 @@ end
 %  May change this to look to environment variables, or a seperate
 %  head/textfile, which will give us dynamic flexibility if our goal is
 %  have end-to-end deployability.
-
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-
 % Gatekeeper support
 gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC');
+% set an env var to get latest dev code, or will defacto run stable. 
+CS_CODE_DEV=getenv('CS_CODE_DEV');
+if isempty(CS_CODE_DEV)
+    CS_CODE_DEV='stable';
+end
 if isempty(gatekeeper_exec)
     %gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/20171004_1111/run_gatekeeper_exec.sh';
     %gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/stable/run_gatekeeper_exec.sh';
-    gatekeeper_exec = '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/latest/run_gatekeeper_exec.sh';
+    gatekeeper_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/' CS_CODE_DEV '/run_gatekeeper_exec.sh'] ;
     setenv('CS_GATEKEEPER_EXEC',gatekeeper_exec);
 end
 
@@ -69,7 +72,7 @@ end
 fid_splitter_exec = getenv('CS_FID_SPLITTER_EXEC');
 if isempty(fid_splitter_exec)
     %fid_splitter_exec = '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/20171026_1718/run_fid_splitter_exec.sh';   
-    fid_splitter_exec = '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/latest/run_fid_splitter_exec.sh';
+    fid_splitter_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/' CS_CODE_DEV '/run_fid_splitter_exec.sh' ];
 
     setenv('CS_FID_SPLITTER_EXEC',fid_splitter_exec);
 end
@@ -79,38 +82,25 @@ if isempty(volume_manager_exec)
     %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_1013/run_volume_manager_exec.sh';
     %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171023_1647//run_volume_manager_exec.sh'; % Sills version
     %volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171031_1006/run_volume_manager_exec.sh'; % Sills version
-    volume_manager_exec = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/latest/run_volume_manager_exec.sh';
-
+    volume_manager_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' CS_CODE_DEV '/run_volume_manager_exec.sh'];
     setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec);
 end
-
-
-
 %% Current defaults--option handling will be upgraded shortly
 if ~exist('target_machine','var')
     target_machine = 'delos';
 end
-
 if ~exist('fermi_filter','var')
     fermi_filter=1; %Changing the fermi_filter default to ON
 end
-
-
 if ~exist('chunk_size','var')
     chunk_size=6; % 25 November 2016, temporarily (?) changed to 6
 end
-
 if ~exist('CS_recon_params','var')
     CS_recon_params=''; % Added 23 December 2016 or otherwise default values won't work. --BJA
 end
-
-
 %%  Option Handling (goes here)
-
 options = struct;% options_handler(varargin{:}); % Check name and syntax later.
-
 % James, here are the OPTIONS (thus far):
-
 % target_machine (string)
 % fermi_filter (boolean)
 % fermi_w1 (float)
@@ -147,7 +137,6 @@ if options.verbose
     log_mode = 1; % Log to file and standard out/error.
 end
 
-
 if ~ischar(agilent_series)
     agilent_series = num2str(agilent_series);
     if length(agilent_series) < 2
@@ -180,15 +169,11 @@ if ~exist(workdir,'dir');
     mkdir_cmd = sprintf('mkdir -m 777 %s',workdir);
     system(mkdir_cmd);
 end
-
-
 % Initialize a log file if it doesn't exist yet.
 log_file = [workdir '/' runno '.recon_log'];
 if ~exist(log_file,'file')
     system(['touch ' log_file]);
 end
-
-
 % Write initialization info to log file.
 ts=fix(clock);
 t=datetime(ts(1:3));
@@ -219,8 +204,7 @@ if ~exist(study_flag,'file')
     %% Second First things first: determine number of volumes to be reconned
     
     local_hdr = [workdir runno '_hdr.fid'];
-    
-    
+        
     %{
     [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
     
@@ -247,11 +231,8 @@ if ~exist(study_flag,'file')
             get_hdr_from_fid(input_fid,local_hdr,scanner);
         end
     end
-    
     [npoints,nblocks,ntraces,bitdepth,bbytes,~,~] = load_fid_hdr_details(local_hdr);
-    
     dim_x = round(npoints/2);
-    
     procpar_file = [workdir runno '.procpar'];
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
@@ -274,7 +255,6 @@ if ~exist(study_flag,'file')
                         error_due_to_network_issues
                         %quit
                     end
-
                     
                     %[~,available_tables]=system(pull_table_cmd);
                     
@@ -299,19 +279,12 @@ if ~exist(study_flag,'file')
             puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
         end
     end
-    
-    
-    
+        
     %% Might as well process skiptable/mask while we're here
-    
     [dim_y, dim_z, n_sampled_lines,sampling_fraction,mask,CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims] = process_CS_mask(procpar_or_CStable,dim_x);
-    
-    
+        
     %%
-    
-    
     nechoes = 1;
-    
     if (nblocks == 1)
         nechoes = round(ntraces/n_sampled_lines); % Shouldn't need to round...just being safe.
         n_volumes = nechoes;
@@ -343,8 +316,6 @@ if ~exist(study_flag,'file')
     
     num_unreconned = length(unreconned_volumes); % For reporting purposes
     num_reconned = length(reconned_volumes); % For reporting purposes
-    
-    
     %% Let the user know the status of the recon.
     s_string = 's';
     if (n_volumes == 1)
@@ -358,12 +329,9 @@ if ~exist(study_flag,'file')
         log_msg =sprintf('%i of %i volume%s have not been fully reconstructed yet; proceeding to look for prerequisite input data.\n',num_unreconned,n_volumes,s_string);
         yet_another_logger(log_msg,log_mode,log_file);
     end
-   
-    
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
         running_jobs = '';
-        
         
         m = matfile(recon_file,'Writable',true);
         m.study_workdir = workdir;
@@ -428,20 +396,14 @@ if ~exist(study_flag,'file')
         OuterIt = 1;
         m.OuterIt = OuterIt;
         
-        
-        
         m.fermi_filter=fermi_filter;
-       
-
         
         if exist('email_addresses','var')
             m.email_addresses = email_addresses;
         end    
         
-        
         % For single-block fids, wait for completion and then slice as
         % necessary.
-        
         if (nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
             if ~exist('local_or_streaming_or_static','var')
                 [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
@@ -541,13 +503,20 @@ if ~exist(study_flag,'file')
             volume_dir = [ workdir volume_runno '/'];
             if ~exist(volume_dir,'dir')
                 system(['mkdir -m 775 ' volume_dir]);
-            end
-            
-            vol_sbatch_dir = [volume_dir 'sbatch'];
-            if ~exist(vol_sbatch_dir,'dir')
+                vol_sbatch_dir = [volume_dir 'sbatch'];
+                %if ~exist(vol_sbatch_dir,'dir')
                 system(['mkdir -m 775 ' vol_sbatch_dir]);
+                %end
+                %%% mkdir commands pulled into here from check status,
+                images_dir = fullfile(volume_dir,[volume_runno 'images']);
+                %if ~exist(images_dir,'dir')
+                system(['mkdir -m 775 ' images_dir]);
+                %end
+                work_subfolder = fullfile(volume_dir,'work');
+                %if ~exist(work_subfolder,'dir')
+                system(['mkdir -m 775 ' work_subfolder]);
+                %end
             end
-            
             
             vm_slurm_options=struct;
             vm_slurm_options.v=''; % verbose
@@ -574,18 +543,12 @@ if ~exist(study_flag,'file')
             log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
         end
-        
-        
     end
-        
-  
     %% Pull fid and procpar, load reconstruction parameter data
     % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,study,series,recon_path);
 %    reconfile = agilent2glusterspaceCS(scanner,runno,study,series,recon_path);
     
 %    load(reconfile)
-
-    
 end % This 'end' belongs to the study_flag check
 end
 
@@ -642,7 +605,5 @@ function [dim_y, dim_z, n_sampled_lines,sampling_fraction,mask,CSpdf,phmask,reco
 
     phmask = zpad(hamming(32)*hamming(32)',recon_dims(2),recon_dims(3)); %mask to grab center frequency
     phmask = phmask/max(phmask(:));			 %for low-order phase estimation and correction
-    
-    
-    
+
 end
