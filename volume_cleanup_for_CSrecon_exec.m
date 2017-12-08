@@ -10,7 +10,7 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable
 % assumed that the QSM requires unfiltered data.  Bake it in now will not
 % require recompilation later if we need this option.
 misguided_status_code = 0;
-if ~isdeployed
+if ~isdeployed && (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
     volume_variable_file = '/nas4/bj/N55024.work//N55024_m00///work/N55024_m00_setup_variables.mat';
     %volume_scale = 1.4493;
     %addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
@@ -119,7 +119,6 @@ if ~temp_file_error %exist('temp_file','var') && exist(temp_file,'file')
     [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(temp_file);
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
-        Itnlim = 98; % For prototyping purposes only!
         unreconned_slices = length(find(tmp_header<Itnlim));
     end
     if  (unreconned_slices > 0)
