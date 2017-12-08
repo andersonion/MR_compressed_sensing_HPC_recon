@@ -57,29 +57,20 @@ if (active_reservation)
 end
 
 %% Executables support
-
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-
-%
 gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
-
 gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(gatekeeper_queue)
     gatekeeper_queue = 'slow_master';%'high_priority';
 end
-
-
 cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
 if isempty(cs_full_volume_queue)
     cs_full_volume_queue = 'high_priority';
 end
-
 cs_recon_queue = getenv('CS_RECON_QUEUE');
 if isempty(cs_recon_queue)
     cs_recon_queue = 'matlab';
 end
-
-%
 volume_manager_exec_path = getenv('CS_VOLUME_MANAGER_EXEC'); % Error check for isempty?
 
 if isempty(volume_manager_exec_path) % Temporary fix.
@@ -87,7 +78,11 @@ if isempty(volume_manager_exec_path) % Temporary fix.
     %volume_manager_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_0904/run_volume_manager_exec.sh';
     setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec_path);
 end
-
+% set an env var to get latest dev code, or will defacto run stable. 
+CS_CODE_DEV=getenv('CS_CODE_DEV');
+if isempty(CS_CODE_DEV)
+    CS_CODE_DEV='stable';
+end
 %
 volume_setup_exec_path = getenv('CS_VOLUME_SETUP_EXEC'); % Error check for isempty?
 
@@ -95,7 +90,7 @@ if isempty(volume_setup_exec_path)
     %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171026_1816/run_setup_volume_work_for_CSrecon_exec.sh';
     %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171030_1349/run_setup_volume_work_for_CSrecon_exec.sh';
     %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/stable/run_setup_volume_work_for_CSrecon_exec.sh';
-    volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/latest/run_setup_volume_work_for_CSrecon_exec.sh';
+    volume_setup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/' CS_CODE_DEV '/run_setup_volume_work_for_CSrecon_exec.sh' ];
     setenv('CS_VOLUME_SETUP_EXEC',volume_setup_exec_path);
 end
 
@@ -105,7 +100,7 @@ slicewise_recon_exec_path = getenv('CS_SLICEWISE_RECON_EXEC'); % Error check for
 if isempty(slicewise_recon_exec_path)
     %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/20171002_1551/run_slicewise_CSrecon_exec.sh';
     %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/stable/run_slicewise_CSrecon_exec.sh';
-    slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/latest/run_slicewise_CSrecon_exec.sh';
+    slicewise_recon_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/' CS_CODE_DEV '/run_slicewise_CSrecon_exec.sh'] ;
     
     setenv('CS_SLICEWISE_RECON_EXEC',slicewise_recon_exec_path);
 end
@@ -114,8 +109,8 @@ volume_cleanup_exec_path = getenv('CS_VOLUME_CLEANUP_EXEC'); % Error check for i
 
 if isempty(volume_cleanup_exec_path)
     %volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/20171005_1536/run_volume_cleanup_for_CSrecon_exec.sh';
-    volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/stable/run_volume_cleanup_for_CSrecon_exec.sh';
-    %volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/latest/run_volume_cleanup_for_CSrecon_exec.sh';
+    %volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/stable/run_volume_cleanup_for_CSrecon_exec.sh'];
+    volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/' CS_CODE_DEV '/run_volume_cleanup_for_CSrecon_exec.sh'];
     setenv('CS_VOLUME_CLEANUP_EXEC',volume_cleanup_exec_path);
 end
 
@@ -124,7 +119,7 @@ procpar_gatekeeper_exec_path = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); % Error che
 if isempty(procpar_gatekeeper_exec_path)
     %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/20171004_1110//run_local_file_gatekeeper_exec.sh';
     %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/stable/run_local_file_gatekeeper_exec.sh';
-    procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/latest/run_local_file_gatekeeper_exec.sh';
+    procpar_gatekeeper_exec_path =['/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/' CS_CODE_DEV '/run_local_file_gatekeeper_exec.sh'];
     
     setenv('CS_PROCPAR_GATEKEEPER_EXEC',procpar_gatekeeper_exec_path);
     
@@ -134,7 +129,7 @@ procpar_cleanup_exec_path = getenv('CS_PROCPAR_CLEANUP_EXEC');
 if isempty(procpar_cleanup_exec_path)
     %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/20171010_1529/run_process_headfile_CS.sh';
     %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/stable/run_process_headfile_CS.sh';
-    procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/latest/run_process_headfile_CS.sh';
+    procpar_cleanup_exec_path=['/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/' CS_CODE_DEV '/run_process_headfile_CS.sh'];
 
     setenv('CS_PROCPAR_CLEANUP_EXEC',procpar_cleanup_exec_path);
 end
@@ -165,7 +160,7 @@ starting_point = 6;
 
 % Check for recon flag
 volume_flag = [workdir '/.' volume_runno '.recon_completed'];
-if ~exist(volume_flag,'file')
+if ~exist(volume_flag,'file')CS_CODE_DEV
     starting_point = 5;
     
     % Check for output images
@@ -361,17 +356,15 @@ if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     quit force
     
 else
-    
     stage_1_running_jobs='';
     stage_2_running_jobs='';
     stage_3_running_jobs='';
     stage_4_running_jobs='';
     stage_5_running_jobs='';
-    
     if (starting_point <= 1)
         [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         volume_fid = [work_subfolder '/' volume_runno '.fid'];
-        
+        user='';
         if (local_or_streaming_or_static == 1)
             fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number);
         else
@@ -389,18 +382,19 @@ else
                 puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
             end
             %}
-            
             if (local_or_streaming_or_static == 1)
                 get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
             else
-                user='omega';
                 get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes,scanner,user);
             end
             
         else
             log_mode = 1;
             error_flag = 1;
-            log_msg =sprintf('Inconsistent source fid for volume %s (%s)! This is not the same source fid as the first volume''s fid. CRITICAL ERROR \n',volume_runno,input_fid);
+            log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid); 
+            log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',log_msg,input_fid,fid_tag_file,volume_number,scanner,user);
+            log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
+            
             yet_another_logger(log_msg,log_mode,log_file,error_flag);
             status=variable_to_force_an_error;
             quit force
