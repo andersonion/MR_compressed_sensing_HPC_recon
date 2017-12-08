@@ -178,8 +178,8 @@ if ~exist(study_flag,'file')
         yet_another_logger(log_msg,log_mode,log_file);
     end
     %}
+    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
     if ~exist(local_hdr,'file');
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         if (local_or_streaming_or_static == 2)
             log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
             yet_another_logger(log_msg,log_mode,log_file);
@@ -195,26 +195,13 @@ if ~exist(study_flag,'file')
     procpar_file = [workdir runno '.procpar'];
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
-        if ~exist('local_or_streaming_or_static','var')
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
-        end
         if (local_or_streaming_or_static == 2)
             tables_in_workdir=dir([workdir '/CS*_*x*_*']);
             if (isempty(tables_in_workdir))
                 if (~options.CS_table)
                     %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
-                    pull_table_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
-                    status = 1;
-                    [status,available_tables]=system(pull_table_cmd);
-                    if status
-                        %error_flag=1;
-                        log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
-                        %yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                        disp(log_msg)
-                        error_due_to_network_issues
-                        %quit
-                    end
-                    %[~,available_tables]=system(pull_table_cmd);
+                    list_cs_tables_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
+                    [~,available_tables]=ssh_call(list_cs_tables_cmd);
                     log_msg = sprintf('Please rerun this code and specify the CS_table to run in streaming mode (otherwise you will need to wait until the entire scan completes).\nAvailable tables:\n%s\n',available_tables);
                     %procpar_or_CStable=[workdir options.CS_table];
                     yet_another_logger(log_msg,log_mode,log_file,1);
