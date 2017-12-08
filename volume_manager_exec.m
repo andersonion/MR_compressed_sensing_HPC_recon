@@ -65,7 +65,7 @@ if isempty(gatekeeper_queue)
 end
 cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
 if isempty(cs_full_volume_queue)
-    cs_full_volume_queue = 'high_priority';
+    cs_full_volume_queue = 'slow_master';%'high_priority'; 
 end
 cs_recon_queue = getenv('CS_RECON_QUEUE');
 if isempty(cs_recon_queue)
