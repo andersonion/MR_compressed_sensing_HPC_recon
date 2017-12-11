@@ -5,7 +5,7 @@ function [slices_remaining, slices_completed, full_header ] = read_header_of_CSt
 %   code of 0->'success;
 
 %if ~exist('header_size','var')
-%    header_size = dims(1); 
+%    header_size = dims(1);
 %end
 quick_check=0;
 if exist('header_size_or_quick_check','var')
@@ -18,13 +18,11 @@ if exist('header_size_or_quick_check','var')
         header_size=header_size_or_quick_check;
     end
 end
-
 fid=fopen(temp_file,'r');
 %work_done=fread(fid,header_size,'double')';
 if ~exist('header_size','var')
     header_size = fread(fid,1,'uint16');  % In version 2 the first 2 bytes (first uint16 element) gives the length of the header.
 end
-
 if (header_size == 0)
     fclose(fid);
     if quick_check == 0
@@ -34,19 +32,15 @@ if (header_size == 0)
     header_size = fread(fid,1,'uint16');
     if (header_size == 0)
         fclose(fid);
-        % Why not just use the "error" function insteexad of a fprintf and a
+        % Why not just use the "error" function instead of a fprintf and a
         % broken status?
         fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
         status=this_undefined_variable_will_return_a_goddamn_error_code;
     end
 end
-
-
-work_done=fread(fid,header_size,'uint16')'; 
-
+work_done=fread(fid,header_size,'uint16')';
 fclose(fid);
 slices_remaining = length(find(~work_done));
 slices_completed = header_size - slices_remaining;
 full_header=work_done;
 end
-
