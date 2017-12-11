@@ -1,4 +1,4 @@
-
+% Paths to add to cs_recon execs prior to compiling. 
 addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);
 addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2']);
 addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2']);
