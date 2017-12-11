@@ -1,6 +1,7 @@
 %compile me
 function compile_dir=compile_command__allpurpose(source_filename,include_files,exec_env_var)
 %% input handle
+[~,source_name]=fileparts(source_filename);
 [~,tok]=regexpi(source_filename,'(.*)(_exec).m', 'match', 'tokens');
 [~,tok2]=regexpi(source_filename,'(.*).m', 'match', 'tokens');
 if ~isempty(tok)
@@ -28,7 +29,8 @@ matlab_execs_dir = fullfile(getenv('WORKSTATION_HOME'),'matlab_execs');
 ts=fix(clock);
 compile_time=sprintf('%04i%02i%02i_%02i%02i%02i',ts(1:5));
 run compile__pathset.m
-this_exec_base_dir=fullfile(matlab_execs_dir,[ script_name '_executable']);
+exec_name=[ script_name '_executable'];
+this_exec_base_dir=fullfile(matlab_execs_dir,exec_name);
 %% prep dir
 compile_dir = fullfile(this_exec_base_dir,compile_time);
 system(['mkdir -m 775 ' compile_dir]);
@@ -52,6 +54,8 @@ system(first_run_cmd);
 %% fix permissions
 permission_fix_cmds = { ...
     sprintf('find %s -type f -exec chmod a+r {} \\; ',compile_dir)
+    sprintf('find %s -type f -name "*.sh" -exec chmod a+x {} \\; ',compile_dir)
+    sprintf('find %s -type f -name "%s" -exec chmod a+x {} \\; ',compile_dir,source_name)
     sprintf('find %s -type f -exec chmod g+w {} \\; ',compile_dir)
     sprintf('find %s -type d -exec chmod a+rx {} \\; ',compile_dir)
     };
