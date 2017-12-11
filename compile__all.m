@@ -1,19 +1,9 @@
 % compile all
-% could find all "compile_* files in here, but didnt bother.
-addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/simulation']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/threshold']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/utils']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/testing_and_prototyping']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/CS_utilities']);
 
-parallel=0;
-
+parallel=1;
 if ~parallel
     % c_commands = ls('compile_command_*');
-    [~,c_commands]= system('find . -name "compile_command_*"')
+    [~,c_commands]= system('find . -name "compile_command_*.m"|grep -v "__"')
     c_commands=strsplit(c_commands);
     for c=1:numel(c_commands)
         if ~isempty({c})
@@ -26,16 +16,17 @@ if ~parallel
         end
     end
 else
-    c_commands = ls('compile_command_*');
+    warning('Background_compile starting! compile logs will be in /tmp/');
+    [~,c_commands]= system('find . -name "compile_command_*.m"|grep -v "__"')
     c_commands=strsplit(c_commands);
-    parfor c=1:numel(c_commands)
+    for c=1:numel(c_commands)
         if ~isempty(c_commands{c})
-            cx=strsplit(c_commands{c},'.');
-            if exist(cx{1},'file')
-                eval(cx{1});
-            end
+            system(sprintf('matlab -nodisplay -nosplash -nodesktop -r "run %s;exit" -logfile /tmp/%s.log & ',c_commands{c},c_commands{c}));
         end
     end
+    fprintf('Run following command to see when background compiles are done\n');
+    fprintf('ps -ef|grep -i matlab |grep %s |grep compile_command\n',getenv('USER'));
+    
 end
 %%
 stop;
