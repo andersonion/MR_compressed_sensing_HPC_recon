@@ -20,8 +20,10 @@ load(reconmat_file);
 partial_info = read_headfile(partial_headfile,true);
 if exist(procpar_path,'file')
     [p,~,~]=fileparts(procpar_path);
-    cmd = sprintf('ln -s %s %s/procpar',procpar_path,p);
-    system(cmd);
+    if ~exist(fullfile(p,'procpar'),'file')
+        cmd = sprintf('ln -s %s %s/procpar',procpar_path,p);
+        system(cmd);
+    end
     a_file = sprintf('%s/agilent.headfile',p);
     if ~exist(a_file,'file') 
         dump_cmd = sprintf('dumpHeader -o %s %s',partial_info.U_scanner,p);
