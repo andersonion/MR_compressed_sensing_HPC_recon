@@ -1,10 +1,10 @@
 % compile all
 
 parallel=1;
+[~,c_commands]= system('find . -name "compile_command_*.m"|grep -v "__"')
+c_commands=strsplit(c_commands);
 if ~parallel
-    % c_commands = ls('compile_command_*');
-    [~,c_commands]= system('find . -name "compile_command_*.m"|grep -v "__"')
-    c_commands=strsplit(c_commands);
+    %% serial run of compile commands in matlab
     for c=1:numel(c_commands)
         if ~isempty({c})
             try
@@ -16,9 +16,8 @@ if ~parallel
         end
     end
 else
+    %% parallel run using shell parllelism, unfortunately doesnt wait for completion yet.
     warning('Background_compile starting! compile logs will be in /tmp/');
-    [~,c_commands]= system('find . -name "compile_command_*.m"|grep -v "__"')
-    c_commands=strsplit(c_commands);
     for c=1:numel(c_commands)
         if ~isempty(c_commands{c})
             system(sprintf('matlab -nodisplay -nosplash -nodesktop -r "run %s;exit" -logfile /tmp/%s.log & ',c_commands{c},c_commands{c}));
@@ -26,7 +25,6 @@ else
     end
     fprintf('Run following command to see when background compiles are done\n');
     fprintf('ps -ef|grep -i matlab |grep %s |grep compile_command\n',getenv('USER'));
-    
 end
 %%
 stop;
