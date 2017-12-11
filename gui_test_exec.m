@@ -1,4 +1,4 @@
-function gui_exec_test( scanner,runno,study,series,target_machine,fermi_filter,CS_recon_params,chunk_size )
+function gui_exec_test( scanner,runno,study,agilent_series,target_machine,fermi_filter,CS_recon_params,chunk_size )
 %GUI_exec_test Testing to see if our gui interface is compatible with a
 %matlab exec function...copied from CS_recon_on_cluster code.
 %   
@@ -45,12 +45,12 @@ if ~exist(recon_path,'dir');
 end
 
 % recon_path = [recon_path '/']; %this may not be necessary, just in case
-if ~ischar(series)
-    series = num2str(series);
-    if length(series) < 2
-        series = ['0' series];
+if ~ischar(agilent_series)
+    agilent_series = num2str(agilent_series);
+    if length(agilent_series) < 2
+        agilent_series = ['0' agilent_series];
     end
-    series = ['ser' series];
+    agilent_series = ['ser' agilent_series];
 end
 
 
@@ -68,7 +68,7 @@ gui_info_collect(databuffer,optstruct);
 
 %% Pull fid and procpar, load reconstruction parameter data
 % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,study,series,recon_path);
-reconfile = agilent2glusterspaceCS(scanner,runno,study,series,recon_path);
+reconfile = agilent2glusterspaceCS(scanner,runno,study,agilent_series,recon_path);
 
 load(reconfile)
 %% Pull CS table (bypass reading it from procpar directly)
