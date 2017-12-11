@@ -1,8 +1,16 @@
 %compile me
-function compile_command__allpurpose(source_filename,include_files,exec_env_var)
+function compile_dir=compile_command__allpurpose(source_filename,include_files,exec_env_var)
 %% input handle
 [~,tok]=regexpi(source_filename,'(.*)(_exec).m', 'match', 'tokens');
-script_name=tok{1}{1};
+[~,tok2]=regexpi(source_filename,'(.*).m', 'match', 'tokens');
+if ~isempty(tok)
+    script_name=tok{1}{1};
+elseif ~isempty(tok2)
+    script_name=tok2{1}{1};
+else
+    error('Please give complete mfilename');
+end
+
 include_string='';
 if exist('include_files','var') && ~isempty(include_files)
     include_string=sprintf(' -a %s',strjoin(include_files,' -a '));
