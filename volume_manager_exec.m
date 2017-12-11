@@ -11,12 +11,12 @@ if ~isdeployed
     base_workdir='/glusterspace/S67710.work/';
 end
 %%% ORIGINAL COMMENT
-% This may seem stupid, but I need to let Matlab know that I'm going need 
+% This may seem stupid, but I need to let Matlab know that I'm going need
 % series to be a variable, and not the builtin function 'series'
 %%%%
 % In fact this is stupid, overloading code generates incredible
 % headaches.The variale has been renamed agilent_series. -James.
-agilent_series=''; 
+agilent_series='';
 workdir=[base_workdir '/' volume_runno '/'];
 % Need to figure out how to pass reconfile, scale_file --> just use recon_file!
 load(recon_file);
@@ -54,7 +54,7 @@ if isempty(gatekeeper_queue)
 end
 cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
 if isempty(cs_full_volume_queue)
-    cs_full_volume_queue = 'slow_master';%'high_priority'; 
+    cs_full_volume_queue = 'slow_master';%'high_priority';
 end
 cs_recon_queue = getenv('CS_RECON_QUEUE');
 if isempty(cs_recon_queue)
@@ -67,7 +67,7 @@ if isempty(volume_manager_exec_path) % Temporary fix.
     %volume_manager_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_0904/run_volume_manager_exec.sh';
     setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec_path);
 end
-% set an env var to get latest dev code, or will defacto run stable. 
+% set an env var to get latest dev code, or will defacto run stable.
 CS_CODE_DEV=getenv('CS_CODE_DEV');
 if isempty(CS_CODE_DEV)
     CS_CODE_DEV='stable';
@@ -214,23 +214,23 @@ local_archive_tag = sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
 
 % Make faux headfile with minimal details (will overwrite later).
 %if ~exist(headfile,'file')
-    bh=struct;
-    bh.dim_X=original_dims(1);
-    bh.dim_Y=original_dims(2);
-    bh.dim_Z=original_dims(3);
-    % TEMPORARY CODE!!
-    %bh.fovx=original_dims(1);
-    %bh.fovy=original_dims(2);
-    %bh.fovz=original_dims(3);
-    % End temp code
-    bh.A_dti_vols=n_volumes;
-    bh.A_channels = 1;
-    bh.A_echoes = nechoes;
-    bh.U_runno = volume_runno;
-    gui_info = read_headfile(fullfile(databuffer.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
-    faux_struct1 = combine_struct(bh,gui_info,'U_');
-    databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
-if ~exist(headfile,'file')   
+bh=struct;
+bh.dim_X=original_dims(1);
+bh.dim_Y=original_dims(2);
+bh.dim_Z=original_dims(3);
+% TEMPORARY CODE!!
+%bh.fovx=original_dims(1);
+%bh.fovy=original_dims(2);
+%bh.fovz=original_dims(3);
+% End temp code
+bh.A_dti_vols=n_volumes;
+bh.A_channels = 1;
+bh.A_echoes = nechoes;
+bh.U_runno = volume_runno;
+gui_info = read_headfile(fullfile(databuffer.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
+faux_struct1 = combine_struct(bh,gui_info,'U_');
+databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
+if ~exist(headfile,'file')
     write_headfile(headfile,databuffer.headfile);
     
     ship_cmd = sprintf('scp %s omega@%s.duhs.duke.edu:/Volumes/%sspace/%s/',headfile,target_machine,target_machine,volume_runno);
@@ -239,10 +239,10 @@ end
 if ~exist(local_archive_tag,'file')
     if ~exist(original_archive_tag,'file')
         write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(3),databuffer.headfile.U_code, ...
-        '.raw',databuffer.headfile.U_civmid,true,images_dir)
+            '.raw',databuffer.headfile.U_civmid,true,images_dir)
     end
     
-    system(sprintf('mv %s %s',original_archive_tag,local_archive_tag)); 
+    system(sprintf('mv %s %s',original_archive_tag,local_archive_tag));
 end
 if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     gk_slurm_options=struct;
@@ -294,7 +294,7 @@ else
             fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number,scanner,user);
         end
         if fid_consistency
-            %{ 
+            %{
             % James commented this out because it was killing streaming CS,
             % when streaming data.
             if ~exist(procpar_file,'file')
@@ -311,7 +311,7 @@ else
         else
             log_mode = 1;
             error_flag = 1;
-            log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid); 
+            log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid);
             log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',log_msg,input_fid,fid_tag_file,volume_number,scanner,user);
             log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
             
@@ -678,7 +678,7 @@ disp('Finished!')
         trashman_cmd = sprintf('if [[ -f "%s" ]]; then\n\tif [[ -d "%s" ]]; then\n\t\techo "Images have been successfully transferred; removing %s now...";\n\t\trm -rf %s;\n\telse\n\t\techo "Work folder %s already appears to have been removed. No action will be taken.";\n\tfi\nelse\n\techo "Images have not been successfully transferred yet; work folder will not be removed at this time.";\nfi', success_flag,work_subfolder,work_subfolder,work_subfolder,work_subfolder );
         dep_string ='';
         if stage_5_running_jobs
-           dep_string = 'afterok-or';
+            dep_string = 'afterok-or';
         end
         batch_file = create_slurm_batch_files(trashman_batch,trashman_cmd, trashman_slurm_options);
         c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_5_running_jobs ,dep_string);
