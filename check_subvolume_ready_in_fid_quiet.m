@@ -16,6 +16,7 @@ end
 % if isstruct(options)
 % options=mat_pipe_opt2cell(options);
 % ends
+
 opt_s=mat_pipe_option_handler(options,types);
 
 test=opt_s.test;
@@ -26,7 +27,6 @@ if test
         aa=load_scanner_dependency(scanner_name);
         scanner=aa.scanner_host_name;   
     end
-
     if ~exist('user','var')
         user='omega';
     end
@@ -39,6 +39,7 @@ else
         end
      end
 end
+
 header_size=32; %agilent file headers are always 32 bytes big.
 byte_position = header_size+bbytes*(volume_number-1)+4;
 
@@ -51,6 +52,8 @@ else
     % of stringing 5 commands together. 
     % Easiest solution is to dump that to a script, send the script, and
     % run the script remotely. 
+    % On more complete investigation, it could be that node network
+    % disconnect issue frustrated this code.
     scrname=sprintf('get_vol_%i_status.sh',volume_number);
     scr_f=fullfile('/tmp',scrname);
     %% scp and run
