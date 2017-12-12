@@ -16,17 +16,8 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  finished.
 %
 if ~isdeployed
-    %addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/utils/');
-    run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
     %% Get all necessary code for reconstruction
-    % addpath('/cm/shared/workstation_code/shared/mathworks/slurm_shared');
-    % addpath('/cm/shared/workstation_code/shared/civm_matlab_common_utils');
-    % addpath('/cm/shared/workstation_code/shared/mathworks/dirrec');
-    % addpath('/cm/shared/workstation_code/recon/mat_recon_pipe/mat_wrappers');
-    % addpath('/cm/shared/workstation_code/shared/mathworks/dlmcell');
-    % addpath('/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/');
-    % addpath('/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/sparseMRI_v0.2');
-    % addpath('/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/Wavelab850');
+    run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
 end
 %% clean up what user said to us.
 % since we have some optional positional args, and legacy behavior,
@@ -122,7 +113,7 @@ end
 if ~options.target_machine
     options.target_machine = 'delos';
 end
-fermi_filter=~options.skip_fermi_filter; % since options are defacto off, this should set inverse.
+options.fermi_filter=~options.skip_fermi_filter; % since options are defacto off, this should set inverse.
 if ~options.chunk_size
     options.chunk_size=6; % 25 November 2016, temporarily (?) changed to 6
 end
@@ -198,7 +189,7 @@ if isempty(volume_manager_exec)
     volume_manager_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' CS_CODE_DEV '/run_volume_manager_exec.sh'];
     setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec);
 end
-%% Input checks
+%% Get workdir
 scratch_drive = getenv('BIGGUS_DISKUS');
 workdir = fullfile(scratch_drive,[runno '.work']);
 if ~exist(workdir,'dir');
@@ -210,7 +201,9 @@ log_file = fullfile(workdir,[ runno '.recon_log']);
 if ~exist(log_file,'file')
     system(['touch ' log_file]);
 end
-% Write initialization info to log file.
+local_fid=fullfile(workdir,[runno '.fid']);
+study_flag = [workdir '/.' runno '.recon_completed'];
+%% Write initialization info to log file.
 ts=fix(clock);
 t=datetime(ts(1:3));
 month_string = month(t,'name');
@@ -225,10 +218,7 @@ log_msg=sprintf('%sScanner study: %s\n',log_msg, study);
 log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
 log_msg=sprintf('%sUser: %s\n',log_msg,user);
 yet_another_logger(log_msg,log_mode,log_file);
-local_fid=fullfile(workdir,[runno '.fid']);
-% input_fid=''; % Initialize input_fid
 % Check to see if a flag_file for complete recon exists
-study_flag = [workdir '/.' runno '.recon_completed'];
 if ~exist(study_flag,'file')
     %% First things first: get specid from user!
     % Create or get one ready.
@@ -332,14 +322,10 @@ if ~exist(study_flag,'file')
     if (m.n_volumes == 1)
         s_string = '';
     end
+    log_msg =sprintf('%i of %i volume%s have fully reconstructed.\n',num_unreconned,m.n_volumes,s_string);
+    yet_another_logger(log_msg,log_mode,log_file);
     if (num_unreconned == 0)
-        log_msg =sprintf('All %i volume%s have been fully reconstructed.\n',m.n_volumes,s_string);
-        yet_another_logger(log_msg,log_mode,log_file);
         return % Will this bust us out of this 'if' statement, or the whole function?
-    else
-        log_msg =sprintf('%i of %i volume%s have not been fully reconstructed yet; ',num_unreconned,m.n_volumes,s_string);
-        log_msg=sprintf('%sproceeding to look for prerequisite input data.\n',log_msg);
-        yet_another_logger(log_msg,log_mode,log_file);
     end
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
@@ -374,19 +360,14 @@ if ~exist(study_flag,'file')
         m.agilent_series = agilent_series;
         m.procpar_file = procpar_file;
         m.log_file = log_file;
-        
         m.options = options; % The following shall soon be cannibalized by options!
-        m.target_machine = options.target_machine;
-        m.chunk_size = options.chunk_size;
-        m.TVWeight = options.TVWeight;
-        m.xfmWeight = options.xfmWeight;
-        m.Itnlim = options.Itnlim;% this should be added via struct combine, but holding off for now.
-        m.OuterIt = options.OuterIt;
-        m.fermi_filter=fermi_filter;
+        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','OuterIt','fermi_filter'};
+        for on=1:numel(transcribed_opts)
+            m.(transcribed_opts{on})=options.(transcribed_opts{on});
+        end
         if ~islogical(options.email_addresses)
             m.email_addresses = options.email_addresses;
         end
-        
         % For single-block fids, wait for completion and then slice as
         % necessary.
         running_jobs = '';
@@ -567,7 +548,6 @@ recon_dims = [original_dims(1) size(mask)];%size(data);
 phmask = zpad(hamming(32)*hamming(32)',recon_dims(2),recon_dims(3)); %mask to grab center frequency
 phmask = phmask/max(phmask(:));			 %for low-order phase estimation and correction
 end
-
 function missing=matfile_missing_vars(mat_file,varlist)
 % function missing=matfile_missing_vars(mat_file,varlist)
 % checks mat file for list of  vars,
