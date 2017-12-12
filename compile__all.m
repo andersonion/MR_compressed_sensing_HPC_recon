@@ -30,9 +30,9 @@ else
     fprintf('%s',list_active_compiles_cmd);
     fprintf('Trying to wait for completion automatically(noramlly takes less than 3 minutes).\n');
     while size(out,2)>2
-        fprintf('.');
+        %fprintf('.');
         pause(5);
-        [s,out]=system(list_active_compiles_cmd);out=strsplit(out,'\n');
+        [s,out]=system(list_active_compiles_cmd);disp(out);out=strsplit(out,'\n');
     end
     fprintf(' Done!\n');
     fprintf('auto-wait seems to have worked!\n');
