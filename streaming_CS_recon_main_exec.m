@@ -64,6 +64,7 @@ types.standard_options={...
     'xfmWeight',            ''
     'TVWeight',             ''
     'OuterIt',              ''
+    'hamming_window',       ' used in the creation of phmask'
     'CS_table',             ' the CS table on the scanner to use. Must be specified in streaming mode.' 
     'first_volume',         ' start reconstructing at volume N, The first volume will also be processed!'
     'last_volume',          ' stop reconstructing at volume N.'
@@ -135,7 +136,9 @@ end
 if ~options.OuterIt
     options.OuterIt = 1;
 end
-
+if ~options.hamming_window
+    options.hamming_window=32;
+end
 %% Reservation support
 active_reservation=getenv('CS_reservation'); % This should work fine, even if CS_reservation is not set.
 if ~islogical(options.CS_reservation)
@@ -288,7 +291,7 @@ if ~exist(study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [m.dim_y,m.dim_z,m.n_sampled_lines,m.sampling_fraction,m.mask,m.CSpdf,m.phmask,m.recon_dims,...
-            m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(procpar_or_CStable,m.dim_x);
+            m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(procpar_or_CStable,m.dim_x,options);
         m.nechoes = 1;
         if (m.nblocks == 1)
             m.nechoes = round(m.ntraces/m.n_sampled_lines); % Shouldn't need to round...just being safe.
@@ -527,7 +530,7 @@ gui_info_collect(databuffer,optstruct);
 m.databuffer = databuffer;
 m.optstruct = optstruct;
 end
-function [dim_y, dim_z, n_sampled_lines,sampling_fraction,mask,CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims]= process_CS_mask(procpar_or_CStable,dim_x)
+function [dim_y, dim_z, n_sampled_lines,sampling_fraction,mask,CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims]= process_CS_mask(procpar_or_CStable,dim_x,options)
 [mask, dim_y, dim_z, pa, pb ] = extract_info_from_CStable(procpar_or_CStable);
 n_sampled_lines=sum(mask(:));
 sampling_fraction = n_sampled_lines/length(mask(:));
@@ -545,7 +548,8 @@ if (p>max(original_dims(2:3)))
     CSpdf = padarray(CSpdf,[p-original_dims(2) p-original_dims(3)]/2,1,'both'); %pad with 1's since we don't want to divide by zero later
 end
 recon_dims = [original_dims(1) size(mask)];%size(data);
-phmask = zpad(hamming(32)*hamming(32)',recon_dims(2),recon_dims(3)); %mask to grab center frequency
+
+phmask = zpad(hamming(options.hamming_window)*hamming(options.hamming_window)',recon_dims(2),recon_dims(3)); %mask to grab center frequency
 phmask = phmask/max(phmask(:));			 %for low-order phase estimation and correction
 end
 function missing=matfile_missing_vars(mat_file,varlist)
