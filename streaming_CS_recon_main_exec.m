@@ -513,8 +513,11 @@ if options.fid_archive && local_or_streaming_or_static==3
         poc='';
         foc='';
     end
-    pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s',poc,scanner,study,agilent_series,runno,foc,user,runno);
+    pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s',poc,scanner,study,agilent_series,runno,foc,user,runno);
     ssh_and_run=sprintf('ssh %s@%s "%s"','omega',options.target_machine,pull_cmd);
+    log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
+    log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);
+    yet_another_logger(log_msg,log_mode,log_file);
     [~,out]=ssh_call(ssh_and_run);
     disp(out);
 elseif options.fid_archive
