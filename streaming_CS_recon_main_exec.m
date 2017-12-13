@@ -71,6 +71,7 @@ types.standard_options={...
     };
 types.beta_options={...
     'CS_reservation',       'specify reservation to run on' 
+    'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
 types.planned_options={...
     'wavelet_dims',         ''
@@ -325,17 +326,13 @@ if ~exist(study_flag,'file')
     if (m.n_volumes == 1)
         s_string = '';
     end
-    log_msg =sprintf('%i of %i volume%s have fully reconstructed.\n',num_unreconned,m.n_volumes,s_string);
+    log_msg =sprintf('%i of %i volume%s have fully reconstructed.\n',m.n_volumes-num_unreconned,m.n_volumes,s_string);
     yet_another_logger(log_msg,log_mode,log_file);
-    if (num_unreconned == 0)
-        return % Will this bust us out of this 'if' statement, or the whole function?
-    end
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
         m.study_workdir = workdir;
         m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
         m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
-        
         %% tangled web of support scanner name ~= host name.
         if ~exist('scanner_host_name','var')
             % What madness is this! Reloading data, Never!...
@@ -506,9 +503,25 @@ if ~exist(study_flag,'file')
     %% Pull fid and procpar, load reconstruction parameter data
     % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,study,series,recon_path);
     %    reconfile = agilent2glusterspaceCS(scanner,runno,study,series,recon_path);
-    
     %    load(reconfile)
 end % This 'end' belongs to the study_flag check
+if options.fid_archive && local_or_streaming_or_static==3
+    if options.overwrite
+        poc='-eor';
+        foc='-o';
+    else
+        poc='';
+        foc='';
+    end
+    pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s',poc,scanner,study,agilent_series,runno,foc,user,runno);
+    ssh_and_run=sprintf('ssh %s@%s "%s"','omega',options.target_machine,pull_cmd);
+    [~,out]=ssh_call(ssh_and_run);
+    disp(out);
+elseif options.fid_archive
+    error('Fid_archive option incomplete for streaming, BJ may be able to fix this ');
+    % NOTE to BJ; we need to schedule this behind a procpar watcher.
+    % -james.
+end
 end
 function m = specid_to_recon_file(scanner,runno,recon_file)
 % holly horrors this function is bad form! 
