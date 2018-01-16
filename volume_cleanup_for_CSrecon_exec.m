@@ -3,7 +3,7 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable
 %   Expected changes include: complex single-precision data stored in the
 %   tmp file instead of double-precision magnitude images.
 %   Decentralized scaling is now handled here instead of during setup
-
+%aa
 % 16 May 2017, BJA: qsm_fermi_filter option is added (default 0) in case we
 % do need the complex data written out a la QSM processing, and decide that
 % we do want the fermi_filtered data instead of the unfiltered data. It is
@@ -11,10 +11,11 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable
 % require recompilation later if we need this option.
 misguided_status_code = 0;
 if ~isdeployed && (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
-    volume_variable_file = '/nas4/bj/N55024.work//N55024_m00///work/N55024_m00_setup_variables.mat';
+    volume_variable_file = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
     %volume_scale = 1.4493;
-    %addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
-    %addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
+    variable_iterations=1;
+    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
+    addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
 end
 load(volume_variable_file);
 %recon_dims(1)=6;
@@ -90,6 +91,20 @@ end
 if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
+
+if continue_recon_enabled % This should be made default.
+        if ~exist('wavelet_dims','var')
+            if exist('waveletDims','var')
+                wavelet_dims = waveletDims;
+            else
+                wavelet_dims = [12 12];
+            end
+        end
+        if ~exist('wavelet_type','var')
+            wavelet_type = 'Daubechies';
+        end
+        XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
+end
 %full_headfile=aux_param2.headfile;
 %struct1=read_headfile(full_headfile,1);
 %{
@@ -119,7 +134,7 @@ if ~temp_file_error %exist('temp_file','var') && exist(temp_file,'file')
     [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(temp_file);
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
-        unreconned_slices = length(find(tmp_header<Itnlim));
+        unreconned_slices = length(find(tmp_header<options.Itnlim));
     end
     if  (unreconned_slices > 0)
         error_flag=1;
@@ -153,9 +168,11 @@ fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
 minimal_memory=getenv('CS_minimize_memory')
 if isempty(minimal_memory)
-    minimal_memory=0;
+    %minimal_memory=0;
+    minimal_memory=1; % Flipping the default switch on 5 January 2018
 end
 if minimal_memory
+    already_fermi_filtered=0;
     log_msg =sprintf('%s operating in minimal memory mode',mfilename);
     yet_another_logger(log_msg,log_mode,log_file);
     %double_down=1
@@ -165,9 +182,35 @@ if minimal_memory
     %   lil_dummy = zeros([1,1],'single');
     %end
     lil_dummy =complex(lil_dummy,lil_dummy);
+    data_out=zeros(original_dims,'like',lil_dummy);
+    bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
+    for ss=1:recon_dims(1)
+       if ~mod(ss,10)      
+         log_msg = sprintf('Processing slice %i...\n',ss);
+         yet_another_logger(log_msg,log_mode,log_file);
+       end
+        data_in=typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
+        data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
+        t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
+        clear data_in;
+        t_data_out = XFM'*t_data_out; 
+        t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+        %% Crop out extra k-space if non-square or non-power of 2, might as well apply fermi filter in k-space, if requested (no QSM requested either)
+        if sum(original_dims == recon_dims) ~= 3
+            t_data_out = fftshift(fftn(fftshift(t_data_out)));
+            final_slice_out = t_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
+                (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2);
+            final_slice_out = fftshift(ifftn(fftshift(final_slice_out)));
+        else
+            final_slice_out=t_data_out;
+        end
+        data_out(ss,:,:)= scaling*final_slice_out;    
+    end
+    fclose(fid);
     
-    c_data_out=zeros(recon_dims,'like',lil_dummy);
-    data_in=typecast(fread(fid,inf,'*uint8'),'double');
+    read_time = toc;
+    log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
+    yet_another_logger(log_msg,log_mode,log_file);
 else
     if ~continue_recon_enabled
         data_in=typecast(fread(fid,inf,'*uint8'),'single');
@@ -177,6 +220,8 @@ else
         data_in=typecast(fread(fid,inf,'*uint8'),'double');
     end
     fclose(fid);
+   
+
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -192,6 +237,9 @@ else
         data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2 recon_dims(1)]);
         c_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
         clear data_in;
+        
+        % The following block was moved up to be a better place.
+        %{
         if ~exist('wavelet_dims','var')
             if exist('waveletDims','var')
                 wavelet_dims = waveletDims;
@@ -203,6 +251,8 @@ else
             wavelet_type = 'Daubechies';
         end
         XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
+        %}
+        
         for ss=1:recon_dims(1)
             c_data_out(:,:,ss) = XFM'*c_data_out(:,:,ss);
         end
@@ -233,8 +283,10 @@ else
     yet_another_logger(log_msg,log_mode,log_file);
     % Permute to final form
     data_out = permute(data_out,[3 1 2 4]);
+    end %?
     % Save complex data for QSM BEFORE the possibility of a fermi filter being
     % applied.
+
     if write_qsm
         qsm_folder = [workdir '/qsm/'];
         if ~exist(qsm_folder,'dir')

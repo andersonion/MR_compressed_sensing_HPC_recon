@@ -1,5 +1,5 @@
 %compile me
-function compile_dir=compile_command__allpurpose(source_filename,include_files,exec_env_var)
+function compile_dir=compile_command__allpurpose_singlethread(source_filename,include_files,exec_env_var)
 %% input handle
 [~,source_name]=fileparts(source_filename);
 [~,tok]=regexpi(source_filename,'(.*)(_exec).m', 'match', 'tokens');
@@ -39,7 +39,6 @@ latest_path_link = fullfile(this_exec_base_dir,'latest');
 % dependney funcitons so we can do a true exec diff.
 [diff_stat,out]=system(sprintf('f1=%s;f2=%s;ls -l $f1 $f2;diff -qs $f1 $f2',source_file,fullfile(latest_path_link,source_filename)));
 if ~diff_stat
-    disp(sprintf('skipping %s',source_filename));
     return;
 else
     disp(out);
@@ -52,7 +51,7 @@ disp('Running mcc, this takes a bit...');
 %-R -singleCompThread 
 eval(['mcc -N -d  ' compile_dir...
    ' -C -m '...
-   ' -R nodisplay -R nosplash -R nojvm '...
+   ' -R -singleCompThread -R nodisplay -R nosplash -R nojvm '...
    ' ' include_string ' '...
    ' ' source_file ';']) 
 %% copy files in so we can do diff check easily(eg check if we need to compile).

@@ -80,7 +80,9 @@ types.planned_options={...
     'fermi_w1',             ''
     'fermi_w2',             ''
     'convergence_threshold',''
+    'keep_work',           ''
     'email_addresses',      ''
+    'verbosity',             ''
     };
 options=mat_pipe_option_handler(varargin,types);
 % A reminder, mat_pipe_option handler exists to do two things. 
@@ -140,6 +142,7 @@ end
 if ~options.hamming_window
     options.hamming_window=32;
 end
+
 %% Reservation support
 active_reservation=getenv('CS_reservation'); % This should work fine, even if CS_reservation is not set.
 if ~islogical(options.CS_reservation)
@@ -361,7 +364,7 @@ if ~exist(study_flag,'file')
         m.procpar_file = procpar_file;
         m.log_file = log_file;
         m.options = options; % The following shall soon be cannibalized by options!
-        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','OuterIt','fermi_filter'};
+        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','OuterIt','fermi_filter','verbosity'};
         for on=1:numel(transcribed_opts)
             m.(transcribed_opts{on})=options.(transcribed_opts{on});
         end

@@ -2,6 +2,7 @@ function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number)
 %CS_RECON_CLUSTER_SETUP_WORK_EXEC An executable MATLAB script for setting
 %up each volume of CS reconstruction in order to avoid saturating the
 %master node (in the context of DTI, with many many volumes to recon.
+   %aa
 %% Update of original version (implied _v1)
 if ~isdeployed
     %{
@@ -167,6 +168,9 @@ if (make_workspace)
     aux_param.CSpdf=CSpdf;
     %aux_param.originalMypdf=mypdf0;
     aux_param.phmask=phmask;
+    if isfield(options,'verbosity')
+        aux_param.verbosity=verbosity;
+    end
     %%
     param = init;
     param.Itnlim = Itnlim;  % Should this be a function of necho?

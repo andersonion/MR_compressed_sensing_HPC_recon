@@ -1,6 +1,6 @@
 function slicewise_CSrecon_exec(matlab_workspace,slice_indices,options_file)
 if ~isdeployed    
-    matlab_workspace ='/glusterspace/S67777t.work/S67777t_m00/work/S67777t_m00_workspace.mat';
+    matlab_workspace ='/nas4/cof/S67960.work/S67960_m023/work/S67960_m023_workspace.mat';
     
     slice_indices ='021_to_040';
     %global_volume = 1;
@@ -8,7 +8,6 @@ if ~isdeployed
    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
 
 end
-
 
 %% This eliminates the nested structure of the incoming slice data, and also writes the each
 %% slice as they finish instead of waiting until all are done.
@@ -67,8 +66,7 @@ log_mode = 1;
 log_file = aux_param.volume_log_file;
 
 log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
-yet_another_logger(log_msg,log_mode,log_file);
-
+yet_another_logger(log_msg,log_mode,log_file)
 
 %param.Itnlim=98; %Testing p
 

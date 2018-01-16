@@ -37,6 +37,7 @@ starting_point = 6;
 vflag_name = sprintf('.%s.recon_completed',volume_runno);
 vol_flag = fullfile(volume_dir,vflag_name);
 
+
 if ~exist(vol_flag,'file')
     starting_point = 5;
     % Check for output images
@@ -54,7 +55,29 @@ if ~exist(vol_flag,'file')
         temp_file = [work_subfolder '/' volume_runno '.tmp'];
         move_up_a_stage =0;
         if exist(temp_file,'file')
-            [slices_remaining,~,~] = read_header_of_CStmp_file(temp_file);  % Need to remember that we are going to add the headersize as the first bytes
+            [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);  % Need to remember that we are going to add the headersize as the first bytes
+            recon_file = [volume_dir '/../*recon.mat'];
+            setup_file= [work_subfolder '/' volume_runno '_setup_variables.mat'];
+            [s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
+            if s==0
+           % if ~exist(setup_file,'file')
+                recon_file=o;
+                rf=matfile(recon_file);
+                %sf=matfile(setup_file);
+                options=rf.options;
+                %options=sf.options;
+                Itnlim=options.Itnlim;
+                slices_remaining = length(find(tmp_header<Itnlim));
+            else
+                %move_up_a_stage=1;
+                 %slices_remaining = 1;
+                error('couldnt find recon file');
+            end
+            if ~exist(setup_file,'file')
+             move_up_a_stage=1;
+                 slices_remaining = 1;
+            end
+            
         else
             slices_remaining = 1; % Will not bother to determine the exact number here.
             move_up_a_stage = 1;

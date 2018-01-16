@@ -2,13 +2,15 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 % Manages the  compressed sensing reconstruction of an independent 3D volume
 % % Functions similarly to old code CS_recon_cluster_bj_multithread_v2[a]
 %
+%
 % Written by BJ Anderson, CIVM
 % 21 September 2017
+
 if ~isdeployed
-    recon_file='/glusterspace/S67710.work/S67710recon.mat';
-    volume_runno='S67710_m00';
-    volume_number='5';
-    base_workdir='/glusterspace/S67710.work/';
+    recon_file='/nas4/cof/S67960.work/S67960recon.mat';
+    volume_runno='S67960_m023';
+    volume_number='24';
+    base_workdir='/nas4/cof/S67960.work/';
 end
 %%% ORIGINAL COMMENT
 % This may seem stupid, but I need to let Matlab know that I'm going need
@@ -189,7 +191,7 @@ end
 
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,agilent_series,bbytes);
 log_mode = 1;
-%log_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
+%%l%og_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
 yet_another_logger(log_msg,log_mode,log_file);
 % Initialize a log file if it doesn't exist yet.
 volume_log_file = [workdir '/' volume_runno '.recon_log'];
@@ -388,7 +390,27 @@ else
     end
     %stage_3_running_jobs='';
     if (starting_point <= 3)
+        mf = matfile(variables_file,'Writable',true);
+        rf = matfile(recon_file);
+    opts2=rf.options;
+    Itnlim = opts2.Itnlim;
+    opts3=mf.options;
+    opts3.Itnlim=Itnlim;
+    mf.options=opts3;
         volume_variable_file = [work_subfolder volume_runno '_workspace.mat'];
+        mf2=matfile(volume_variable_file,'Writable',true);
+        t_param=mf2.param;
+        
+       t_param.Itnlim=Itnlim; 
+       mf2.param=t_param;
+       if isfield(options,'verbosity')
+      
+        t_aux_param=mf2.aux_param;
+        t_aux_param.verbosity=options.verbosity;
+        mf2.aux_param=t_aux_param;
+       end
+       
+       
         % Schedule slice jobs
         if ~exist('variables_file','var')
             variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
@@ -420,10 +442,10 @@ else
             [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
             if length(tmp_header) > 2
                 slices_to_process = find(~tmp_header);
-                if exist('continue_recon_enabled','var')
-                    if continue_recon_enabled
+                if isfield(options,'keep_work')
+                    if options.keep_work
                         %% Currently iteration limit is not a part of the recon.mat variable group...will need to add it.
-                        %slices_to_process = find(tmp_header<params.Itnlim);
+                        slices_to_process = find(tmp_header<Itnlim);
                     end
                 end
                 if isempty(slices_to_process)
@@ -435,64 +457,67 @@ else
         else
             slices_to_process = 1:1:original_dims(1);
         end
-        zero_width = ceil(log10((original_dims(1)+1)));
-        num_chunks = ceil(length(slices_to_process)/chunk_size);
-        log_msg =sprintf('Volume %s: Number of chunks (independent jobs): %i.\n',volume_runno,num_chunks);
-        yet_another_logger(log_msg,log_mode,log_file);
-        new_size = num_chunks*chunk_size;
-        temp_size=length(slices_to_process);
-        log_msg =sprintf('Volume %s: Number of slices to be reconstructed: %i.\n',volume_runno,temp_size);
-        yet_another_logger(log_msg,log_mode,log_file);
         
-        while new_size > temp_size
-            slices_to_process = [slices_to_process NaN];
-            temp_size = size(slices_to_process);
-        end
-        slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
-        for slice = slices_to_process
-            slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(1)));
-            slice(isnan(slice))=[];
-            if length(slice)>3
-                no_con_test = sum(diff(diff(slice)));
-            else
-                no_con_test = 1;
+        if slices_to_process
+            zero_width = ceil(log10((original_dims(1)+1)));
+            num_chunks = ceil(length(slices_to_process)/chunk_size);
+            log_msg =sprintf('Volume %s: Number of chunks (independent jobs): %i.\n',volume_runno,num_chunks);
+            yet_another_logger(log_msg,log_mode,log_file);
+            new_size = num_chunks*chunk_size;
+            temp_size=length(slices_to_process);
+            log_msg =sprintf('Volume %s: Number of slices to be reconstructed: %i.\n',volume_runno,temp_size);
+            yet_another_logger(log_msg,log_mode,log_file);
+            
+            while new_size > temp_size
+                slices_to_process = [slices_to_process NaN];
+                temp_size = size(slices_to_process);
             end
-            for ss = 2:length(slice)
-                if (no_con_test)
-                    slice_string = [slice_string '_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
-                elseif (ss==length(slice))
-                    slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
+            slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
+            for slice = slices_to_process
+                slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(1)));
+                slice(isnan(slice))=[];
+                if length(slice)>3
+                    no_con_test = sum(diff(diff(slice)));
+                else
+                    no_con_test = 1;
+                end
+                for ss = 2:length(slice)
+                    if (no_con_test)
+                        slice_string = [slice_string '_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
+                    elseif (ss==length(slice))
+                        slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
+                    end
+                end
+                slicewise_recon_batch = [workdir 'sbatch/' volume_runno '_slice' slice_string '_CS_recon.bash'];
+                swr_cmd = sprintf('%s %s %s %s %s', slicewise_recon_exec_path,matlab_path, volume_variable_file, slice_string,recon_options_file);
+                if  stage_2_running_jobs
+                    dep_string = stage_2_running_jobs;
+                    dep_type = 'afterok-or';
+                else
+                    dep_string = '';
+                    dep_type = '';
+                end
+                batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
+                c_running_jobs ='';
+                [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
+                if c_running_jobs
+                    %if stage_3_running_jobs
+                    stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
+                    %else
+                    %    stage_3_running_jobs = c_running_jobs;
+                    %end
+                end
+                if msg1
+                    disp(msg1)
+                end
+                if msg2
+                    disp(msg2)
                 end
             end
-            slicewise_recon_batch = [workdir 'sbatch/' volume_runno '_slice' slice_string '_CS_recon.bash'];
-            swr_cmd = sprintf('%s %s %s %s %s', slicewise_recon_exec_path,matlab_path, volume_variable_file, slice_string,recon_options_file);
-            if  stage_2_running_jobs
-                dep_string = stage_2_running_jobs;
-                dep_type = 'afterok-or';
-            else
-                dep_string = '';
-                dep_type = '';
-            end
-            batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
-            c_running_jobs ='';
-            [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
-            if c_running_jobs
-                %if stage_3_running_jobs
-                stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
-                %else
-                %    stage_3_running_jobs = c_running_jobs;
-                %end
-            end
-            if msg1
-                disp(msg1)
-            end
-            if msg2
-                disp(msg2)
-            end
-        end
-        if stage_3_running_jobs
-            if strcmp(':',stage_3_running_jobs(1))
-                stage_3_running_jobs(1)=[];
+            if stage_3_running_jobs
+                if strcmp(':',stage_3_running_jobs(1))
+                    stage_3_running_jobs(1)=[];
+                end
             end
         end
     end
@@ -531,7 +556,7 @@ else
         vcu_slurm_options.mem=66000; % memory requested; vcu needs a significant amount; could do this smarter, though.
         vcu_slurm_options.p=cs_full_volume_queue; % Really want this to be high_priority, and will usually be that.
         vcu_slurm_options.job_name =[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
-        vcu_slurm_options.reservation = active_reservation;
+        %vcu_slurm_options.reservation = active_reservation;
         volume_cleanup_batch = [workdir 'sbatch/' volume_runno '_volume_cleanup_for_CS_recon.bash'];
         vcu_cmd = sprintf('%s %s %s %i', volume_cleanup_exec_path,matlab_path, variables_file);
         batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
@@ -543,11 +568,15 @@ else
     end
     write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
     handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s.duhs.duke.edu:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,target_machine,target_machine,volume_runno,write_archive_tag_success_cmd);
+    
+    
+    
     if (starting_point <= 5)
-        % Send to workstation and write completion flag.
-        %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
-        t_images_dir = images_dir;
-        %{
+        if ~options.keep_work
+            % Send to workstation and write completion flag.
+            %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
+            t_images_dir = images_dir;
+            %{
         while 1
             if strcmp(t_images_dir(end),'/')
                 t_images_dir(end) = [];
@@ -555,64 +584,72 @@ else
                 break;
             end
         end
-        %}
-        mkdir_cmd = sprintf('ssh omega@%s.duhs.duke.edu ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',target_machine,target_machine,volume_runno,volume_runno);
-        scp_cmd = sprintf('echo "Attempting to transfer data to %s.";scp -r %s omega@%s.duhs.duke.edu:/Volumes/%sspace/%s/ && success=1',target_machine,t_images_dir,target_machine,target_machine,volume_runno);
-        write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
-        %{
+        %aa
+            %}
+            mkdir_cmd = sprintf('ssh omega@%s.duhs.duke.edu ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',target_machine,target_machine,volume_runno,volume_runno);
+            scp_cmd = sprintf('echo "Attempting to transfer data to %s.";scp -r %s omega@%s.duhs.duke.edu:/Volumes/%sspace/%s/ && success=1',target_machine,t_images_dir,target_machine,target_machine,volume_runno);
+            write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
+            %{
         local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
         remote_size_cmd = sprintf('freespaceK=`ssh omega@%s.duhs.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | cut -d '' '' -f5`',target_machine,target_machine);
          eval_cmd = sprintf(['success=0;\nif [[ $freespaceK -lt $gimmespaceK ]]; then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."; '...
            'else %s; fi; %s'],  images_dir,target_machine, scp_cmd,write_success_cmd);
-        %}
-        n_raw_images = original_dims(3);
-        shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
-        shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-        shipper_cmds{3}=sprintf('freespaceK=`ssh omega@%s.duhs.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`',target_machine,target_machine);
-        shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
-        shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
-        shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
-        shipper_cmds{7}=sprintf('fi\n%s',write_success_cmd);
-        shipper_cmds{8}=sprintf('%s',handle_archive_tag_cmd);
-        shipper_slurm_options=struct;
-        shipper_slurm_options.v=''; % verbose
-        shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
-        shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
-        shipper_slurm_options.p=gatekeeper_queue; % For now, will use gatekeeper queue for volume manager as well
-        shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
-        %shipper_slurm_options.reservation = active_reservation;
-        shipper_batch = [workdir 'sbatch/' volume_runno '_shipper.bash'];
-        %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
-        batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
-        dep_status='';
-        if stage_4_running_jobs
-            dep_status='afterok-or';
-        end
-        stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
-        %{
+            %}
+            n_raw_images = original_dims(3);
+            shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
+            shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
+            shipper_cmds{3}=sprintf('freespaceK=`ssh omega@%s.duhs.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`',target_machine,target_machine);
+            shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
+            shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
+            shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
+            shipper_cmds{7}=sprintf('fi\n%s',write_success_cmd);
+            shipper_cmds{8}=sprintf('%s',handle_archive_tag_cmd);
+            shipper_slurm_options=struct;
+            shipper_slurm_options.v=''; % verbose
+            shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
+            shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
+            shipper_slurm_options.p=gatekeeper_queue; % For now, will use gatekeeper queue for volume manager as well
+            shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
+            %shipper_slurm_options.reservation = active_reservation;
+            shipper_batch = [workdir 'sbatch/' volume_runno '_shipper.bash'];
+            %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
+            batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
+            dep_status='';
+            if stage_4_running_jobs
+                dep_status='afterok-or';
+            end
+            stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
+            %{
         if exist('continue_recon_enabled','var') && ~continue_recon_enabled
             clean_cmd_1 = ['rm -r ' work_subfolder];
             if exist(work_dir,'dir')
                 %system(clean_cmd_1);
             end
         end
-        %}
-        %{
+            %}
+            %{
 copy_archivetag_cmd = ['sshpass -p ' pw ' scp -p ' fullfile(images_dir,['READY_' volume_runno]) ...
     ' omega@' target_machine '.duhs.duke.edu:/Volumes/' target_machine 'space/Archive_Tags/READY_' volume_runno];
 system(copy_archivetag_cmd);
 disp('Finished!')
-        %}
+            %}
+        end
     end
+    
+    recon_type = 'CS_v2';
     if (starting_point <= 6)
+        %opts=load(recon_file,'options');
+        
         % Send a message that all recon is completed and has successfully
         % been sent to the target machine
-        recon_type = 'CS_v2';
+        
         ship_cmd_0=sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi',hf_fail_flag,hf_fail_flag);
         ship_cmd_1 = sprintf('ssh omega@%s.duhs.duke.edu ''if [[ ! -d /Volumes/%sspace/%s/ ]] ; then\n\t mkdir -m 777 /Volumes/%sspace/%s/;\nfi;''\nscp -p %s omega@%s.duhs.duke.edu:/Volumes/%sspace/%s/;',target_machine,target_machine,volume_runno,target_machine,volume_runno,procpar_file,target_machine,target_machine,volume_runno);
         ship_cmd_2 = sprintf('hf_success=0;\nssh omega@%s.duhs.duke.edu ''if [[ ! -d /Volumes/%sspace/%s/%simages/ ]] ; then\n\t mkdir -m 777 /Volumes/%sspace/%s/%simages/;\nfi '';\nscp -p %s omega@%s.duhs.duke.edu:/Volumes/%sspace/%s/%simages/ && hf_success=1',target_machine,target_machine,volume_runno,volume_runno,target_machine,volume_runno, volume_runno,headfile,target_machine,target_machine,volume_runno,volume_runno);
         write_hf_success_cmd = sprintf('if [[ $hf_success -eq 1 ]];\nthen\n\techo "Headfile transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',hf_success_flag,hf_fail_flag);
         %archive_tag_cmd = '...';
+        
+        
         pp_running_jobs='';
         if ~(volume_number == n_volumes) && ~exist(procpar_file,'file')
             %{
@@ -660,31 +697,37 @@ disp('Finished!')
         %if pp_running_jobs
         %   dep_string = 'afterok';
         %end
-        batch_file = create_slurm_batch_files(procpar_cleanup_batch,{ppcu_cmd ship_cmd_0 ship_cmd_1 ship_cmd_2 write_hf_success_cmd handle_archive_tag_cmd},ppcu_slurm_options);
-        c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
-        log_mode = 1;
-        log_msg =sprintf('Procpar data for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
-        yet_another_logger(log_msg,log_mode,log_file);
-        %%%% Schedule cleanup
-        trashman_slurm_options=struct;
-        trashman_slurm_options.v=''; % verbose
-        trashman_slurm_options.s=''; % shared; volume manager needs to share resources.
-        trashman_slurm_options.mem=500; % memory requested; trashman only needs a miniscule amount.
-        trashman_slurm_options.p='slow_master'; % For now, will use gatekeeper queue for volume manager as well
-        %trashman_slurm_options.job_name = [volume_runno '_procpar_cleanup'];
-        trashman_slurm_options.job_name = [volume_runno '_trashman']; % Trying singleton dependency
-        %trashman_slurm_options.reservation = active_reservation;
-        trashman_batch = [workdir 'sbatch/' volume_runno '_trashman.bash'];
-        trashman_cmd = sprintf('if [[ -f "%s" ]]; then\n\tif [[ -d "%s" ]]; then\n\t\techo "Images have been successfully transferred; removing %s now...";\n\t\trm -rf %s;\n\telse\n\t\techo "Work folder %s already appears to have been removed. No action will be taken.";\n\tfi\nelse\n\techo "Images have not been successfully transferred yet; work folder will not be removed at this time.";\nfi', success_flag,work_subfolder,work_subfolder,work_subfolder,work_subfolder );
-        dep_string ='';
-        if stage_5_running_jobs
-            dep_string = 'afterok-or';
+        if ~options.keep_work
+            batch_file = create_slurm_batch_files(procpar_cleanup_batch,{ppcu_cmd ship_cmd_0 ship_cmd_1 ship_cmd_2 write_hf_success_cmd handle_archive_tag_cmd},ppcu_slurm_options);
+            c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+            log_mode = 1;
+            log_msg =sprintf('Procpar data for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
+            yet_another_logger(log_msg,log_mode,log_file);
         end
-        batch_file = create_slurm_batch_files(trashman_batch,trashman_cmd, trashman_slurm_options);
-        c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_5_running_jobs ,dep_string);
-        log_mode = 1;
-        log_msg =sprintf('Once images for volume %s have been reconned and sent to %s, work folder %s will be removed via SLURM job(s): %s.\n',volume_runno,target_machine,work_subfolder,c_running_jobs);
-        yet_another_logger(log_msg,log_mode,log_file);
+        
+        if ~options.keep_work
+            %%%% Schedule cleanup
+            
+            trashman_slurm_options=struct;
+            trashman_slurm_options.v=''; % verbose
+            trashman_slurm_options.s=''; % shared; volume manager needs to share resources.
+            trashman_slurm_options.mem=500; % memory requested; trashman only needs a miniscule amount.
+            trashman_slurm_options.p='slow_master'; % For now, will use gatekeeper queue for volume manager as well
+            %trashman_slurm_options.job_name = [volume_runno '_procpar_cleanup'];
+            trashman_slurm_options.job_name = [volume_runno '_trashman']; % Trying singleton dependency
+            %trashman_slurm_options.reservation = active_reservation;
+            trashman_batch = [workdir 'sbatch/' volume_runno '_trashman.bash'];
+            trashman_cmd = sprintf('if [[ -f "%s" ]]; then\n\tif [[ -d "%s" ]]; then\n\t\techo "Images have been successfully transferred; removing %s now...";\n\t\trm -rf %s;\n\telse\n\t\techo "Work folder %s already appears to have been removed. No action will be taken.";\n\tfi\nelse\n\techo "Images have not been successfully transferred yet; work folder will not be removed at this time.";\nfi', success_flag,work_subfolder,work_subfolder,work_subfolder,work_subfolder );
+            dep_string ='';
+            if stage_5_running_jobs
+                dep_string = 'afterok-or';
+            end
+            batch_file = create_slurm_batch_files(trashman_batch,trashman_cmd, trashman_slurm_options);
+            c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_5_running_jobs ,dep_string);
+            log_mode = 1;
+            log_msg =sprintf('Once images for volume %s have been reconned and sent to %s, work folder %s will be removed via SLURM job(s): %s.\n',volume_runno,target_machine,work_subfolder,c_running_jobs);
+            yet_another_logger(log_msg,log_mode,log_file);
+        end
     end
     if stage_4_running_jobs
         vm_slurm_options=struct;
