@@ -14,11 +14,11 @@ fi;
 # added chucnk size force to try to make cs_recon easier on the slurm scheduler. 
 chunk_size_set=$(echo $@ |grep -c chunk_size);
 c_force="";
-if [ $chunk_size_set eq 0 ] ;then 
+if [ $chunk_size_set -eq 0 ] ;then 
     c_force="chunk_size=60";
 fi;
 echo "# start $CS_CODE_DEV exec ($exec_path)"
-echo "# with args ($@) $c_force";
+echo "# with args ( $@ $c_force)";
 $exec_path $@ $c_force
 
 # advice on $@ and other things.
