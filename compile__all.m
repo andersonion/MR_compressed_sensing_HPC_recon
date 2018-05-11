@@ -28,7 +28,7 @@ else
     [s,out]=system(list_active_compiles_cmd);out=strsplit(out,'\n');
     fprintf('Run following command to see when background compiles are done\n');
     fprintf('%s',list_active_compiles_cmd);
-    fprintf('Trying to wait for completion automatically(noramlly takes less than 3 minutes).\n');
+    fprintf('Trying to wait for completion automatically(normally takes less than 3 minutes).\n');
     while size(out,2)>2
         %fprintf('.');
         pause(5);
