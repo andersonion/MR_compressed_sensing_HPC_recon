@@ -1,5 +1,8 @@
-function [ starting_point ,log_msg] = check_status_of_CSrecon( volume_dir,volume_runno,scanner,runno,study,agilent_series,bbytes )
-
+function [ starting_point ,log_msg,sub_status] = check_status_of_CSrecon( ...
+    volume_dir,volume_runno,scanner,runno,study,agilent_series,bbytes )
+% check status of an individual volume in the cs recon.
+%%% NOTEABLY bbytes can be omitted.
+%
 %% Preflight checks
 % Determining where we need to start doing work, setting up folders as
 % needed.
@@ -11,11 +14,11 @@ function [ starting_point ,log_msg] = check_status_of_CSrecon( volume_dir,volume
 % 4 : Run volume cleanup.
 % 5 : Send volume to workstation and write recon_completed flag.
 % 6 : All work done; do nothing.
-
+%
 % Required inputs:
 %   workdir (volume_subfolder, so '../volume_runno NOT '../volume_runno/work/')
 %   volume_runno (usually runno_mXX)
-
+%
 % Required for earlier check calls, if absent when needed, will return
 % starting_point = 0:
 %   scanner
@@ -37,7 +40,10 @@ starting_point = 6;
 vflag_name = sprintf('.%s.recon_completed',volume_runno);
 vol_flag = fullfile(volume_dir,vflag_name);
 
-
+sub_status=0; % sub status is what % from 0-100 are we for this stage.
+% may only be useful in the slices stage
+% going to build a precise staus along the way so we can use this function
+% to tell us what is happening in a whole set of volumes.
 if ~exist(vol_flag,'file')
     starting_point = 5;
     % Check for output images
@@ -60,7 +66,7 @@ if ~exist(vol_flag,'file')
             setup_file= [work_subfolder '/' volume_runno '_setup_variables.mat'];
             [s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
             if s==0
-           % if ~exist(setup_file,'file')
+                % if ~exist(setup_file,'file')
                 recon_file=o;
                 rf=matfile(recon_file);
                 %sf=matfile(setup_file);
@@ -70,14 +76,15 @@ if ~exist(vol_flag,'file')
                 slices_remaining = length(find(tmp_header<Itnlim));
             else
                 %move_up_a_stage=1;
-                 %slices_remaining = 1;
+                %slices_remaining = 1;
                 error('couldnt find recon file');
             end
+            sub_status=100*(numel(tmp_header)-slices_remaining)/numel(tmp_header);
+            %sub_status=sprintf('%sslices are %05.2f%% complete ',sub_status,100*(numel(tmp_header)-slices_remaining)/numel(tmp_header));
             if ~exist(setup_file,'file')
-             move_up_a_stage=1;
-                 slices_remaining = 1;
+                move_up_a_stage=1;
+                slices_remaining = 1;
             end
-            
         else
             slices_remaining = 1; % Will not bother to determine the exact number here.
             move_up_a_stage = 1;
@@ -130,7 +137,16 @@ if ~exist(vol_flag,'file')
     end
 end
 
-log_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
+status_codes={'Acquistion in progress on scanner.'
+'Extract fid.'
+'Run volume setup. (create workspace.mat and .tmp files)'
+'Slice jobs.'
+'volume cleanup.'
+'Send volume to workstation and write recon_completed flag.'
+'All work done; do nothing.'
+};
+% sub_status=sprintf('%s',status_codes{starting_point+1},sub_status);
+log_msg =sprintf('Starting point for volume %s: Stage %i. %s\n',volume_runno,starting_point,status_codes{starting_point+1});
 
 
 
