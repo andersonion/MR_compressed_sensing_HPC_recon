@@ -68,6 +68,8 @@ types.standard_options={...
     'CS_table',             ' the CS table on the scanner to use. Must be specified in streaming mode.' 
     'first_volume',         ' start reconstructing at volume N, The first volume will also be processed!'
     'last_volume',          ' stop reconstructing at volume N.'
+    'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
+    'roll_data',            ' pre-roll the data before reconstruction'
     };
 types.beta_options={...
     'CS_reservation',       'specify reservation to run on' 
@@ -491,8 +493,10 @@ if ~exist(study_flag,'file')
             volume_manager_batch = fullfile(volume_dir,'sbatch',[ volume_runno '_volume_manager.bash']);
             vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec, matlab_path, recon_file,volume_runno, volume_number,workdir);
             %%% James's happy delay patch
-            delay_unit=5;
-            vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
+            if ~options.process_headfiles_only
+                delay_unit=5;
+                vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
+            end
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
             or_dependency = '';
             if ~isempty(running_jobs)
@@ -536,6 +540,12 @@ function m = specid_to_recon_file(scanner,runno,recon_file)
 m = matfile(recon_file,'Writable',true);
 databuffer.engine_constants = load_engine_dependency();
 databuffer.scanner_constants = load_scanner_dependency(scanner);
+
+%if ~options.target_machine % we want this for automatic host name
+%resolution, but this currently doesn't work!
+%    databuffer.target_constants=load_engine_dependency(options.target_machine);
+%end
+
 databuffer.headfile.U_runno = runno;
 databuffer.headfile.U_scanner = scanner;
 databuffer.input_headfile = struct; % Load procpar here.
