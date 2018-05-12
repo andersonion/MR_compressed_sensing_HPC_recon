@@ -1,4 +1,4 @@
-function [ starting_point ,log_msg,sub_status] = check_status_of_CSrecon( ...
+function [ starting_point ,log_msg,vol_status] = check_status_of_CSrecon( ...
     volume_dir,volume_runno,scanner,runno,study,agilent_series,bbytes )
 % check status of an individual volume in the cs recon.
 %%% NOTEABLY bbytes can be omitted.
@@ -40,12 +40,12 @@ starting_point = 6;
 vflag_name = sprintf('.%s.recon_completed',volume_runno);
 vol_flag = fullfile(volume_dir,vflag_name);
 
-sub_status=0; % sub status is what % from 0-100 are we for this stage.
-% may only be useful in the slices stage
-% going to build a precise staus along the way so we can use this function
-% to tell us what is happening in a whole set of volumes.
+vol_status=100;% starting at complete, keep working it down. 
+% vol status is what % from 0-100 are we. 
+% have to assign each stage some % it takes. lets pretend that only slices matter, and they take 90% of the work.
 if ~exist(vol_flag,'file')
     starting_point = 5;
+    vol_status=vol_status-2;
     % Check for output images
     images_dir = fullfile(volume_dir,[volume_runno 'images']);
     if ~exist(images_dir,'dir')
@@ -56,6 +56,7 @@ if ~exist(vol_flag,'file')
     end
     if (finished_slices_count == 0) % We assume that all the raw files were written at once, and correctly so.
         starting_point = 4;
+	vol_status=vol_status-3;
         % Check .tmp file to see if all slices have reconned.
         work_subfolder = [volume_dir '/work/'];
         temp_file = [work_subfolder '/' volume_runno '.tmp'];
@@ -79,14 +80,17 @@ if ~exist(vol_flag,'file')
                 %slices_remaining = 1;
                 error('couldnt find recon file');
             end
-            sub_status=100*(numel(tmp_header)-slices_remaining)/numel(tmp_header);
-            %sub_status=sprintf('%sslices are %05.2f%% complete ',sub_status,100*(numel(tmp_header)-slices_remaining)/numel(tmp_header));
+	    % the 90 is so slices only account for 90%
+	    vol_status=vol_status-90*slices_remaining/numel(tmp_header);
+            %vol_status=sprintf('%sslices are %05.2f%% complete ',vol_status,100*(numel(tmp_header)-slices_remaining)/numel(tmp_header));
             if ~exist(setup_file,'file')
                 move_up_a_stage=1;
                 slices_remaining = 1;
+		vol_status=vol_status-90;
             end
         else
             slices_remaining = 1; % Will not bother to determine the exact number here.
+	    vol_status=vol_status-90;
             move_up_a_stage = 1;
         end
         
@@ -111,6 +115,7 @@ if ~exist(vol_flag,'file')
                 volume_fid=fullfile(work_subfolder,[volume_runno,'.fid']);
                 if ~exist(volume_fid,'file')
                     starting_point = 1;
+		    vol_status=vol_status-4
                     % Need to remember to  handle differently for single
                     % blocks scans...I think (I haven't put in the split code for this yet!).
                     if (exist('scanner','var') && exist('runno','var') && exist('study','var') && exist('agilent_series','var'))
@@ -136,7 +141,9 @@ if ~exist(vol_flag,'file')
         end
     end
 end
-
+if starting_point==0
+    vol_status=vol_status-1;
+end
 status_codes={'Acquistion in progress on scanner.'
 'Extract fid.'
 'Run volume setup. (create workspace.mat and .tmp files)'
@@ -145,7 +152,7 @@ status_codes={'Acquistion in progress on scanner.'
 'Send volume to workstation and write recon_completed flag.'
 'All work done; do nothing.'
 };
-% sub_status=sprintf('%s',status_codes{starting_point+1},sub_status);
+% vol_status=sprintf('%s',status_codes{starting_point+1},vol_status);
 log_msg =sprintf('Starting point for volume %s: Stage %i. %s\n',volume_runno,starting_point,status_codes{starting_point+1});
 
 
