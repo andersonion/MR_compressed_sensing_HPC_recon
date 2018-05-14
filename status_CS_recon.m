@@ -11,6 +11,7 @@ end
 
 [s,ls_blob]=system(sprintf('ls -d %s/%s.work/%s*/',data_directory,base_runno,base_runno)); % the */ forces a trailing slash.
 if s==0 % unix status check
+    ls_blob=strtrim(ls_blob);
     C=strsplit(ls_blob);
     [dummy, index] = sort(C);
     rundirs = C(index);clear C dummy index;
