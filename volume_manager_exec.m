@@ -440,7 +440,12 @@ else
                 swr_slurm_options.s='';
                 swr_slurm_options.hint='multithread';
             end
-            swr_slurm_options.mem='5900'; % Want to allow 32-40 jobs per node, but use --ntasks-per-core=1 to make sure that every core has exactly one job on them.
+            % We use mem limit to control the number of jobs per node. 
+            % Want to allow 32-40 jobs per node, but use --ntasks-per-core=1 
+            % to make sure that every core has exactly one job on them.
+            % That is why this mem number gets to be constant, we shouldnt
+            % run into trouble until CS_slices are very (VERY) large. 
+            swr_slurm_options.mem='5900'; 
             swr_slurm_options.p=cs_recon_queue;
             swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
             swr_slurm_options.reservation = active_reservation;
@@ -575,34 +580,24 @@ else
         end
     end
     
-        write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
-        handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
-        
-        
-    if ~options.process_headfiles_only    
+    write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
+    handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+    
+    
+    if ~options.process_headfiles_only
         if (starting_point <= 5)
             if ~options.keep_work
                 % Send to workstation and write completion flag.
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
-                %{
-        while 1
-            if strcmp(t_images_dir(end),'/')
-                t_images_dir(end) = [];
-            else
-                break;
-            end
-        end
-        %aa
-                %}
                 mkdir_cmd = sprintf('ssh omega@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',full_host_name,target_machine,volume_runno,volume_runno);
                 scp_cmd = sprintf('echo "Attempting to transfer data to %s.";scp -r %s omega@%s:/Volumes/%sspace/%s/ && success=1',target_machine,t_images_dir,full_host_name,target_machine,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
-        local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-        remote_size_cmd = sprintf('freespaceK=`ssh omega@%s.dhe.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | cut -d '' '' -f5`',target_machine,target_machine);
-         eval_cmd = sprintf(['success=0;\nif [[ $freespaceK -lt $gimmespaceK ]]; then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."; '...
-           'else %s; fi; %s'],  images_dir,target_machine, scp_cmd,write_success_cmd);
+                local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
+                remote_size_cmd = sprintf('freespaceK=`ssh omega@%s.dhe.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | cut -d '' '' -f5`',target_machine,target_machine);
+                eval_cmd = sprintf(['success=0;\nif [[ $freespaceK -lt $gimmespaceK ]]; then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."; '...
+               'else %s; fi; %s'],  images_dir,target_machine, scp_cmd,write_success_cmd);
                 %}
                 n_raw_images = original_dims(3);
                 shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
@@ -629,18 +624,18 @@ else
                 end
                 stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
                 %{
-        if exist('continue_recon_enabled','var') && ~continue_recon_enabled
-            clean_cmd_1 = ['rm -r ' work_subfolder];
-            if exist(work_dir,'dir')
-                %system(clean_cmd_1);
-            end
-        end
+                if exist('continue_recon_enabled','var') && ~continue_recon_enabled
+                    clean_cmd_1 = ['rm -r ' work_subfolder];
+                    if exist(work_dir,'dir')
+                        %system(clean_cmd_1);
+                    end
+                end
                 %}
                 %{
-copy_archivetag_cmd = ['sshpass -p ' pw ' scp -p ' fullfile(images_dir,['READY_' volume_runno]) ...
-    ' omega@' target_machine '.dhe.duke.edu:/Volumes/' target_machine 'space/Archive_Tags/READY_' volume_runno];
-system(copy_archivetag_cmd);
-disp('Finished!')
+                copy_archivetag_cmd = ['sshpass -p ' pw ' scp -p ' fullfile(images_dir,['READY_' volume_runno]) ...
+                   ' omega@' target_machine '.dhe.duke.edu:/Volumes/' target_machine 'space/Archive_Tags/READY_' volume_runno];
+                system(copy_archivetag_cmd);
+                disp('Finished!')
                 %}
             end
         end
