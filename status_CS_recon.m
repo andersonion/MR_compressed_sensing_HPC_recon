@@ -1,4 +1,4 @@
-function recon_report_progress(base_runno,data_directory)
+function status_CS_recon(base_runno,data_directory)
 % function recon_report_progress(rx,bd)
 % function to report total progress of a cs recon. 
 
@@ -13,7 +13,7 @@ end
 if s==0 % unix status check
     ls_blob=strtrim(ls_blob);
     C=strsplit(ls_blob);
-    [dummy, index] = sort(C);
+    [~, index] = sort(C);
     rundirs = C(index);clear C dummy index;
     sum=0;
     for ri=1:numel(rundirs)
@@ -22,12 +22,12 @@ if s==0 % unix status check
         end
         vd=rundirs{ri}(1:end-1);
         [~,vr]=fileparts(vd);
-        [sp,lm,pc]=check_status_of_CSrecon(vd,vr);
+        [~,lm,pc]=check_status_of_CSrecon(vd,vr);
         fprintf('%05.2f%% - %s',pc,lm);
         sum=sum+pc;
     end
     total_completion=sum/(numel(rundirs));
     fprintf('TOTAL progress: %05.2f%%\n',total_completion);
 else
-    error('didnt find runno %s in working folder %s.',base_runno,data_directory);
+    error('didnt find runno work (%s.work) in working folder %s. \nAre you trying to check for someone else? \nPlease specify their working folder.',base_runno,data_directory);
 end
