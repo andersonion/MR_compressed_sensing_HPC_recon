@@ -36,14 +36,21 @@ end
 %}
 starting_point = 6;
 
-% Check for recon flag
-vflag_name = sprintf('.%s.recon_completed',volume_runno);
-vol_flag = fullfile(volume_dir,vflag_name);
-
+% Check for archive_ready sent flag. Previously checked for
+% recon_completed, but that has since been changed.
+% vflag_name = sprintf('.%s.recon_completed',volume_runno);
+% archive_ready_flag = fullfile(volume_dir,vflag_name);
+archive_ready_flag = fullfile(volume_dir,sprintf('%simages',volume_runno), ...
+    sprintf('.%s_send_archive_tag_to_*_SUCCESSFUL',volume_runno));
+[s,archive_ready_flag]=system(sprintf('ls -t %s|head -n2|tail -n1',archive_ready_flag));
+if s ~= 0
+    archive_ready_flag='__FIND_FLAG_ERROR'
+end
+archive_ready_flag=strtrim(archive_ready_flag);
 vol_status=100;% starting at complete, keep working it down. 
 % vol status is what % from 0-100 are we. 
 % have to assign each stage some % it takes. lets pretend that only slices matter, and they take 90% of the work.
-if ~exist(vol_flag,'file')
+if ~exist(archive_ready_flag,'file')
     starting_point = 5;
     vol_status=vol_status-2;
     % Check for output images
