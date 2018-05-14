@@ -60,7 +60,7 @@ if ~exist(vol_flag,'file')
         % Check .tmp file to see if all slices have reconned.
         work_subfolder = [volume_dir '/work/'];
         temp_file = [work_subfolder '/' volume_runno '.tmp'];
-        move_up_a_stage =0;
+        move_down_a_stage =0;
         if exist(temp_file,'file')
             [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);  % Need to remember that we are going to add the headersize as the first bytes
             recon_file = [volume_dir '/../*recon.mat'];
@@ -76,7 +76,7 @@ if ~exist(vol_flag,'file')
                 Itnlim=options.Itnlim;
                 slices_remaining = length(find(tmp_header<Itnlim));
             else
-                %move_up_a_stage=1;
+                %move_down_a_stage=1;
                 %slices_remaining = 1;
                 error('couldnt find recon file');
             end
@@ -84,14 +84,14 @@ if ~exist(vol_flag,'file')
 	    vol_status=vol_status-90*slices_remaining/numel(tmp_header);
             %vol_status=sprintf('%sslices are %05.2f%% complete ',vol_status,100*(numel(tmp_header)-slices_remaining)/numel(tmp_header));
             if ~exist(setup_file,'file')
-                move_up_a_stage=1;
+                move_down_a_stage=1;
                 slices_remaining = 1;
 		vol_status=vol_status-90;
             end
         else
             slices_remaining = 1; % Will not bother to determine the exact number here.
 	    vol_status=vol_status-90;
-            move_up_a_stage = 1;
+            move_down_a_stage = 1;
         end
         
         if (slices_remaining)
@@ -106,10 +106,10 @@ if ~exist(vol_flag,'file')
                 dummy_mf = matfile(workspace_file,'Writable',false);
                 tmp_param = dummy_mf.param;
             catch
-                move_up_a_stage = 1;
+                move_down_a_stage = 1;
             end
             
-            if (move_up_a_stage)
+            if (move_down_a_stage)
                 starting_point = 2;
                 % Check to see if the volume fid is ready.
                 volume_fid=fullfile(work_subfolder,[volume_runno,'.fid']);
