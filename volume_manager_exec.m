@@ -15,7 +15,7 @@ end
 %%% ORIGINAL COMMENT
 % This may seem stupid, but I need to let Matlab know that I'm going need
 % series to be a variable, and not the builtin function 'series'
-%%%%
+%%%%f
 % In fact this is stupid, overloading code generates incredible
 % headaches.The variale has been renamed agilent_series. -James.
 agilent_series='';
@@ -653,27 +653,13 @@ else
         write_hf_success_cmd = sprintf('if [[ $hf_success -eq 1 ]];\nthen\n\techo "Headfile transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',hf_success_flag,hf_fail_flag);
         %archive_tag_cmd = '...';
         
-        
+         
         pp_running_jobs='';
-        if ~(volume_number == n_volumes) && ~exist(procpar_file,'file')
-            %{
-            process_headfile_CS(recon_file,headfile,procpar_file,recon_type);
-            log_mode=1;
-            log_msg =sprintf('Procpar data for volume %s exists; Converting procpar information to headfile: %s.\n',volume_runno,headfile);
-            yet_another_logger(log_msg,log_mode,log_file);
-            system(ship_cmd_1);
-            log_msg =sprintf('Volume %s: procpar file %s has been shipped to machine: %s.\n',volume_runno,procpar_file,target_machine);
-            yet_another_logger(log_msg,log_mode,log_file);
-            %ship_cmd = sprintf('ssh omega@%s.dhe.duke.edu ''if [[ ! -d /Volumes/%sspace/%s/ ]] ; then mkdir -m 777 /Volumes/%sspace/%s/;fi ''; scp %s omega@%s.dhe.duke.edu:/Volumes/%sspace/%s/',target_machine,target_machine,volume_runno,target_machine,volume_runno, headfile,target_machine,target_machine,volume_runno);
-            system(ship_cmd_2);
-            log_msg =sprintf('Volume %s: complete headfile %s has been shipped to machine: %s.\n',volume_runno,headfile,target_machine);
-            yet_another_logger(log_msg,log_mode,log_file);
-            %{
-            copy_archivetag_cmd = ['sshpass -p ' pw ' scp -p ' fullfile(images_dir,['READY_' volume_runno]) ...
-            ' omega@' target_machine '.dhe.duke.edu:/Volumes/' target_machine 'space/Archive_Tags/READY_' volume_runno];
-            system(copy_archivetag_cmd);
-            %}
-            %}
+        if (volume_number == n_volumes) && ~exist(procpar_file,'file')
+            datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
+            mode =2; % Only pull procpar file
+            puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
+        elseif ~exist(procpar_file,'file')
             gk_slurm_options=struct;
             gk_slurm_options.v=''; % verbose
             gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
