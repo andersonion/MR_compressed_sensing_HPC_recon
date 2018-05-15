@@ -260,7 +260,8 @@ if ~exist(study_flag,'file')
     procpar_file = fullfile(workdir,[runno '.procpar']);
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
-        if (local_or_streaming_or_static == 2)
+        if (local_or_streaming_or_static == 2) 
+            %% streaming mode
             tables_in_workdir=dir([workdir '/CS*_*x*_*']);
             if (isempty(tables_in_workdir))
                 if (~options.CS_table)
@@ -284,6 +285,7 @@ if ~exist(study_flag,'file')
             procpar_or_CStable=fullfile(workdir,options.CS_table);
             yet_another_logger(log_msg,log_mode,log_file);
         else
+            %% local or static mode
             %datapath='/home/mrraw/' study '/' agilent_series '.fid'];
             datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
             mode =2; % Only pull procpar file
@@ -559,7 +561,11 @@ gui_info_collect(databuffer,optstruct);
 m.databuffer = databuffer;
 m.optstruct = optstruct;
 end
-function [dim_y, dim_z, n_sampled_lines,sampling_fraction,mask,CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims]= process_CS_mask(procpar_or_CStable,dim_x,options)
+function [dim_y, dim_z, n_sampled_lines, sampling_fraction, mask, ...
+    CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims]= ...
+    process_CS_mask(procpar_or_CStable,dim_x,options)
+% function process_CS_mask 
+
 [mask, dim_y, dim_z, pa, pb ] = extract_info_from_CStable(procpar_or_CStable);
 n_sampled_lines=sum(mask(:));
 sampling_fraction = n_sampled_lines/length(mask(:));
@@ -582,10 +588,10 @@ phmask = zpad(hamming(options.hamming_window)*hamming(options.hamming_window)',r
 phmask = phmask/max(phmask(:));			 %for low-order phase estimation and correction
 end
 function missing=matfile_missing_vars(mat_file,varlist)
-% function missing=matfile_missing_vars(mat_file,varlist)
+% function missing_count=matfile_missing_vars(mat_file,varlist)
 % checks mat file for list of  vars,
 % mat_file is the path to the .mat file, 
-% varlist is the commaseparated list of expected variables, WATCH OUT FOR
+% varlist is the comma separated list of expected variables, WATCH OUT FOR
 % SPACES.
     listOfVariables = who('-file',mat_file);
     lx=strsplit(varlist,',');
