@@ -1,6 +1,8 @@
 function puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
 % puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
-% mode: 1 -> pull fid, 2 -> pull procpar, 3 -> pull both.
+% mode: 1 -> pull fid, 
+%       2 -> pull procpar, 
+%       3 -> pull both.
 % This function name is terrible, and only marginally connects to its
 % purpose. -James 20171204
 %check arguments

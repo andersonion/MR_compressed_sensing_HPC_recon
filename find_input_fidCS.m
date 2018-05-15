@@ -1,6 +1,9 @@
 function [ input_fid, local_or_streaming_or_static ] = find_input_fidCS( scanner,runno,study,agilent_series,user )
 %
-% local_or_streaming_or_static: 1 => local fid found, 2 -> using fid of in-progress scan, 3 -> using fid in its remote static location;
+% local_or_streaming_or_static: 
+%      1 => local fid found,
+%      2 -> using fid of in-progress scan, 
+%      3 -> using fid in its remote static location;
 if ~exist('user','var')
     user='omega';
 end
