@@ -382,7 +382,8 @@ if ~exist(study_flag,'file')
             if ~exist('local_or_streaming_or_static','var')
                 [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
             end
-            if (local_or_streaming_or_static == 2)
+            if (local_or_streaming_or_static == 2) 
+                %% if we're streaming a MGRE or single block
                 log_msg =sprintf('WARNING: Unable to stream recon for this type of scan (single-block fid); will wait for scan to complete.\n');
                 yet_another_logger(log_msg,log_mode,log_file);
                 input_fid = ['/home/mrraw/' study '/' agilent_series '.fid/fid'];
@@ -390,13 +391,13 @@ if ~exist(study_flag,'file')
             if ~exist(local_fid,'file') % If local_fid exists, then it will also be input_fid.
                 missing_fids = 0;
                 for vs = 1:length(unreconned_volumes_strings)
-                    runno_m_string=[runno '_m' unreconned_volumes_strings{vs}];
-                    subvolume_workspace_file = [workdir  runno_m_string '/' runno_m_string '_workspace.mat'];
+                    volumn_runno = [runno '_m' unreconned_volumes_strings{vs}];
+                    subvolume_workspace_file = [workdir '/' volumn_runno '/' volumn_runno '_workspace.mat'];
                     try
                         dummy_mf = matfile(subvolume_workspace_file,'Writable',false);
                         tmp_param = dummy_mf.param;
                     catch
-                        c_fid = [workdir runno '_m' unreconned_volumes_strings{vs} '.fid'];
+                        c_fid = [workdir '/' volumn_runno '.fid'];
                         if ~exist(c_fid,'file')
                             missing_fids = missing_fids+1;
                         end
@@ -446,7 +447,7 @@ if ~exist(study_flag,'file')
             if ~isempty(running_jobs)
                 or_dependency='afterok-or';
             end
-            fid_splitter_batch = [workdir 'sbatch/' runno '_fid_splitter_CS_recon.bash'];
+            fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
             fs_cmd = sprintf('%s %s %s %s', fid_splitter_exec,matlab_path, local_fid,recon_file);
             batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
             fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
@@ -470,20 +471,20 @@ if ~exist(study_flag,'file')
             volume_number = unreconned_volumes(vs);
             volume_dir = fullfile(workdir,volume_runno);
             if ~exist(volume_dir,'dir')
-                system(['mkdir -m 775 ' volume_dir]);
-                vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
-                %if ~exist(vol_sbatch_dir,'dir')
-                system(['mkdir -m 775 ' vol_sbatch_dir]);
-                %end
                 %%% mkdir commands pulled into here from check status,
-                images_dir = fullfile(volume_dir,[volume_runno 'images']);
-                %if ~exist(images_dir,'dir')
-                system(['mkdir -m 775 ' images_dir]);
-                %end
-                work_subfolder = fullfile(volume_dir,'work');
-                %if ~exist(work_subfolder,'dir')
-                system(['mkdir -m 775 ' work_subfolder]);
-                %end
+                fprintf('Making voldir,sbatch,work,images,directories\n');
+                vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
+                work_subfolder = fullfile(volume_dir, 'work');
+                images_dir     = fullfile(volume_dir,[volume_runno 'images']);
+                mkdir_s(1)=system(['mkdir -m 775 ' volume_dir]);
+                mkdir_s(2)=system(['mkdir -m 775 ' vol_sbatch_dir]);
+                mkdir_s(3)=system(['mkdir -m 775 ' work_subfolder]);
+                mkdir_s(4)=system(['mkdir -m 775 ' images_dir]);
+                if(sum(mkdir_s)>0)
+                    log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ',volume_runno,volume_dir);
+                    yet_another_logger(log_msg,log_mode,log_file,1);
+                    quit force
+                end
             end
             vm_slurm_options=struct;
             vm_slurm_options.v=''; % verbose
