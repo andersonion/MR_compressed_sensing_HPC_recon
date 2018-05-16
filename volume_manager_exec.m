@@ -203,20 +203,20 @@ if ~exist(volume_log_file,'file')
     system(['touch ' volume_log_file]);
 end
 work_subfolder = [workdir '/work/'];
-variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
-temp_file = [work_subfolder '/' volume_runno '.tmp'];
-volume_fid = [work_subfolder '/' volume_runno '.fid'];
-images_dir= [workdir '/' volume_runno 'images/'];
-headfile = [images_dir volume_runno '.headfile'];
-hf_fail_flag=sprintf('%s/.%s_send_headfile_to_%s_FAILED', images_dir,volume_runno,target_machine);
-hf_success_flag=sprintf('%s/.%s_send_headfile_to_%s_SUCCESSFUL', images_dir,volume_runno,target_machine);
-fail_flag=sprintf('%s/.%s_send_images_to_%s_FAILED', images_dir,volume_runno,target_machine);
-success_flag=sprintf('%s/.%s_send_images_to_%s_SUCCESSFUL', images_dir,volume_runno,target_machine);
-at_fail_flag=sprintf('%s/.%s_send_archive_tag_to_%s_FAILED', images_dir,volume_runno,target_machine);
-at_success_flag=sprintf('%s/.%s_send_archive_tag_to_%s_SUCCESSFUL', images_dir,volume_runno,target_machine);
-original_archive_tag=sprintf('%s/READY_%s',images_dir,volume_runno);
+variables_file = [work_subfolder     volume_runno '_setup_variables.mat'];
+temp_file =      [work_subfolder '/' volume_runno '.tmp'];
+volume_fid =     [work_subfolder '/' volume_runno '.fid'];
+images_dir =     [workdir        '/' volume_runno 'images/'];
+headfile =       [images_dir         volume_runno '.headfile'];
+hf_fail_flag=         sprintf('%s/.%s_send_headfile_to_%s_FAILED',        images_dir,volume_runno,target_machine);
+hf_success_flag=      sprintf('%s/.%s_send_headfile_to_%s_SUCCESSFUL',    images_dir,volume_runno,target_machine);
+fail_flag=            sprintf('%s/.%s_send_images_to_%s_FAILED',          images_dir,volume_runno,target_machine);
+success_flag=         sprintf('%s/.%s_send_images_to_%s_SUCCESSFUL',      images_dir,volume_runno,target_machine);
+at_fail_flag=         sprintf('%s/.%s_send_archive_tag_to_%s_FAILED',     images_dir,volume_runno,target_machine);
+at_success_flag=      sprintf('%s/.%s_send_archive_tag_to_%s_SUCCESSFUL', images_dir,volume_runno,target_machine);
+original_archive_tag= sprintf('%s/READY_%s',images_dir,volume_runno);
 local_archive_tag_prefix = [volume_runno '_' target_machine];
-local_archive_tag = sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
+local_archive_tag =   sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
 
 % Make faux headfile with minimal details (will overwrite later).
 %if ~exist(headfile,'file')
@@ -264,6 +264,7 @@ if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', gatekeeper_exec, matlab_path,volume_fid,input_fid,scanner,log_file,volume_number,bbytes);
     batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
     running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+    
     vm_slurm_options=struct;
     vm_slurm_options.v=''; % verbose
     vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -291,8 +292,10 @@ else
     stage_5_running_jobs='';
     
     if (~options.process_headfiles_only)
+        % James pulled this input fid check up out of starting point 1 to
+        % make it easier to handle procpar processing decisions later.
+        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
         if (starting_point <= 1)
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
             volume_fid = [work_subfolder '/' volume_runno '.fid'];
             user='';
             if (local_or_streaming_or_static == 1)
@@ -303,13 +306,14 @@ else
             end
             if fid_consistency
                 %{
-            % James commented this out because it was killing streaming CS,
-            % when streaming data.
-            if ~exist(procpar_file,'file')
-                datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
-                mode =2; % Only pull procpar file
-                puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
-            end
+                % James commented this out because it was killing streaming CS,
+                % when streaming data.
+                % This code needs to be put someplace correct! 
+                if ~exist(procpar_file,'file')
+                    datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
+                    mode =2; % Only pull procpar file
+                    puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
+                end
                 %}
                 if (local_or_streaming_or_static == 1)
                     get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
@@ -352,19 +356,19 @@ else
                 mf.target_machine = target_machine;
             end
             %{
-        % Make faux headfile with minimal details (will overwrite later).
-        bh=struct;
-        bh.dim_X=original_dims(1);
-        bh.dim_Y=original_dims(2);
-        bh.dim_Z=original_dims(3);
-        bh.A_dti_vols=n_volumes;
-        bh.A_channels = 1;
-        bh.A_echoes = nechoes;
-        bh.U_runno = volume_runno;
-        gui_info = read_headfile(fullfile(databuffer.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
-        faux_struct1 = combine_struct(bh,gui_info,'U_');
-        databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
-        write_headfile(headfile,databuffer.headfile);
+            % Make faux headfile with minimal details (will overwrite later).
+            bh=struct;
+            bh.dim_X=original_dims(1);
+            bh.dim_Y=original_dims(2);
+            bh.dim_Z=original_dims(3);
+            bh.A_dti_vols=n_volumes;
+            bh.A_channels = 1;
+            bh.A_echoes = nechoes;
+            bh.U_runno = volume_runno;
+            gui_info = read_headfile(fullfile(databuffer.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
+            faux_struct1 = combine_struct(bh,gui_info,'U_');
+            databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
+            write_headfile(headfile,databuffer.headfile);
             %}
             if exist('wavelet_dims','var')
                 mf.wavelet_dims = wavelet_dims;
@@ -655,11 +659,19 @@ else
         
          
         pp_running_jobs='';
-        if (volume_number == n_volumes) && ~exist(procpar_file,'file')
-            datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
+        if ~exist(procpar_file,'file') ...
+                && ( (volume_number == n_volumes) || local_or_streaming_or_static ~= 2 )
             mode =2; % Only pull procpar file
-            puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
+            datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
+            log_msg=sprintf(['No procpar, and vn%i == nv%i (or we''re done), \n' ...
+                '\tfetching procpar with puller_glusterspaceCS_2(''%s'',''%s'',''%s'',''%s'',%i);\n'], ...
+                volume_number,n_volumes, ...
+                runno,datapath,scanner,base_workdir,mode);
+            yet_another_logger(log_msg,log_mode,log_file);
+            puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
         elseif ~exist(procpar_file,'file')
+            log_msg=sprintf('No procpar, and vn%i ~= nv%i, \n',volume_number,n_volumes);
+            yet_another_logger(log_msg,log_mode,log_file);
             gk_slurm_options=struct;
             gk_slurm_options.v=''; % verbose
             gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
