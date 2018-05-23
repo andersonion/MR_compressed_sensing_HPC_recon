@@ -1,8 +1,11 @@
 % compile all
+P = fileparts(mfilename('fullpath'));
+cd(P);
 
 parallel=1;
 [~,c_commands]= system(sprintf('find %s -name "compile_command_*.m"|grep -v "__"',pwd))
 c_commands=strsplit(c_commands);
+
 if ~parallel
     %% serial run of compile commands in matlab
     for c=1:numel(c_commands)
