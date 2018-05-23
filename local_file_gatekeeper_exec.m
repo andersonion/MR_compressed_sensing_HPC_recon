@@ -46,21 +46,25 @@ ready = 0;
 max_checks = ceil(time_limit/interval);
 effective_time_limit = ceil(max_checks*interval)/60;
 
-log_msg = sprintf('Gatekeeper will now check every %i seconds (up to %i minutes) for either local file ''%s'' to exist.\n',interval,effective_time_limit,local_file);
+log_msg = sprintf('Gatekeeper will now check every %i seconds (up to %i minutes) for local file(s) ''%s'' to exist.\n',interval,effective_time_limit,local_file);
 log_mode = 1;
 yet_another_logger(log_msg,log_mode,log_file);
 
 tic
-
+local_files = strsplit(local_file,':');
 for tt = 1:max_checks
-    if exist(local_file,'file')
+    c=0;
+    for fn=1:numel(local_files)
+      if exist(local_files{fn},'file')
+          c=c+1;
+      end
+    end
+    if c==numel(local_files)
         ready = 1;   
         break 
     else
         pause(interval);
     end
- 
-
 end
 
 
