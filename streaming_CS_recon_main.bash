@@ -15,7 +15,7 @@ fi;
 chunk_size_set=$(echo $@ |grep -c chunk_size);
 c_force="";
 if [ $chunk_size_set -eq 0 ] ;then 
-    c_force="chunk_size=60";
+    c_force="planned_ok chunk_size=30";
 fi;
 echo "# start $CS_CODE_DEV exec ($exec_path)"
 echo "# with args ( $@ $c_force)";
