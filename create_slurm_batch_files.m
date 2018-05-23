@@ -1,7 +1,7 @@
 function [ file_name ] = create_slurm_batch_files(file_name,cell_array_of_lines_to_write,slurm_option_struct )
 % Formats, in a consistent manner, batch files to be called from sbatch
 %   
-    she_bang = '#!/bin/bash';
+    sha_bang = '#!/bin/bash';
    
   
     file_name_array = strsplit(file_name,'/');
@@ -21,14 +21,18 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_array_of_lines_
     end
     
     if ~exist(default_dir,'dir')
-       mkdir_cmd = ['mkdir -m 777 ' default_dir];
-       system(mkdir_cmd);
+       mkdir(default_dir);
     end
     
-    
     fid=fopen(file_name,'w'); % Note that this will overwrite existing files!
-    fprintf(fid,'%s\n',she_bang);
-    
+    if fid<0;
+        ed='';% error details
+        if numel(file_name)>250
+            ed=sprintf(': the name may be to long');
+        end
+        error('Couldnt open file %s%s',file_name,ed);
+    end
+    fprintf(fid,'%s\n',sha_bang);
     
     if ~exist('slurm_option_struct','var')
         slurm_option_struct = struct;
