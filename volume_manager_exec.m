@@ -5,7 +5,6 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
-
 if ~isdeployed
     recon_file='/nas4/cof/S67960.work/S67960recon.mat';
     volume_runno='S67960_m023';
@@ -102,6 +101,7 @@ if isempty(volume_cleanup_exec_path)
     volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/' CS_CODE_DEV '/run_volume_cleanup_for_CSrecon_exec.sh'];
     setenv('CS_VOLUME_CLEANUP_EXEC',volume_cleanup_exec_path);
 end
+%{ %Moved to deploy_procpar_handlers function
 procpar_gatekeeper_exec_path = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); % Error check for isempty?
 if isempty(procpar_gatekeeper_exec_path)
     %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/20171004_1110//run_local_file_gatekeeper_exec.sh';
@@ -116,13 +116,14 @@ if isempty(procpar_cleanup_exec_path)
     procpar_cleanup_exec_path=['/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/' CS_CODE_DEV '/run_process_headfile_CS.sh'];
     setenv('CS_PROCPAR_CLEANUP_EXEC',procpar_cleanup_exec_path);
 end
+%}
 if ischar(volume_number)
     volume_number=str2double(volume_number);
 end
 if strcmp('/',workdir(end))
     workdir=[workdir '/'];
 end
-%{
+
 %% Preflight checks
 % Determining where we need to start doing work, setting up folders as
 % needed.
@@ -133,69 +134,10 @@ end
 % 4 : Run volume cleanup.
 % 5 : Send volume to workstation and write recon_completed flag.
 % 6 : All work done; do nothing.
-starting_point = 6;
-% Check for recon flag
-volume_flag = [workdir '/.' volume_runno '.recon_completed'];
-if ~exist(volume_flag,'file')CS_CODE_DEV
-    starting_point = 5;
-    % Check for output images
-    images_dir = [workdir '/' volume_runno 'images/'];
-    if ~exist(images_dir,'dir')
-        system(['mkdir -m 777 ' images_dir]);
-    end
-    finished_slices = dir( [images_dir '/*.raw' ]);
-    finished_slices_count = length(finished_slices(not([finished_slices.isdir])));
-    if (finished_slices_count == 0) % We assume that all the raw files were written at once, and correctly so.
-        starting_point = 4;
-        % Check .tmp file to see if all slices have reconned.
-        work_subfolder = [workdir '/work/'];
-        if ~exist(work_subfolder,'dir')
-            system(['mkdir -m 777 ' work_subfolder]);
-        end
-        temp_file = [work_subfolder '/' volume_runno '.tmp'];
-        if exist(temp_file,'file')
-            [slices_remaining,~,~] = read_header_of_CStmp_file(temp_file);  % Need to remember that we are going to add the headersize as the first bytes
-        else
-            slices_remaining = 1; % Will not bother to determine the exact number here.
-        end
-        if (slices_remaining)
-            starting_point = 3;
-            % Check for a complete workspace file
-            workspace_file = [work_subfolder '/' volume_runno '_workspace.mat'];
-            try
-                %dummy = load(workspace_file,'aux_param.maskSize'); % Need to try to load an arbitrary variable from the work file
-                dummy_mf = matfile(workspace_file,'Writable',false);
-                tmp_param = dummy_mf.param;
-                workspace_is_ready = 1;
-            catch
-                workspace_is_ready = 0;
-            end
-            if ~workspace_is_ready
-                starting_point = 2;
-                % Check to see if the volume fid is ready.
-                volume_fid = [work_subfolder '/' volume_runno '.fid'];
-                if ~exist(volume_fid,'file')
-                    starting_point = 1;
-                    % Need to remember to  handle differently for single
-                    % blocks scans...I think (I haven't put in the split code for this yet!).
-                    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,series);
-                    if (local_or_streaming_or_static == 2)
-                        remote_user='omega';
-                        ready=check_subvolume_ready_in_fid_quiet(input_fid,volume_number,bbytes,scanner,remote_user);
-                        if ~ready
-                            starting_point = 0;
-                        end
-                    end
-                end
-            end
-        end
-    end
-end
-%}
+
 
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,agilent_series,bbytes);
 log_mode = 1;
-%%l%og_msg =sprintf('Starting point for volume %s: Stage %i.\n',volume_runno,starting_point);
 yet_another_logger(log_msg,log_mode,log_file);
 % Initialize a log file if it doesn't exist yet.
 volume_log_file = [workdir '/' volume_runno '.recon_log'];
@@ -203,11 +145,14 @@ if ~exist(volume_log_file,'file')
     system(['touch ' volume_log_file]);
 end
 work_subfolder = [workdir '/work/'];
-variables_file = [work_subfolder     volume_runno '_setup_variables.mat'];
-temp_file =      [work_subfolder '/' volume_runno '.tmp'];
-volume_fid =     [work_subfolder '/' volume_runno '.fid'];
+%variables_file = [work_subfolder     volume_runno '_setup_variables.mat'];
+variables_file = [workdir        '/' volume_runno '_setup_variables.mat'];
 images_dir =     [workdir        '/' volume_runno 'images/'];
 headfile =       [images_dir         volume_runno '.headfile'];
+
+temp_file =      [work_subfolder '/' volume_runno '.tmp'];
+volume_fid =     [work_subfolder '/' volume_runno '.fid'];
+
 hf_fail_flag=         sprintf('%s/.%s_send_headfile_to_%s_FAILED',        images_dir,volume_runno,target_machine);
 hf_success_flag=      sprintf('%s/.%s_send_headfile_to_%s_SUCCESSFUL',    images_dir,volume_runno,target_machine);
 fail_flag=            sprintf('%s/.%s_send_images_to_%s_FAILED',          images_dir,volume_runno,target_machine);
@@ -218,6 +163,27 @@ original_archive_tag= sprintf('%s/READY_%s',images_dir,volume_runno);
 local_archive_tag_prefix = [volume_runno '_' target_machine];
 local_archive_tag =   sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
 
+
+%TEMPCODE
+variables_file2 = [work_subfolder       '/' volume_runno '_setup_variables.mat'];
+if (exist(variables_file2,'file'))
+    if ~exist(variables_file,'file')
+        [t_workdir, t_file_name, t_ext]=fileparts(variables_file);
+        old_vv_file = [t_workdir '/work/' t_file_name t_ext];
+        mv_cmd = ['mv ' old_vv_file ' ' variables_file];
+        if exist(old_vv_file,'file')
+            system(mv_cmd);
+        end
+    end
+    mf = matfile(variables_file2,'Writable',true);
+    mf.volume_runno = volume_runno;
+    write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
+    handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+    mf.handle_archive_tag_cmd=handle_archive_tag_cmd;
+end
+
+
+%{
 % Make faux headfile with minimal details (will overwrite later).
 %if ~exist(headfile,'file')
 bh=struct;
@@ -236,12 +202,16 @@ bh.U_runno = volume_runno;
 gui_info = read_headfile(fullfile(databuffer.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
 faux_struct1 = combine_struct(bh,gui_info,'U_');
 databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
+%}
+%{
 if ~exist(headfile,'file')
     write_headfile(headfile,databuffer.headfile);
     
     ship_cmd = sprintf('scp %s omega@%s:/Volumes/%sspace/%s/',headfile,full_host_name,target_machine,volume_runno);
     system(ship_cmd);
 end
+%}
+
 if ~exist(local_archive_tag,'file')
     if ~exist(original_archive_tag,'file')
         write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(3),databuffer.headfile.U_code, ...
@@ -355,7 +325,7 @@ else
             if exist('target_machine','var')
                 mf.target_machine = target_machine;
             end
-            %{
+           %{
             % Make faux headfile with minimal details (will overwrite later).
             bh=struct;
             bh.dim_X=original_dims(1);
@@ -369,7 +339,7 @@ else
             faux_struct1 = combine_struct(bh,gui_info,'U_');
             databuffer.headfile = combine_struct(databuffer.headfile,faux_struct1);
             write_headfile(headfile,databuffer.headfile);
-            %}
+           %}
             if exist('wavelet_dims','var')
                 mf.wavelet_dims = wavelet_dims;
             end
@@ -392,7 +362,7 @@ else
             vsu_slurm_options.mem=50000; % memory requested; vsu needs a significant amount; could do this smarter, though.
             vsu_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vsu_slurm_options.job_name = [volume_runno '_volume_setup_for_CS_recon'];
-            vsu_slurm_options.reservation = active_reservation;
+            %vsu_slurm_options.reservation = active_reservation;
             volume_setup_batch = [workdir 'sbatch/' volume_runno '_volume_setup_for_CS_recon.bash'];
             vsu_cmd = sprintf('%s %s %s %i', volume_setup_exec_path,matlab_path, variables_file, volume_number);
             batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
@@ -423,9 +393,13 @@ else
             end
             
             % Schedule slice jobs
-            if ~exist('variables_file','var')
-                variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
+            %{
+            if ~exist('variables_file','var') % This is already being set above--should just delete altogether.
+                variables_file = [workdir '/' volume_runno '_setup_variables.mat'];
+                %variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
             end
+            %}
+            
             if ~exist('recon_options_file','var')
                 recon_options_file='';
             end
@@ -537,6 +511,12 @@ else
                 end
             end
         end
+        
+        write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
+        handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+        mf2 = matfile(variables_file,'Writable',true);
+        mf2.handle_archive_tag_cmd=handle_archive_tag_cmd;
+        
         if (starting_point <= 4)
             % Schedule cleanup
             %         aux_param2.dims=voldims;
@@ -583,10 +563,6 @@ else
             stage_4_running_jobs = dispatch_slurm_jobs(batch_file,'',maybe_im_a_singleton);
         end
     end
-    
-    write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
-    handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
-    
     
     if ~options.process_headfiles_only
         if (starting_point <= 5)
@@ -644,9 +620,13 @@ else
             end
         end
     end
+    
     recon_type = 'CS_v2';
-    if (starting_point <= 6)
-        %opts=load(recon_file,'options');
+    if (starting_point >= 5)%(starting_point <= 6)
+        c_running_jobs = deploy_procpar_handlers(variables_file);
+        % Begin functionizing procpar handling
+        %{
+       %opts=load(recon_file,'options');
         
         % Send a message that all recon is completed and has successfully
         % been sent to the target machine
@@ -656,9 +636,10 @@ else
         ship_cmd_2 = sprintf('hf_success=0;\nssh omega@%s ''if [[ ! -d /Volumes/%sspace/%s/%simages/ ]] ; then\n\t mkdir -m 777 /Volumes/%sspace/%s/%simages/;\nfi '';\nscp -p %s omega@%s:/Volumes/%sspace/%s/%simages/ && hf_success=1',full_host_name,target_machine,volume_runno,volume_runno,target_machine,volume_runno, volume_runno,headfile,full_host_name,target_machine,volume_runno,volume_runno);
         write_hf_success_cmd = sprintf('if [[ $hf_success -eq 1 ]];\nthen\n\techo "Headfile transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',hf_success_flag,hf_fail_flag);
         %archive_tag_cmd = '...';
-        
+    
          
         pp_running_jobs='';
+        
         if ~exist(procpar_file,'file') ...
                 && ( (volume_number == n_volumes) || local_or_streaming_or_static ~= 2 )
             mode =2; % Only pull procpar file
@@ -669,7 +650,12 @@ else
                 runno,datapath,scanner,base_workdir,mode);
             yet_another_logger(log_msg,log_mode,log_file);
             puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
-        elseif ~exist(procpar_file,'file')
+        end
+        
+        
+
+        
+        if (~exist(procpar_file,'file') || ~exist(headfile,'file'))
             log_msg=sprintf('No procpar, and vn%i ~= nv%i, \n',volume_number,n_volumes);
             yet_another_logger(log_msg,log_mode,log_file);
             gk_slurm_options=struct;
@@ -681,9 +667,13 @@ else
             gk_slurm_options.job_name = [runno '_procpar_gatekeeper_and_processor'];
             %gk_slurm_options.reservation = active_reservation;
             procpar_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_procpar_gatekeeper.bash'];
-            procpar_gatekeeper_cmd = sprintf('%s %s %s %s', procpar_gatekeeper_exec_path, matlab_path,procpar_file,log_file);
+            procpar_gatekeeper_cmd = sprintf('%s %s %s %s', procpar_gatekeeper_exec_path, matlab_path,[procpar_file ':' headfile],log_file);
             batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
             pp_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+            
+            log_mode = 1;
+            log_msg =sprintf('Procpar data and/or headfile for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,pp_running_jobs);
+            yet_another_logger(log_msg,log_mode,log_file);
         end
         ppcu_slurm_options=struct;
         ppcu_slurm_options.v=''; % verbose
@@ -702,11 +692,8 @@ else
         if ~options.keep_work
             batch_file = create_slurm_batch_files(procpar_cleanup_batch,{ppcu_cmd ship_cmd_0 ship_cmd_1 ship_cmd_2 write_hf_success_cmd handle_archive_tag_cmd},ppcu_slurm_options);
             c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
-            log_mode = 1;
-            log_msg =sprintf('Procpar data for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
-            yet_another_logger(log_msg,log_mode,log_file);
         end
-        
+
         if ~options.keep_work && ~options.process_headfiles_only
             %%%% Schedule cleanup
             
@@ -730,6 +717,11 @@ else
             log_msg =sprintf('Once images for volume %s have been reconned and sent to %s, work folder %s will be removed via SLURM job(s): %s.\n',volume_runno,target_machine,work_subfolder,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
         end
+                
+        %}
+        % End procpar functionizing
+        
+        
     end
     if stage_4_running_jobs
         vm_slurm_options=struct;

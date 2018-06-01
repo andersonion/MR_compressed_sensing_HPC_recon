@@ -75,8 +75,13 @@ if ~exist(send_archive_tag,'file')
     else
         finished_slices = dir( [images_dir '/*.raw' ]);
         finished_slices_count = length(finished_slices(not([finished_slices.isdir])));
+        
+        headfile_exists = numel(dir( [images_dir '/*.headfile' ]));
     end
-    if (finished_slices_count == 0) % We assume that all the raw files were written at once, and correctly so.
+    
+    
+    
+    if (finished_slices_count == 0) || (~headfile_exists) % We assume that all the raw files were written at once, and correctly so.
         starting_point = 4;
 	vol_status=vol_status-3;
         % Check .tmp file to see if all slices have reconned.

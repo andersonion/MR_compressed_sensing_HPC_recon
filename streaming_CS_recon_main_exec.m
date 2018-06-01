@@ -307,6 +307,24 @@ if ~exist(study_flag,'file')
         else
             m.n_volumes = m.nblocks;
         end
+        
+        % Please enhance later to not be so clumsy (include these variables
+        % in the missing variable list elsewhere in this function.
+
+        bh=struct;
+        original_dims=m.original_dims;
+        bh.dim_X=original_dims(1);
+        bh.dim_Y=original_dims(2);
+        bh.dim_Z=original_dims(3);
+        bh.A_dti_vols=m.n_volumes;
+        bh.A_channels = 1;
+        bh.A_echoes = m.nechoes;
+        %bh.U_runno = volume_runno;
+        temp=m.databuffer;
+        gui_info = read_headfile(fullfile(temp.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
+        faux_struct1 = combine_struct(bh,gui_info,'U_');
+        temp.headfile = combine_struct(temp.headfile,faux_struct1);
+        m.databuffer=temp;
     end; 
     %% Check all n_volumes for incomplete reconstruction
     %WARNING: this code relies on each entry in recon status being
@@ -470,12 +488,12 @@ if ~exist(study_flag,'file')
             volume_runno = [runno '_m' unreconned_volumes_strings{vs}];
             volume_number = unreconned_volumes(vs);
             volume_dir = fullfile(workdir,volume_runno);
-            if ~exist(volume_dir,'dir')
+            vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
+            work_subfolder = fullfile(volume_dir, 'work');
+            images_dir     = fullfile(volume_dir,[volume_runno 'images']);
+            if ~exist(images_dir,'dir')
                 %%% mkdir commands pulled into here from check status,
-                fprintf('Making voldir,sbatch,work,images,directories\n');
-                vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
-                work_subfolder = fullfile(volume_dir, 'work');
-                images_dir     = fullfile(volume_dir,[volume_runno 'images']);
+                fprintf('Making voldir,sbatch,work,images,directories\n');    
                 mkdir_s(1)=system(['mkdir -m 775 ' volume_dir]);
                 mkdir_s(2)=system(['mkdir -m 775 ' vol_sbatch_dir]);
                 mkdir_s(3)=system(['mkdir -m 775 ' work_subfolder]);
@@ -559,6 +577,7 @@ optstruct.debug_mode = 0;
 optstruct.warning_pause = 0;
 optstruct.param_file =[runno '.param'];
 gui_info_collect(databuffer,optstruct);
+
 m.databuffer = databuffer;
 m.optstruct = optstruct;
 end

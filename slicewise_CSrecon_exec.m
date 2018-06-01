@@ -39,14 +39,18 @@ if  (~exist(matlab_workspace,'file'))
     error_flag = 1;
     log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    quit force
+    if isdeployed
+        quit force
+    end
 else
     a = who('-file',matlab_workspace,'aux_param');
     if ~size(a)
         error_flag = 1;
         log_msg =sprintf('Matlab workspace (''%s'') exists, but parameter ''aux_param'' not found. Dying now.\n',matlab_workspace);
         yet_another_logger(log_msg,log_mode,log_file,error_flag);
-        quit force
+        if isdeployed
+            quit force
+        end
     end
 end
 
@@ -236,6 +240,8 @@ for index=1:length(slice_numbers)
         %%
         %tic
         
+        %if (split_recon)
+        %
         for n=1:OuterIt
             param.TVWeight =TVWeight(n);     % TV penalty
             param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
@@ -334,12 +340,29 @@ for index=1:length(slice_numbers)
             header_info = uint16(previous_Itnlim+iterations_performed);
             %fseek(fid,8*(slice_index-1),-1); % 8 May 2017, BJA: changing header from binary to double local_scaling factor.
             %fseek(fid,2*(slice_index-1),-1); % 15 May 2017, BJA: header stores number of iterations now
-            fseek(fid,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
-            %fwrite(fid,header_info,'double');
-            fwrite(fid,header_info,'uint16'); % 15 May 2017, BJA: see directly above
-            % fclose(fid);
             
-            log_msg =sprintf('Slice %i: Reconstruction flag written to header of %s.\n',slice_index,temp_file);
+            %fwrite(fid,header_info,'double');
+            num_written=0;
+            for tt=1:30
+                fseek(fid,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
+                num_written=fwrite(fid,header_info,'uint16'); % 15 May 2017, BJA: see directly above
+            
+                if (num_written ~= 1)
+                    pause(.05)
+                else
+                    break
+                end
+            end
+            % fclose(fid);
+            if (num_written ~= 1) 
+                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',slice_index,header_info,temp_file,tt);
+                yet_another_logger(log_msg,log_mode,log_file,1);
+                variable_that_throws_an_error_so_slurm_knows_we_failed;
+            else
+                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") written to header of %s, after %i tries.\n',slice_index,header_info,temp_file,tt);
+            end
+
+            
             yet_another_logger(log_msg,log_mode,log_file);
             
             time_to_write_data=toc;
