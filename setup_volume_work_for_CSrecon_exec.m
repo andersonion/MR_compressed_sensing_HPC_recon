@@ -2,16 +2,17 @@ function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number)
 %CS_RECON_CLUSTER_SETUP_WORK_EXEC An executable MATLAB script for setting
 %up each volume of CS reconstruction in order to avoid saturating the
 %master node (in the context of DTI, with many many volumes to recon.
-   %aa
+
 %% Update of original version (implied _v1)
 if ~isdeployed
     % {
-    setup_vars = '/civmnas4/rja20/Z56017.work/Z56017_m0/work/Z56017_m0_setup_variables.mat';
-    volume_number = '1';
+    %setup_vars = '/civmnas4/rja20/Z56017.work/Z56017_m0/work/Z56017_m0_setup_variables.mat';
+    %volume_number = '1';
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities');
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2');
     %}
-
+   setup_vars='/civmnas4/rja20/N96041.work/N96041_m6/N96041_m6_setup_variables.mat';
+   volume_number='7'
 end
 make_tmp = 0;
 %%   Import Variables
@@ -55,42 +56,30 @@ volume_number=str2double(volume_number);
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno);
 make_workspace = 0;
 make_tmp = 0;
-if ~isdeployed
-    %   starting_point = 2;
-end
 work_subfolder = fullfile(workdir,'work');
 volume_workspace_file = fullfile(work_subfolder,[volume_runno '_workspace.mat']);
 temp_file = [work_subfolder '/' volume_runno '.tmp'];
 if (starting_point == 2)
-    if isdeployed
+    make_workspace = 1;
     try
         dummy_mf = matfile(volume_workspace_file,'Writable',false);
         tmp_param = dummy_mf.param;
+        make_workspace = 0;
     catch
-        make_workspace =1;
     end
-    else
-        make_workspace =1 ;
-    end
-    
     if ~exist(temp_file,'file')
         make_tmp = 1;
     end
+elseif (starting_point < 2)
+    error_flag = 1
+    log_msg =sprintf('Volume %s: Source fid not ready yet! Unable to run recon setup.\n',volume_runno);
+    yet_another_logger(log_msg,log_mode,log_file,error_flag);
 else
-    if (starting_point < 2)
-        error_flag =1
-        log_msg =sprintf('Volume %s: Source fid not ready yet! Unable to run recon setup.\n',volume_runno);
-        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    else
-        log_msg =sprintf('Volume %s: Setup work appears to have been previously completed; skipping.\n',volume_runno);
-        yet_another_logger(log_msg,log_mode,log_file);
-    end
+    log_msg =sprintf('Volume %s: Setup work appears to have been previously completed; skipping.\n',volume_runno);
+    yet_another_logger(log_msg,log_mode,log_file);
+    make_workspace = 0;
 end
-%{
-if ~isdeployed
-   make_workspace=1;
-end
-%}
+
 if (make_workspace)
     tic
     %data=single(zeros([floor(npoints/2),n_sampled_points]));
@@ -135,11 +124,8 @@ if (make_workspace)
         %block
         m.scaling = scaling;
         
-       
+        m.shift_modifier=shift_modifier;
         
-        m.shift_modifier=shift_modifier; 
-            
-       
         % Write scaling factor to scale file
         fid = fopen(scale_file,'w');
         fwrite(fid,scaling,'float');
@@ -184,7 +170,6 @@ if (make_workspace)
     %aux_param.DN = DN;
     aux_param.TVWeight=TVWeight;
     aux_param.xfmWeight=xfmWeight;
-    %aux_param.OuterIt=OuterIt;
     aux_param.volume_scale=volume_scale;
     aux_param.scaleFile=scale_file;
     aux_param.tempFile=temp_file;
