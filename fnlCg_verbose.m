@@ -23,6 +23,7 @@ function [x,k,total_elapsed_time] = fnlCg_verbose(x0,params,options)
 % 27 September 2017
 
 if exist('options','var')
+    %% non-compute options
     if ~isfield(options,'verbosity')
         verbosity = 0;
     else
@@ -41,7 +42,7 @@ if exist('options','var')
             log_file = options.log_file;
         end
     end
-    
+    %% compute options
     if ~isfield(options,'variable_iterations')
         variable_iterations = 0;
     else
@@ -54,8 +55,6 @@ if exist('options','var')
         else
             convergence_limit=options.convergence_limit;
         end
-        
-        
     end
     
     if ~isfield(options,'convergence_window')
@@ -73,7 +72,6 @@ end
 
 x = x0;
 
-
 % line search parameters
 maxlsiter = params.lineSearchItnlim ;
 gradToll = params.gradToll ;
@@ -88,7 +86,6 @@ t = 1;
 g0 = wGradient(x,params);
 
 dx = -g0;
-
 
 % BJA-2017 code
 f1_vector=zeros([1 params.Itnlim]);
@@ -108,8 +105,7 @@ if verbosity
         log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in FIXED ITERATION mode.\n\tnumber of iterations: %i.\n',max_iterations);
         yet_another_logger(log_msg,log_mode,log_file);
     end
-    
-    
+        
     log_msg = sprintf('Iteration,\t     obj,\tdelta obj,\tconv metric,\titeration time,\telapsed time.\n');
     yet_another_logger(log_msg,log_mode,log_file);
 else
@@ -117,8 +113,6 @@ else
 end
 
 while(1)
-    
-    
     % backtracking line-search
     if verbosity
         iteration_timer = tic;
@@ -131,7 +125,6 @@ while(1)
     [f1, ERRobj, RMSerr]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params);
     
     lsiter = 0;
-    
     while (f1 > f0 - alpha*t*abs(g0(:)'*dx(:)))^2 & (lsiter<maxlsiter)
         lsiter = lsiter + 1;
         t = t * beta;
@@ -147,7 +140,6 @@ while(1)
     if lsiter > 2
         t0 = t0 * beta;
     end
-    
     if lsiter<1
         t0 = t0 / beta;
     end
@@ -155,7 +147,6 @@ while(1)
     x = (x + t*dx);
     
     %conjugate gradient calculation
-    
     g1 = wGradient(x,params);
     bk = g1(:)'*g1(:)/(g0(:)'*g0(:)+eps);
     g0 = g1;
@@ -190,6 +181,7 @@ while(1)
             elapsed_time(k) = elapsed_time(k-1) + iteration_time(k);
         end
 
+        %% loggy bits
         %--------- uncomment for debug purposes ------------------------
         %log_msg = sprintf('%d   obj: %f, RMS: %f, L-S: %d\n', k,f1,RMSerr,lsiter);
         if ((k > convergence_window) && (k > 2))
@@ -197,12 +189,9 @@ while(1)
         else
             log_msg = sprintf(['%0'  num2str(numel(num2str(max_iterations)))  'i,\t%03.06f,\t       %+s,\t      %+s,\t%0.04f s,\t%0.04f s.\n'], k,f1,'N/A','N/A',iteration_time(k),elapsed_time(k));
         end
-        
         yet_another_logger(log_msg,log_mode,log_file);
         %---------------------------------------------------------------
     end
-    
-    
     
     %if (k > params.Itnlim) | (norm(dx(:)) < gradToll)
     break_flag = 0;
@@ -213,8 +202,8 @@ while(1)
     end
     
     if ((k >= params.Itnlim) || (break_flag))
-        
         if verbosity
+            %% loggy bits
             total_elapsed_time = elapsed_time(k);
             if (variable_iterations)
                 log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\nAbsolute value of the convergence metric %.4e was less than the convergence limit %.4e.\n\n',k,elapsed_time(k),convergence_metric(k),convergence_limit);
@@ -222,26 +211,21 @@ while(1)
                 log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\n\n',k,elapsed_time(k));
             end
             yet_another_logger(log_msg,log_mode,log_file);
-            break;
         else
             total_elapsed_time = toc(time_zero);
-            break;
         end
+        break; % This is how we exit our while loop. 
     end
     
 end
 
-
 return;
 
-
 function [FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx] = preobjective(x, dx, params)
-
+%%
 % precalculates transforms to make line search cheap
-
 FTXFMtx = params.FT*(params.XFM'*x);
 FTXFMtdx = params.FT*(params.XFM'*dx);
-
 if params.TVWeight
     DXFMtx = params.TV*(params.XFM'*x);
     DXFMtdx = params.TV*(params.XFM'*dx);
@@ -250,34 +234,24 @@ else
     DXFMtdx = 0;
 end
 
-
-
-
-
-function [res, obj, RMS] = objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx, x,dx,t, params);
+function [res, obj, RMS] = objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx, x,dx,t, params)
+%%
 %calculated the objective function
-
 p = params.pNorm;
-
 obj = FTXFMtx + t*FTXFMtdx - params.data;
 obj = obj(:)'*obj(:);
-
 if params.TVWeight
     w = DXFMtx(:) + t*DXFMtdx(:);
     TV = (w.*conj(w)+params.l1Smooth).^(p/2);
 else
     TV = 0;
 end
-
 if params.xfmWeight
     w = x(:) + t*dx(:);
     XFM = (w.*conj(w)+params.l1Smooth).^(p/2);
 else
     XFM=0;
 end
-
-
-
 TV = sum(TV.*params.TVWeight(:));
 XFM = sum(XFM.*params.xfmWeight(:));
 RMS = sqrt(obj/sum(abs(params.data(:))>0));
@@ -285,7 +259,7 @@ RMS = sqrt(obj/sum(abs(params.data(:))>0));
 res = obj + (TV) + (XFM) ;
 
 function grad = wGradient(x,params)
-
+%%
 gradXFM = 0;
 gradTV = 0;
 
@@ -296,39 +270,26 @@ end
 if params.TVWeight
     gradTV = gTV(x,params);
 end
-
-
 grad = (gradObj +  params.xfmWeight.*gradXFM + params.TVWeight.*gradTV);
 
 
-
-function gradObj = gOBJ(x,params);
+function gradObj = gOBJ(x,params)
+%%
 % computes the gradient of the data consistency
-
 gradObj = params.XFM*(params.FT'*(params.FT*(params.XFM'*x) - params.data));
-
 gradObj = 2*gradObj ;
 
 function grad = gXFM(x,params)
+%%
 % compute gradient of the L1 transform operator
-
 p = params.pNorm;
-
 grad = p*x.*(x.*conj(x)+params.l1Smooth).^(p/2-1);
 
-
 function grad = gTV(x,params)
+%%
 % compute gradient of TV operator
-
 p = params.pNorm;
-
 Dx = params.TV*(params.XFM'*x);
-
 G = p*Dx.*(Dx.*conj(Dx) + params.l1Smooth).^(p/2-1);
 grad = params.XFM*(params.TV'*G);
-
-
-
-
-
 
