@@ -1,5 +1,7 @@
 function [npoints,nblocks,ntraces,bitdepth,bytes_per_block,complete_file_size,b_status] = load_fid_hdr_details(fidpath)
-% Useful Ref: https://www.agilent.com/cs/library/usermanuals/Public/0199937900a.pdf
+% Useful Ref:
+% https://www.agilent.com/cs/library/usermanuals/Public/0199937900a.pdf
+% page 275
 try
     fid = fopen(fidpath,'r','ieee-be');
 catch ME
@@ -12,7 +14,12 @@ ntraces   = fread(fid,1,'int32');
 npoints   = fread(fid,1,'int32');
 bytes_per_element     = fread(fid,1,'int32');
 bytes_per_trace    = fread(fid,1,'int32');
-bytes_per_block     = fread(fid,1,'int32');
+
+% Out of spec (should be int32) because we may have integer overflow (>2,147,483,647)
+% Changing to uint32 will still always return the right number in the
+% common (valid) range of 0 to 2,147,483,647.
+bytes_per_block     = fread(fid,1,'uint32'); 
+
 version_id     = fread(fid,1,'int16');
 status    = fread(fid,1,'int16');
 n_block_headers_per_block   = fread(fid,1,'int32');
