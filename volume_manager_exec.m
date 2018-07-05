@@ -727,7 +727,9 @@ else
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
-        vm_slurm_options.mem=512; % memory requested; vm only needs a miniscule amount.
+        vm_slurm_options.mem=2048; % memory requested; vm only needs a miniscule amount.
+            %--In theory only! For yz-array sizes > 2048^2, loading the
+            % data of phmask, CSmask, etc can push the memory of 512 MB
         vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
         vm_slurm_options.job_name = [volume_runno '_volume_manager'];
         %vm_slurm_options.reservation = active_reservation;
