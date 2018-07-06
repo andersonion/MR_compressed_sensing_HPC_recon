@@ -160,18 +160,23 @@ for index=1:length(slice_numbers)
     if (completed_iterations > 0);
         %previous_Itnlim = floor(c_work_done/1000000); % 9 May 2017, BJA: Adding ability to continue CS recon with more iterations.
         if (current_Itnlim > completed_iterations)
-            % current is the max n of iterations, ignoring re-init's 
-            % I think we need a conditional of when outerIT>1
-            % I think we say, current_itnlim/outerit.
-            %current_Itnlim/OuterIt=interval.
-            % completed mod interval, not to worry we dont save partial blocks.
-            
-            
             param.Itnlim = current_Itnlim - completed_iterations;
             % current_Itnlim/re_inits 
             continue_work=1;
             log_msg =sprintf('Slice %i: Previous recon work done (%i iterations); continuing recon up to maximum total of %i iterations.\n',slice_index,completed_iterations,current_Itnlim);
             yet_another_logger(log_msg,log_mode,log_file);
+        end
+    else
+        % current is the max n of iterations, ignoring re-init's
+        % re-initalizaiton is not compatible with keep work for now. 
+        % I think we need a conditional of when outerIT>1
+        % I think we say, current_itnlim/outerit.
+        % completed mod interval, not to worry we dont save partial blocks.
+        % current_Itnlim/OuterIt
+        
+        param.Itnlim= current_Itnlim / OuterIt;
+        if mod(current_Itnlim,OuterIt)>0 
+            error('re_init error');
         end
     end
     
