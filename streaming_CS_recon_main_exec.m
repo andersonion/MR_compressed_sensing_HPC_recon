@@ -63,7 +63,6 @@ types.standard_options={...
     'Itnlim',               'number of iterations, would like to rename ot max_iterations. Probably have to chase this down in the code.'
     'xfmWeight',            ''
     'TVWeight',             ''
-    'OuterIt',              ''
     'hamming_window',       ' used in the creation of phmask'
     'CS_table',             ' the CS table on the scanner to use. Must be specified in streaming mode.' 
     'first_volume',         ' start reconstructing at volume N, The first volume will also be processed!'
@@ -72,10 +71,12 @@ types.standard_options={...
     'roll_data',            ' pre-roll the data before reconstruction'
     };
 types.beta_options={...
-    'CS_reservation',       'specify reservation to run on' 
+    'CS_reservation',       ' specify reservation to run on' 
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
 types.planned_options={...
+    'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
+    're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
     'wavelet_dims',         ''
     'wavelet_type',         ''
     'chunk_size',           ''
@@ -111,7 +112,8 @@ options=mat_pipe_option_handler(varargin,types);
 % TEMPORARY, until options are fully implemented
 
 %% Current defaults--option handling will be upgraded shortly
-options.verbose=1;% james normally attaches this to the "debug_val" option, with increasing values of debugging generating more and more outtput.
+options.verbose=1;% james normally attaches this to the "debug_val" option, 
+% with increasing values of debugging generating more and more outtput.
 log_mode = 2; % Log only to log file.
 if options.verbose
     log_mode = 1; % Log to file and standard out/error.
@@ -119,18 +121,13 @@ end
 if ~options.target_machine
     options.target_machine = 'delos';
 end
-options.fermi_filter=~options.skip_fermi_filter; % since options are defacto off, this should set inverse.
+% since options are defacto off, this should set inverse.
+options.fermi_filter=~options.skip_fermi_filter; 
 if ~options.chunk_size
-    options.chunk_size=6; % 25 November 2016, temporarily (?) changed to 6
-end
-%{
-if ~exist('CS_recon_params','var')
-    CS_recon_params=''; % Added 23 December 2016 or otherwise default values won't work. --BJA
-end
-% commented 20171211 This appeared to be dead code. -james.
-%}
-if ~options.Itnlim
-    options.Itnlim=98;
+    % 25 November 2016, temporarily (?) changed to 6
+    % 2018 07 05 set to 30 like our wrapping shell script to reduce cluster
+    % over load.
+    options.chunk_size=30;
 end
 if islogical(options.TVWeight)
     options.TVWeight = 0.0012;
@@ -138,11 +135,39 @@ end
 if islogical(options.xfmWeight)
     options.xfmWeight =0.006;
 end
-if ~options.OuterIt
-    options.OuterIt = 1;
-end
 if ~options.hamming_window
     options.hamming_window=32;
+end
+%% iteration determination with glorious complication !
+% uses "temporary" option re_init_count which is 
+% the number of iteration blocks -1 (becuase Re_init :) ) 
+if ~options.iteration_strategy
+    if ~options.Itnlim
+        % previous default, now changing it to bj's found "good" value of
+        % 10 with 4 re-inits(50 total iterations)
+        % options.Itnlim=98;
+        options.Itnlim=50;
+        options.re_init_count=4;
+    end
+else
+    if options.keep_work
+        error('keep_work and iteration_strategy are not tested together');
+    end
+    % options.iteration_strategy='10x5';
+    options.iteration_strategy=strsplit(options.iteration_strategy,'x');
+    ic=str2double(options.iteration_strategy(1));
+    options.re_init_count=str2double(options.iteration_strategy(2))-1;
+    options.Itnlim=ic*(options.re_init_count+1);
+end
+if numel(options.xfmWeight) == 1
+    options.xfmWeight= ones(1,options.re_init_count+1)*options.xfmWeight;
+end
+if numel(options.TVWeight) == 1
+    options.TVWeight= ones(1,options.re_init_count+1)*options.TVWeight;
+end
+if numel(options.xfmWeight) ~=  numel(options.TVWeight) ...
+    || numel(options.xfmWeight) ~= options.re_init_count+1
+    error('mis-match for our re_initalizations and required params, TVWeight and xfmWeight');
 end
 
 %% Reservation support
@@ -251,6 +276,7 @@ if ~exist(study_flag,'file')
             get_hdr_from_fid(input_fid,local_hdr,scanner);
         end
     end
+    
     varlist='npoints,nblocks,ntraces,bitdepth,bbytes,dim_x';
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
@@ -398,6 +424,7 @@ if ~exist(study_flag,'file')
         running_jobs = '';
         if (m.nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
             if ~exist('local_or_streaming_or_static','var')
+                warning('Weird code here, should never run, debug later - james');
                 [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
             end
             if (local_or_streaming_or_static == 2) 
@@ -507,7 +534,11 @@ if ~exist(study_flag,'file')
             vm_slurm_options=struct;
             vm_slurm_options.v=''; % verbose
             vm_slurm_options.s=''; % shared; volume manager needs to share resources.
-            vm_slurm_options.mem=512; % memory requested; vm only needs a miniscule amount.
+            
+            % memory requested; volume manager only needs a miniscule amount.
+            %--In theory only! For yz-array sizes > 2048^2, loading the
+            % data of phmask, CSmask, etc can push the memory of 512 MB
+            vm_slurm_options.mem=2048;
             vm_slurm_options.p=gatekeeper_queue;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vm_slurm_options.job_name = [volume_runno '_volume_manager'];
             %vm_slurm_options.reservation = active_reservation;
