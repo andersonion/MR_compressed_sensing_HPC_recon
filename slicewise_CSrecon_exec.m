@@ -1,12 +1,8 @@
 function slicewise_CSrecon_exec(matlab_workspace,slice_indices,options_file)
+
+
 if ~isdeployed    
-    matlab_workspace ='/nas4/cof/S67960.work/S67960_m023/work/S67960_m023_workspace.mat';
-    
-    slice_indices ='021_to_040';
-    %global_volume = 1;
-
    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
-
 end
 
 %%%
@@ -241,14 +237,16 @@ for index=1:length(slice_numbers)
         %% iterate OuterIt times inner it passed by param as Itnlim
         %if (split_recon)
         %
+        iterations_performed=0;
         for n=1:OuterIt
             param.TVWeight  = TVWeight(n);   % TV penalty
             param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
-            [res, iterations_performed, time_to_recon] = fnlCg_verbose(res, param,recon_options);
+            [res, inner_its, time_to_recon] = fnlCg_verbose(res, param,recon_options);
+            iterations_performed=iterations_performed+inner_its;
         end
         %time_to_recon = toc;
         
-        log_msg =sprintf('Slice %i: Time to reconstruct data:  %0.2f seconds.\n',slice_index,time_to_recon);
+        log_msg =sprintf('Slice %i: Time to reconstruct data (With %i iteration blocks):  %0.2f seconds. \n',slice_index,n,time_to_recon);
         yet_another_logger(log_msg,log_mode,log_file);
         %{
         if ~isdeployed
@@ -331,7 +329,7 @@ for index=1:length(slice_numbers)
             header_info = uint16(completed_iterations+iterations_performed);
             %fseek(fid,8*(slice_index-1),-1); % 8 May 2017, BJA: changing header from binary to double local_scaling factor.
             %fseek(fid,2*(slice_index-1),-1); % 15 May 2017, BJA: header stores number of iterations now
-            9
+            
             num_written=0;
             for tt=1:30 %% is this a 30 retry count for write?
                 fseek(t_id,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
