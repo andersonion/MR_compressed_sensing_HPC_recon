@@ -74,17 +74,13 @@ x = x0;
 
 % line search parameters
 maxlsiter = params.lineSearchItnlim ;
-gradToll = params.gradToll ;
+% gradToll = params.gradToll ; % unused
 alpha = params.lineSearchAlpha;
 beta = params.lineSearchBeta;
 t0 = params.lineSearchT0;
-k = 0;
-t = 1;
 
 % copmute g0  = grad(Phi(x))
-
 g0 = wGradient(x,params);
-
 dx = -g0;
 
 % BJA-2017 code
@@ -95,9 +91,10 @@ convergence_metric=zeros([1 params.Itnlim]);
 delta_obj = zeros([1 params.Itnlim]);
 iteration_time =  zeros([1 params.Itnlim]);
 max_iterations = params.Itnlim;
-
+elapsed_time = zeros([1 params.Itnlim]);
 % iterations
 if verbosity
+    %% loggy bits
     if (variable_iterations)
         log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in VARIABLE ITERATION mode.\n\tmax iterations: %i\n\tconvergence window: %i iterations\n\tconvergence limit: %.4e\n\tconvergence metric: %s\n',max_iterations,convergence_window,convergence_limit,'Second derivative of normalized objective');
         yet_another_logger(log_msg,log_mode,log_file);
@@ -105,38 +102,40 @@ if verbosity
         log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in FIXED ITERATION mode.\n\tnumber of iterations: %i.\n',max_iterations);
         yet_another_logger(log_msg,log_mode,log_file);
     end
-        
     log_msg = sprintf('Iteration,\t     obj,\tdelta obj,\tconv metric,\titeration time,\telapsed time.\n');
     yet_another_logger(log_msg,log_mode,log_file);
 else
     time_zero = tic;
-end
+end % time keeping
 
-while(1)
-    % backtracking line-search
+k = 0;
+while ( (k < params.Itnlim) ...
+        || ( variable_iterations ...
+        && ( k<=2 && k <= convergence_window) ...
+        && convergence_limit < abs(convergence_metric(k)) ) ...
+    )
     if verbosity
         iteration_timer = tic;
     end
+    %% do backtracking line-search 
     % pre-calculate values, such that it would be cheap to compute the objective
     % many times for efficient line-search
     [FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx] = preobjective(x, dx, params);
     f0 = objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, 0, params);
     t = t0;
-    [f1, ERRobj, RMSerr]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params);
-    
+    [f1, ~, ~]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params); % [f1, ERRobj, RMSerr]
     lsiter = 0;
-    while (f1 > f0 - alpha*t*abs(g0(:)'*dx(:)))^2 & (lsiter<maxlsiter)
+    while ( f1 >  ( f0 - alpha*t*abs(g0(:)'*dx(:)) )  )^2 & (lsiter<maxlsiter)
         lsiter = lsiter + 1;
         t = t * beta;
-        [f1, ERRobj, RMSerr]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params);
+        [f1, ~, ~]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params); %[f1, ERRobj, RMSerr]
     end
-    
     if lsiter == maxlsiter
-        disp('Reached max line search,.... not so good... might have a bug in operators. exiting... ');
-        return;
+        warning('Reached max line search,.... not so good... might have a bug in operators. exiting... ');
+        break; % return;
     end
-    
     % control the number of line searches by adapting the initial step search
+    % should this happen before the first linear search?
     if lsiter > 2
         t0 = t0 * beta;
     end
@@ -144,6 +143,7 @@ while(1)
         t0 = t0 / beta;
     end
     
+    %%
     x = (x + t*dx);
     
     %conjugate gradient calculation
@@ -154,7 +154,6 @@ while(1)
     k = k + 1;
     
     % BJA-2017 Code
-    
     %RMSerr_vector(k)=RMSerr;
     
     if k==1
@@ -172,15 +171,10 @@ while(1)
         convergence_metric(k) = mean_window(k)-2*mean_window(k-1)+mean_window(k-2);
     end
     
-    
     if (verbosity)
+        %% log time keeping
         iteration_time(k) = toc(iteration_timer);
-        if k == 1
-            elapsed_time(k) = iteration_time(k);
-        else
-            elapsed_time(k) = elapsed_time(k-1) + iteration_time(k);
-        end
-
+        elapsed_time(k)   = sum(iteration_time);
         %% loggy bits
         %--------- uncomment for debug purposes ------------------------
         %log_msg = sprintf('%d   obj: %f, RMS: %f, L-S: %d\n', k,f1,RMSerr,lsiter);
@@ -191,35 +185,28 @@ while(1)
         end
         yet_another_logger(log_msg,log_mode,log_file);
         %---------------------------------------------------------------
-    end
+    end % time keeping
     
-    %if (k > params.Itnlim) | (norm(dx(:)) < gradToll)
-    break_flag = 0;
-    if (variable_iterations)
-        if ((k > convergence_window) && (k > 2) && (convergence_limit >= abs(convergence_metric(k))))
-            break_flag = 1;
-        end
-    end
-    
-    if ((k >= params.Itnlim) || (break_flag))
-        if verbosity
-            %% loggy bits
-            total_elapsed_time = elapsed_time(k);
-            if (variable_iterations)
-                log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\nAbsolute value of the convergence metric %.4e was less than the convergence limit %.4e.\n\n',k,elapsed_time(k),convergence_metric(k),convergence_limit);
-            else
-                log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\n\n',k,elapsed_time(k));
-            end
-            yet_another_logger(log_msg,log_mode,log_file);
-        else
-            total_elapsed_time = toc(time_zero);
-        end
-        break; % This is how we exit our while loop. 
-    end
-    
+    % if (k > params.Itnlim) | (norm(dx(:)) < gradToll)
+    %     break;
+    % end
 end
 
+if verbosity
+    %% loggy bits
+    total_elapsed_time = elapsed_time(k);
+    if (variable_iterations)
+        log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\nAbsolute value of the convergence metric %.4e was less than the convergence limit %.4e.\n\n',k,elapsed_time(k),convergence_metric(k),convergence_limit);
+    else
+        log_msg = sprintf('\nReconstruction complete after %i iterations; total elapsed time: %0.04f s.\n\n',k,elapsed_time(k));
+    end
+    yet_another_logger(log_msg,log_mode,log_file);
+else
+    total_elapsed_time = toc(time_zero);
+end % time keeping
+
 return;
+end
 
 function [FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx] = preobjective(x, dx, params)
 %%
@@ -232,6 +219,7 @@ if params.TVWeight
 else
     DXFMtx = 0;
     DXFMtdx = 0;
+end
 end
 
 function [res, obj, RMS] = objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx, x,dx,t, params)
@@ -257,6 +245,7 @@ XFM = sum(XFM.*params.xfmWeight(:));
 RMS = sqrt(obj/sum(abs(params.data(:))>0));
 
 res = obj + (TV) + (XFM) ;
+end
 
 function grad = wGradient(x,params)
 %%
@@ -271,19 +260,21 @@ if params.TVWeight
     gradTV = gTV(x,params);
 end
 grad = (gradObj +  params.xfmWeight.*gradXFM + params.TVWeight.*gradTV);
-
+end
 
 function gradObj = gOBJ(x,params)
 %%
 % computes the gradient of the data consistency
 gradObj = params.XFM*(params.FT'*(params.FT*(params.XFM'*x) - params.data));
 gradObj = 2*gradObj ;
+end
 
 function grad = gXFM(x,params)
 %%
 % compute gradient of the L1 transform operator
 p = params.pNorm;
 grad = p*x.*(x.*conj(x)+params.l1Smooth).^(p/2-1);
+end
 
 function grad = gTV(x,params)
 %%
@@ -292,4 +283,4 @@ p = params.pNorm;
 Dx = params.TV*(params.XFM'*x);
 G = p*Dx.*(Dx.*conj(Dx) + params.l1Smooth).^(p/2-1);
 grad = params.XFM*(params.TV'*G);
-
+end
