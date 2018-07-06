@@ -52,7 +52,7 @@ if exist(procpar_path,'file')
     output_headfile.CS_TVWeight = TVWeight;
     output_headfile.CS_xfmWeight = xfmWeight;
     output_headfile.CS_Itnlim = Itnlim;
-    output_headfile.CS_OuterIt = OuterIt;
+    %output_headfile.CS_OuterIt = OuterIt;
     
     %{
         output_headfile.S_PSDname = char(procpar.seqfil);

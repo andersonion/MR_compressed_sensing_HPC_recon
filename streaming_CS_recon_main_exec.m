@@ -412,7 +412,7 @@ if ~exist(study_flag,'file')
         m.procpar_file = procpar_file;
         m.log_file = log_file;
         m.options = options; % The following shall soon be cannibalized by options!
-        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','OuterIt','fermi_filter','verbosity'};
+        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','fermi_filter','verbosity'};
         for on=1:numel(transcribed_opts)
             m.(transcribed_opts{on})=options.(transcribed_opts{on});
         end

@@ -13,7 +13,7 @@ if ~parallel
             try
                 run(c_commands{c});
             catch exc
-                exceptions{c}=exc;o
+                exceptions{c}=exc;
                 disp(exc);
             end
         end
