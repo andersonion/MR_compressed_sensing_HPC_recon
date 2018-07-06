@@ -9,8 +9,10 @@ if ~isdeployed
 
 end
 
-%% This eliminates the nested structure of the incoming slice data, and also writes the each
-%% slice as they finish instead of waiting until all are done.
+%%%
+% This eliminates the nested structure of the incoming slice data, and also writes the each
+% slice as they finish instead of waiting until all are done.
+%%%
 
 slice_numbers=[];
 slice_number_strings = strsplit(slice_indices,'_');
@@ -27,12 +29,7 @@ for ss = 1:length(slice_number_strings)
 end
 slice_numbers=unique(slice_numbers);
 
-
-%if ~isdeployed
-%    addpath(genpath('/home/rmd22/Documents/MATLAB/'));
-%end
-
-%% Make sure the goddam workspace file exist
+%% Make sure the workspace file exist
 log_mode = 3;
 log_file ='';
 if  (~exist(matlab_workspace,'file'))
@@ -72,8 +69,6 @@ log_file = aux_param.volume_log_file;
 log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
 yet_another_logger(log_msg,log_mode,log_file)
 
-%param.Itnlim=98; %Testing p
-
 %% Setup common variables
 %mask_size=aux_param.maskSize;
 mask=aux_param.mask;
@@ -85,15 +80,15 @@ temp_file=aux_param.tempFile;
 recon_dims=aux_param.recon_dims;
 CSpdf=aux_param.CSpdf; % We can find the LESS THAN ONE elements to recreate original slice array size
 phmask=aux_param.phmask;
-
-OuterIt=length(TVWeight);%aux_param.OuterIt;
-
 wavelet_dims=aux_param.waveletDims;
-
 if isfield(aux_param,'waveletType')
     wavelet_type=aux_param.waveletType;
 else
     wavelet_type = 'Daubechies';
+end
+OuterIt=length(TVWeight);
+if length(xfmWeight) ~= OuterIt
+    error('Outer iterations determined by length of xfmWeight and TVWeight, Error in setting!');
 end
 
 XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
@@ -147,77 +142,81 @@ header_size = 1+recon_dims(1);% 26 September 2017, BJA: 1st uint16 bytes are hea
 %% Reconstruct slice(s)
 for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
-    fid=fopen(temp_file,'r+');
+    %% read temp_file header for completed work.
+    t_id=fopen(temp_file,'r+');
+    % Should be the same size as header_size 
+    header_length = fread(t_id,1,'uint16'); 
+    % 15 May 2017, BJA; changed header from double to uint16; will indicate number of iterationsperformed
     %work_done = fread(fid,dims(1),'*uint8');
-    header_length = fread(fid,1,'uint16'); % Should be the same size as header_size
-    work_done = fread(fid,header_length,'uint16'); % 15 May 2017, BJA; changed header from double to uint16; will indicate number of iterationsperformed
-    %work_done = fread(fid,dims(1),'double'); % 8 May 2017, BJA: converting header from binary to double local_scaling
-    fclose(fid);
-    %previous_Itnlim = 0;
+    work_done = fread(t_id,header_length,'uint16');
+    % 8 May 2017, BJA: converting header from binary to double local_scaling
+    %work_done = fread(fid,dims(1),'double'); 
+    fclose(t_id);
+    %% decide if we're continuting work or not
     continue_work = 0;
     c_work_done = work_done(slice_index);
-    previous_Itnlim = c_work_done;
-    if (c_work_done > 0);
+    % completed_iterations formerly previous_Itnlim
+    completed_iterations = c_work_done; 
+    if (completed_iterations > 0);
         %previous_Itnlim = floor(c_work_done/1000000); % 9 May 2017, BJA: Adding ability to continue CS recon with more iterations.
-       
-        if (current_Itnlim > previous_Itnlim)
-            param.Itnlim = current_Itnlim - previous_Itnlim;
+        if (current_Itnlim > completed_iterations)
+            % current is the max n of iterations, ignoring re-init's 
+            % I think we need a conditional of when outerIT>1
+            % I think we say, current_itnlim/outerit.
+            %current_Itnlim/OuterIt=interval.
+            % completed mod interval, not to worry we dont save partial blocks.
+            
+            
+            param.Itnlim = current_Itnlim - completed_iterations;
+            % current_Itnlim/re_inits 
             continue_work=1;
-            log_msg =sprintf('Slice %i: Previous recon work done (%i iterations); continuing recon up to maximum total of %i iterations.\n',slice_index,previous_Itnlim,current_Itnlim);
+            log_msg =sprintf('Slice %i: Previous recon work done (%i iterations); continuing recon up to maximum total of %i iterations.\n',slice_index,completed_iterations,current_Itnlim);
             yet_another_logger(log_msg,log_mode,log_file);
         end
     end
     
     if ((c_work_done == 0) || (continue_work)) %~work_done(slice_index)
-        
         %% Load slice specific data
-        tic
-        
-        %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
-        slice_data = complex(mm.real_data(slice_index,:),mm.imag_data(slice_index,:));
-        param.data = zeros(size(mask),'like',slice_data); % Ibid
-        %param.data = zeros([size(mask)],'like',slice_data);
-        param.data(mask(:))=slice_data(:); % Ibid
-        time_to_load_sparse_data = toc;
-        
-        log_msg =sprintf('Slice %i: Time to load sparse data:  %0.2f seconds.\n',slice_index,time_to_load_sparse_data);
-        yet_another_logger(log_msg,log_mode,log_file);
         
         tic
         
-        im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale; % this compensates the intensity for the undersampling
-        
-        ph = exp(1i*angle((ifft2c(param.data.*phmask))));
-        
-        param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
-        
-        %Dev mode
-        %{
-        if exist('res','var')
-            clear res
-            'Clearing res'
-         end
-        %}
-        
-        if (c_work_done == 0)
-            res=XFM*im_zfwdc;
+        if (c_work_done == 0) 
+            %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
+            slice_data = complex(mm.real_data(slice_index,:),mm.imag_data(slice_index,:));
+            param.data = zeros(size(mask),'like',slice_data); % Ibid
+            %param.data = zeros([size(mask)],'like',slice_data);
+            param.data(mask(:))=slice_data(:); % Ibid
             
+            time_to_load_sparse_data = toc;
+            log_msg =sprintf('Slice %i: Time to load sparse data:  %0.2f seconds.\n',slice_index,time_to_load_sparse_data);
+            yet_another_logger(log_msg,log_mode,log_file);
+            
+            tic
+            
+            % this compensates the intensity for the undersampling
+            im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
+            ph = exp(1i*angle((ifft2c(param.data.*phmask))));
+            param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
+                        
+            res=XFM*im_zfwdc;
+            clear im_zfwdc ph slice_data; 
         else
+            % convergence_window is only added after we've done some work.
+            % Is that the behavior we want?
             recon_options.convergence_window = 3;
             %data_offset= header_size + (8*dims(2)*dims(3)*(slice_index-1));
             s_vector_length = recon_dims(2)*recon_dims(3);
             data_offset= 2*header_size + (2*8*s_vector_length*(slice_index-1)); % Each slice is double dim_y*dim_z real, then double dim_y*dim_z imaginary
-            fid=fopen(temp_file,'r+');
-            fseek(fid,data_offset,-1);
-            reconned_slice=fread(fid,2*s_vector_length,'double');
-            fclose(fid);
+            t_id=fopen(temp_file,'r+');
+            fseek(t_id,data_offset,-1);
+            reconned_slice=fread(t_id,2*s_vector_length,'double');
+            fclose(t_id);
             
             res=complex(reconned_slice(1:s_vector_length),reconned_slice((s_vector_length+1):end));
             res=reshape(res,[recon_dims(2) recon_dims(3)]);
             
             %{
             temp_res=sqrt(mask_size)/myscale*temp_res;
-            
             if (sum(dims1-dims)>0)
                 temp_res = fftshift(ifftn(fftshift(temp_res)));
                 res= padarray(temp_res,[dims1(2)-dims(2) dims1(3)-dims(3)]/2,0,'both');
@@ -225,25 +224,20 @@ for index=1:length(slice_numbers)
                 
             else
             %}
-            
             %res=XFM*res;
             %res =XFM*im_zfwdc ; %pick up where we left off...
-            
+            clear reconned_slice data_offset;
         end
         
-        
         time_to_set_up = toc;
-        
         log_msg =sprintf('Slice %i: Time to set up recon:  %0.2f seconds.\n',slice_index,time_to_set_up);
         yet_another_logger(log_msg,log_mode,log_file);
         
-        %%
-        %tic
-        
+        %% iterate OuterIt times inner it passed by param as Itnlim
         %if (split_recon)
         %
         for n=1:OuterIt
-            param.TVWeight =TVWeight(n);     % TV penalty
+            param.TVWeight  = TVWeight(n);   % TV penalty
             param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
             [res, iterations_performed, time_to_recon] = fnlCg_verbose(res, param,recon_options);
         end
@@ -251,22 +245,22 @@ for index=1:length(slice_numbers)
         
         log_msg =sprintf('Slice %i: Time to reconstruct data:  %0.2f seconds.\n',slice_index,time_to_recon);
         yet_another_logger(log_msg,log_mode,log_file);
-        
+        %{
         if ~isdeployed
             plotting_today_BJ = 1;
         else
             plotting_today_BJ = 0;
         end
-        
-        if plotting_today_BJ
+        %if plotting_today_BJ
+        %}
+        if ~isdeployed
+            %% Plotting today BJ?
             scale_file=aux_param.scaleFile;
             fid_sc = fopen(scale_file,'r');
             scaling = fread(fid_sc,inf,'*float');
             fclose(fid_sc);
             im_res = XFM'*res;
             im_res = im_res*volume_scale/sqrt(recon_dims(2)*recon_dims(3)); % --->> check this, sqrt of 2D plane elements required for proper scaling
-            
-            
             %% Crop out extra k-space if non-square or non-power of 2
             %if sum(original_dims == recon_dims) ~= 3
             %    im_res = fftshift(fftn(fftshift(im_res)));
@@ -282,17 +276,12 @@ for index=1:length(slice_numbers)
             axis xy
             pause(3)
             
-        end
-        
-        
+        end % Plotting today BJ?
+
         %{
         tic
         im_res = XFM'*res;
-        
-        
         im_res = im_res*volume_scale/sqrt(mask_size); % --->> check this, sqrt of 2D plane elements required for proper scaling
-        
-        
         %% Crop out extra k-space if non-square or non-power of 2
         if sum(dims == dims1) ~= 3
             im_res = fftshift(fftn(fftshift(im_res)));
@@ -302,11 +291,8 @@ for index=1:length(slice_numbers)
         end
         %im_to_write =double(abs(im_res)*scaling);
         %}
-        
         %im_to_write =double(abs(im_res)); % 8 May 2017, BJA: moving global scaling to cleanup
-        
         %%
-        
         %{
         im_to_write = zeros([2, numel(im_res)],'single');
         im_to_write(1,:)=single(real(im_res(:)));
@@ -318,58 +304,56 @@ for index=1:length(slice_numbers)
         %}
         
         tic
-        image_to_write = [real(res(:))' imag(res(:))'];
         
-        
-        fid=fopen(temp_file,'r+');
-        header_length = fread(fid,1,'uint16'); % Should be the same size as header_size
-        work_done = fread(fid,header_length,'uint16');
-        
+        t_id=fopen(temp_file,'r+');
+        header_length = fread(t_id,1,'uint16'); % Should be the same size as header_size
+        work_done = fread(t_id,header_length,'uint16');
+        %% Write data
         if (~work_done(slice_index) || ((continue_work) && (work_done(slice_index) < current_Itnlim)))
-            %Write data
             s_vector_length = recon_dims(2)*recon_dims(3);
             data_offset=(2*8*s_vector_length*(slice_index-1));
-            fseek(fid,data_offset,0);
-            fwrite(fid,image_to_write,'double'); %'n'
+            fseek(t_id,data_offset,0);
+            % switched out these two lines for a one liner to reduce mem overhead.
+            % image_to_write = [real(res(:))' imag(res(:))'];
+            % fwrite(t_id,image_to_write,'double'); %'n'
+            fwrite(t_id,[real(res(:))' imag(res(:))'],'double')
+            
             log_msg =sprintf('Slice %i: Successfully reconstructed and written to %s.\n',slice_index,temp_file);
             yet_another_logger(log_msg,log_mode,log_file);
             
-            
-            %Write header
+            % Write header
             %fseek(fid,(slice_index-1),-1);
-            header_info = uint16(previous_Itnlim+iterations_performed);
+            header_info = uint16(completed_iterations+iterations_performed);
             %fseek(fid,8*(slice_index-1),-1); % 8 May 2017, BJA: changing header from binary to double local_scaling factor.
             %fseek(fid,2*(slice_index-1),-1); % 15 May 2017, BJA: header stores number of iterations now
-            
-            %fwrite(fid,header_info,'double');
+            9
             num_written=0;
-            for tt=1:30
-                fseek(fid,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
-                num_written=fwrite(fid,header_info,'uint16'); % 15 May 2017, BJA: see directly above
-            
+            for tt=1:30 %% is this a 30 retry count for write?
+                fseek(t_id,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
+                num_written=fwrite(t_id,header_info,'uint16'); % 15 May 2017, BJA: see directly above
                 if (num_written ~= 1)
-                    pause(.05)
+                    pause(0.05)
                 else
                     break
                 end
             end
-            % fclose(fid);
             if (num_written ~= 1) 
-                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',slice_index,header_info,temp_file,tt);
+                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',...
+                    slice_index,header_info,temp_file,tt);
                 yet_another_logger(log_msg,log_mode,log_file,1);
                 variable_that_throws_an_error_so_slurm_knows_we_failed;
+                error('would slurm see this slice error?');
             else
-                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") written to header of %s, after %i tries.\n',slice_index,header_info,temp_file,tt);
+                log_msg =sprintf('Slice %i: Reconstruction flag ("%i") written to header of %s, after %i tries.\n',...
+                    slice_index,header_info,temp_file,tt);
             end
-
-            
             yet_another_logger(log_msg,log_mode,log_file);
             
             time_to_write_data=toc;
             log_msg =sprintf('Slice %i: Time to write data:  %0.2f seconds.\n',slice_index,time_to_write_data);
             yet_another_logger(log_msg,log_mode,log_file);
         end
-        fclose(fid);
+        fclose(t_id);
     else
         log_msg =sprintf('Slice %i: Previously reconstructed; skipping.\n',slice_index);
         yet_another_logger(log_msg,log_mode,log_file);
