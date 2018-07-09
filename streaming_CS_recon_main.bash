@@ -19,7 +19,10 @@ if [ $chunk_size_set -eq 0 ] ;then
 fi;
 echo "# start $CS_CODE_DEV exec ($exec_path)"
 echo "# with args ( $@ $c_force)";
+echo -e "$(date +"%F_%T")\t$USER\t$0\t$@ $c_force" >> $BIGGUS_DISKUS/activity_log.txt
 $exec_path $@ $c_force
+
+
 
 # advice on $@ and other things.
 # https://stackoverflow.com/questions/12314451/accessing-bash-command-line-args-vs
