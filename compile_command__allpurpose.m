@@ -40,6 +40,7 @@ latest_path_link = fullfile(this_exec_base_dir,'latest');
 [diff_stat,out]=system(sprintf('f1=%s;f2=%s;ls -l $f1 $f2;diff -qs $f1 $f2',source_file,fullfile(latest_path_link,source_filename)));
 if ~diff_stat
     disp(sprintf('skipping %s',source_filename));
+    compile_dir='NOT COMPILED DUE TO MAIN FILE IS THE SAME';
     return;
 else
     disp(out);
