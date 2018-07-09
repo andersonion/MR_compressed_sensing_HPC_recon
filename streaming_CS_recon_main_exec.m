@@ -59,27 +59,27 @@ end
 %% run the option digester
 types.standard_options={...
     'target_machine',       'which regular engine should we send data to for archival.' 
-    'skip_fermi_filter',    'do not do fermi_filtering of kspace before fft' 
-    'Itnlim',               'number of iterations, would like to rename ot max_iterations. Probably have to chase this down in the code.'
-    'xfmWeight',            ''
-    'TVWeight',             ''
-    'hamming_window',       ' used in the creation of phmask'
     'CS_table',             ' the CS table on the scanner to use. Must be specified in streaming mode.' 
     'first_volume',         ' start reconstructing at volume N, The first volume will also be processed!'
     'last_volume',          ' stop reconstructing at volume N.'
-    'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
     'roll_data',            ' pre-roll the data before reconstruction'
+    'skip_fermi_filter',    'do not do fermi_filtering of kspace before fft' 
+    'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
+    'Itnlim',               'number of iterations, would like to rename ot max_iterations. Probably have to chase this down in the code.'
+    're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
+    'TVWeight',             ''
+    'xfmWeight',            ''
+    'hamming_window',       ' used in the creation of phmask'
+    'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
     };
 types.beta_options={...
     'CS_reservation',       ' specify reservation to run on' 
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
 types.planned_options={...
-    'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
-    're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
     'wavelet_dims',         ''
     'wavelet_type',         ''
-    'chunk_size',           ''
+    'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
     'fermi_w1',             ''
     'fermi_w2',             ''
     'convergence_threshold',''
@@ -133,7 +133,10 @@ if islogical(options.TVWeight)
     options.TVWeight = 0.0012;
 end
 if islogical(options.xfmWeight)
+    %{
     options.xfmWeight =0.006;
+    %}
+    options.xfmWeight =0.002;
 end
 if ~options.hamming_window
     options.hamming_window=32;
@@ -141,6 +144,8 @@ end
 %% iteration determination with glorious complication !
 % uses "temporary" option re_init_count which is 
 % the number of iteration blocks -1 (becuase Re_init :) ) 
+% both iteration_strategy, and re_init_count are done after this, with no
+% further direct use.
 if ~options.iteration_strategy
     if ~options.Itnlim
         % previous default, now changing it to bj's found "good" value of
@@ -148,6 +153,7 @@ if ~options.iteration_strategy
         % options.Itnlim=98;
         options.Itnlim=50;
         options.re_init_count=4;
+        options.iteration_strategy=sprintf('%ix%i',options.Itnlim,option.re_init_count+1);
     end
 else
     if options.keep_work
@@ -158,6 +164,7 @@ else
     ic=str2double(options.iteration_strategy(1));
     options.re_init_count=str2double(options.iteration_strategy(2))-1;
     options.Itnlim=ic*(options.re_init_count+1);
+    options.iteration_strategy=strjoin(options.iteration_strategy,'x');
 end
 if numel(options.xfmWeight) == 1
     options.xfmWeight= ones(1,options.re_init_count+1)*options.xfmWeight;
@@ -186,6 +193,26 @@ if (active_reservation)
         options.CS_reservation=active_reservation;
     end
 end
+%% Give options feedback to user, with pause so they can cancel
+fprintf('Ready to start! Here are your selected options\n');
+fprintf('Ctrl+C now to stop and try again\n');
+fields=fieldnames(options);
+for fn=1:numel(fields)
+    if iscell(options.(fields{fn}))
+        ot='cell array!';
+    elseif ~ischar(options.(fields{fn}))
+        ot=sprintf('%g ',options.(fields{fn}));
+    else
+        ot=options.(fields{fn});
+    end
+    if islogical(options.(fields{fn})) ...
+            && ~options.(fields{fn})
+        % skip any "off" fields.... may be bad idea, we'll see.
+        continue;
+    end
+    fprintf('\t%s = \t%s\n',fields{fn},ot);
+end; clear fields fn;
+pause(3);
 %% Determine where the matlab executables live
 %  May change this to look to environment variables, or a seperate
 %  head/textfile, which will give us dynamic flexibility if our goal is
