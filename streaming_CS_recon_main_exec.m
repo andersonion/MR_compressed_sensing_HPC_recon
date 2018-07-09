@@ -293,13 +293,13 @@ if ~exist(study_flag,'file')
     local_hdr = fullfile(workdir,[runno '_hdr.fid']);
     [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
     if ~exist(local_hdr,'file');
-        if (local_or_streaming_or_static == 2)
-            log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
-            yet_another_logger(log_msg,log_mode,log_file);
-        end
         if (local_or_streaming_or_static == 1)
             get_hdr_from_fid(input_fid,local_hdr);
         else
+            if (local_or_streaming_or_static == 2)
+                log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
+                yet_another_logger(log_msg,log_mode,log_file);
+            end
             get_hdr_from_fid(input_fid,local_hdr,scanner);
         end
     end
@@ -639,11 +639,12 @@ gui_info_collect(databuffer,optstruct);
 m.databuffer = databuffer;
 m.optstruct = optstruct;
 end
+
 function [dim_y, dim_z, n_sampled_lines, sampling_fraction, mask, ...
     CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims]= ...
     process_CS_mask(procpar_or_CStable,dim_x,options)
 % function process_CS_mask 
-
+fprintf('process_CS_mask ... this can take a minute.\n');
 [mask, dim_y, dim_z, pa, pb ] = extract_info_from_CStable(procpar_or_CStable);
 n_sampled_lines=sum(mask(:));
 sampling_fraction = n_sampled_lines/length(mask(:));
