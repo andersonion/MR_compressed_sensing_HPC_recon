@@ -83,7 +83,7 @@ if ~exist(send_archive_tag,'file')
     
     if (finished_slices_count == 0) || (~headfile_exists) % We assume that all the raw files were written at once, and correctly so.
         starting_point = 4;
-	vol_status=vol_status-3;
+        vol_status=vol_status-3;
         % Check .tmp file to see if all slices have reconned.
         work_subfolder = [volume_dir '/work/'];
         temp_file = [work_subfolder '/' volume_runno '.tmp'];
@@ -91,35 +91,30 @@ if ~exist(send_archive_tag,'file')
         if exist(temp_file,'file')
             [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);  % Need to remember that we are going to add the headersize as the first bytes
             recon_file = [volume_dir '/../*recon.mat'];
-            setup_file= [work_subfolder '/' volume_runno '_setup_variables.mat'];
+            setup_file = [volume_dir '/' volume_runno '_setup_variables.mat'];
             [s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
             if s==0
-                % if ~exist(setup_file,'file')
                 recon_file=o;
                 rf=matfile(recon_file);
-                %sf=matfile(setup_file);
                 options=rf.options;
-                %options=sf.options;
                 Itnlim=options.Itnlim;
                 slices_remaining = length(find(tmp_header<Itnlim));
+                slice_remain_frac=slices_remaining/numel(tmp_header);
             else
-                %move_down_a_stage=1;
-                %slices_remaining = 1;
                 error('couldnt find recon file');
             end
-	    % the 90 is so slices only account for 90%
-	    vol_status=vol_status-90*slices_remaining/numel(tmp_header);
-            %vol_status=sprintf('%sslices are %05.2f%% complete ',vol_status,100*(numel(tmp_header)-slices_remaining)/numel(tmp_header));
             if ~exist(setup_file,'file')
                 move_down_a_stage=1;
                 slices_remaining = 1;
-		vol_status=vol_status-90;
+                slice_remain_frac= 1;
             end
         else
             slices_remaining = 1; % Will not bother to determine the exact number here.
-	    vol_status=vol_status-90;
+            slice_remain_frac= 1;
             move_down_a_stage = 1;
         end
+        % the 90 is so slices only account for 90%
+        vol_status=vol_status-90*slice_remain_frac;
         
         if (slices_remaining)
             starting_point = 3;
