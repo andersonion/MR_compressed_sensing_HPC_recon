@@ -5,12 +5,7 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
-if ~isdeployed
-    recon_file='/nas4/cof/S67960.work/S67960recon.mat';
-    volume_runno='S67960_m023';
-    volume_number='24';
-    base_workdir='/nas4/cof/S67960.work/';
-end
+  
 %%% ORIGINAL COMMENT
 % This may seem stupid, but I need to let Matlab know that I'm going need
 % series to be a variable, and not the builtin function 'series'
@@ -40,16 +35,7 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 %chunk_size
 %CS_recon_parameters: TVWeight,xfmWeight,Itnlim,wavelet_dims,wavelet_type
 %% Reservation support
-active_reservation=getenv('CS_reservation'); % This should work fine, even if CS_reservation is not set.
-% Ensure that reservation exists
-if (active_reservation)
-    [~, res_check] = system(['scontrol show reservation ' active_reservation]);
-    res_check = strtrim(res_check);
-    failure_string = ['Reservation ' active_reservation ' not found'];
-    if strcmp(res_check,failure_string)
-        active_reservation = '';
-    end
-end
+active_reservation=get_reservation(options.CS_reservation);
 %% Executables support
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
