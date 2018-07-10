@@ -16,6 +16,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  finished.
 %
 
+
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -148,19 +149,24 @@ end
 % both iteration_strategy, and re_init_count are done after this, with no
 % further direct use.
 if ~options.iteration_strategy
+    % previous default, would like to changing it to bj's found "good" value of
+    % 10 with 4 re-inits(50 total iterations) but dont want to disrupt
+    % current studies.
     if ~options.Itnlim
-        % previous default, now changing it to bj's found "good" value of
-        % 10 with 4 re-inits(50 total iterations)
-        % options.Itnlim=98;
-        options.Itnlim=50;
-        options.re_init_count=4;
-        options.iteration_strategy=sprintf('%ix%i',options.Itnlim/(options.re_init_count+1),options.re_init_count+1);
+        options.Itnlim=100;
+        % options.Itnlim=50;
     end
+    if ~options.re_init_count 
+        % this one is kinda silly becuase we default to 0 anyway. this is
+        % just here to hold the idea open for when we set default to 4.
+        options.re_init_count=0;
+        %options.re_init_count=4;
+    end
+    options.iteration_strategy=sprintf('%ix%i',options.Itnlim/(options.re_init_count+1),options.re_init_count+1);
 else
     if options.keep_work
         error('keep_work and iteration_strategy are not tested together');
     end
-    % options.iteration_strategy='10x5';
     options.iteration_strategy=strsplit(options.iteration_strategy,'x');
     ic=str2double(options.iteration_strategy(1));
     options.re_init_count=str2double(options.iteration_strategy(2))-1;
@@ -180,9 +186,19 @@ end
 
 %% Reservation support
 active_reservation=getenv('CS_reservation'); % This should work fine, even if CS_reservation is not set.
-if ~islogical(options.CS_reservation)
+
+% normal system variables, if these are set we should use these and ignore
+% what the user said, empty strings are unset.
+sbatch_r=getenv('SBATCH_RESERVATION');
+slurm_r =getenv('SLURM_RESERVATION'); 
+if ~isempty(sbatch_r)
+    active_reservation=sbatch_r;
+elseif ~isempty(slurm_r)
+    active_reservation=slurm_r;
+elseif ~islogical(options.CS_reservation)
     active_reservation=options.CS_reservation;
 end
+
 % Ensure that reservation exists
 if (active_reservation)
     [~, res_check] = system(['scontrol show reservation ' active_reservation]);
