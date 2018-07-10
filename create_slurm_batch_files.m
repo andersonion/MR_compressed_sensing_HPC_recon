@@ -43,6 +43,10 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_array_of_lines_
     for sf = 1:length(slurm_fields)
         slurm_option=slurm_fields(sf);
         slurm_option=slurm_option{1};
+        if isempty(slurm_option)
+            % avoid adding blank options.
+            continue;
+        end
         
         slurm_option_parameter = getfield(slurm_option_struct,slurm_option);
         
