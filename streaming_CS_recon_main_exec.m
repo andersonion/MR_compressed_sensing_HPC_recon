@@ -153,7 +153,7 @@ if ~options.iteration_strategy
         % options.Itnlim=98;
         options.Itnlim=50;
         options.re_init_count=4;
-        options.iteration_strategy=sprintf('%ix%i',options.Itnlim,option.re_init_count+1);
+        options.iteration_strategy=sprintf('%ix%i',options.Itnlim,options.re_init_count+1);
     end
 else
     if options.keep_work
