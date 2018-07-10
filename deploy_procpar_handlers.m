@@ -1,7 +1,7 @@
 function [ c_running_jobs ] = deploy_procpar_handlers(volume_variable_file)
 %Handles waiting for the procpar file to exist, then processing it into a
 %complete headfile.
-
+ 
 if ~isdeployed
     volume_variable_file='/civmnas4/cof/N56021.work/N56021_m16/N56021_m16_setup_variables.mat';
     %handle_archive_tag_cmd='echo "Hello, Mofo."';
@@ -74,6 +74,8 @@ if (~exist(procpar_file,'file') || ~exist(headfile,'file'))
     %gk_slurm_options.job_name = [volume_runno '_procpar_gatekeeper'];
     gk_slurm_options.job_name = [runno '_procpar_gatekeeper_and_processor'];
     %gk_slurm_options.reservation = active_reservation;
+    % using a blank reservation to force no reservation for this job.
+    gk_slurm_options.reservation = '';
     procpar_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_procpar_gatekeeper.bash'];
     procpar_gatekeeper_cmd = sprintf('%s %s %s %s', procpar_gatekeeper_exec_path, matlab_path,[procpar_file ':' headfile],log_file);
     batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
