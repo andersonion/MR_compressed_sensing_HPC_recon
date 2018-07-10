@@ -18,6 +18,18 @@ if exist(batch_file,'file') % batch_file could just be a naked command
     if ~strcmp(default_dir(end),'/')
        default_dir = [default_dir '/']; 
     end
+    %%% DIRTY RESERVATION PATCH DUE TO ENV OVERRIDEING CONTENTS OF
+    %%% BATCH FILE.
+    % only do this if we have an sbatch file, and there is no reservation
+    % string in the current dispatch to minimize collateral damage.
+    if isempty(regexpi(slurm_optiops_string,'.*reservation.*'))
+        [s,o]=system('sed -rn ''s/.*(--reservation.*)/\1/p'' %s',batch_file);
+        if s==0
+            slurm_options_string=[slurm_options_string ' ' strtrim(o)];
+        end
+    end
+    %%%
+    %%%
 end
 
 or_flag = 0;
@@ -78,7 +90,6 @@ end
 if ~isempty(dependency_string)
    dependencies = ['--dependency=' dependency_string]; 
 end
-
 if exist('slurm_options_string','var')
     out_test_array = strsplit(slurm_options_string,'--out');
     out_test = 2 - length(out_test_array);
@@ -104,6 +115,7 @@ else
         slurm_options_string=[slurm_options_string out_string];
     end
     % Add other defaults
+    
 end
 
 sbatch_cmd = sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);%['sbatch --requeue --mem=' mem ' -s -p ' queue ' ' slurm_options ' ' setup_dependency ' --job-name=' job_name ' --out=' batch_folder 'slurm-%j.out ' batch_file];
