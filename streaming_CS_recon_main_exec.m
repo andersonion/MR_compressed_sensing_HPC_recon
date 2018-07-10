@@ -15,8 +15,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
-
-
+  
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -185,31 +184,9 @@ if numel(options.xfmWeight) ~=  numel(options.TVWeight) ...
 end
 
 %% Reservation support
-active_reservation=getenv('CS_reservation'); % This should work fine, even if CS_reservation is not set.
-
-% normal system variables, if these are set we should use these and ignore
-% what the user said, empty strings are unset.
-sbatch_r=getenv('SBATCH_RESERVATION');
-slurm_r =getenv('SLURM_RESERVATION'); 
-if ~isempty(sbatch_r)
-    active_reservation=sbatch_r;
-elseif ~isempty(slurm_r)
-    active_reservation=slurm_r;
-elseif ~islogical(options.CS_reservation)
-    active_reservation=options.CS_reservation;
-end
-
-% Ensure that reservation exists
-if (active_reservation)
-    [~, res_check] = system(['scontrol show reservation ' active_reservation]);
-    res_check = strtrim(res_check);
-    failure_string = ['Reservation ' active_reservation ' not found'];
-    if strcmp(res_check,failure_string)
-        active_reservation = '';
-    else
-        options.CS_reservation=active_reservation;
-    end
-end
+active_reservation=get_reservation(options.CS_reservation);
+options.CS_reservation=active_reservation;
+ 
 %% Give options feedback to user, with pause so they can cancel
 fprintf('Ready to start! Here are your selected options\n');
 fprintf('Ctrl+C now to stop and try again\n');
