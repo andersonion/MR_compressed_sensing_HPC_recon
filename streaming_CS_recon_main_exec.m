@@ -15,6 +15,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
+
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -500,6 +501,8 @@ if ~exist(study_flag,'file')
                     gk_slurm_options.p=gatekeeper_queue;
                     gk_slurm_options.job_name = [runno '_gatekeeper'];
                     %gk_slurm_options.reservation = active_reservation;
+                    % using a blank reservation to force no reservation for this job.
+                    gk_slurm_options.reservation = '';
                     study_gatekeeper_batch = [workdir '/sbatch/' runno '_gatekeeper.bash'];
                     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', ...
                         gatekeeper_exec, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
@@ -569,6 +572,8 @@ if ~exist(study_flag,'file')
             vm_slurm_options.p=gatekeeper_queue;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vm_slurm_options.job_name = [volume_runno '_volume_manager'];
             %vm_slurm_options.reservation = active_reservation;
+            % using a blank reservation to force no reservation for this job.
+            vm_slurm_options.reservation = ''; 
             volume_manager_batch = fullfile(volume_dir,'sbatch',[ volume_runno '_volume_manager.bash']);
             vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec, matlab_path, recon_file,volume_runno, volume_number,workdir);
             %%% James's happy delay patch

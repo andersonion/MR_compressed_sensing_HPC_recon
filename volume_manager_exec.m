@@ -229,6 +229,8 @@ if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     %gk_slurm_options.job_name = [volume_runno '_gatekeeper'];
     gk_slurm_options.job_name = [runno '_gatekeeper']; %Trying out singleton behavior
     %gk_slurm_options.reservation = active_reservation;
+    % using a blank reservation to force no reservation for this job.
+    gk_slurm_options.reservation = '';
     study_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_gatekeeper.bash'];
     [input_fid,~] =find_input_fidCS(scanner,runno,study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', gatekeeper_exec, matlab_path,volume_fid,input_fid,scanner,log_file,volume_number,bbytes);
@@ -242,6 +244,8 @@ if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
     vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
     vm_slurm_options.job_name = [volume_runno '_volume_manager'];
     %vm_slurm_options.reservation = active_reservation;
+    % using a blank reservation to force no reservation for this job.
+    vm_slurm_options.reservation = '';
     volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
     vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec_path,matlab_path, recon_file,volume_runno, volume_number,base_workdir);
     batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
@@ -363,6 +367,8 @@ else
             vsu_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vsu_slurm_options.job_name = [volume_runno '_volume_setup_for_CS_recon'];
             %vsu_slurm_options.reservation = active_reservation;
+            % using a blank reservation to force no reservation for this job.
+            vsu_slurm_options.reservation = ''; 
             volume_setup_batch = [workdir 'sbatch/' volume_runno '_volume_setup_for_CS_recon.bash'];
             vsu_cmd = sprintf('%s %s %s %i', volume_setup_exec_path,matlab_path, variables_file, volume_number);
             batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
@@ -553,6 +559,8 @@ else
             vcu_slurm_options.p=cs_full_volume_queue; % Really want this to be high_priority, and will usually be that.
             vcu_slurm_options.job_name =[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
             %vcu_slurm_options.reservation = active_reservation;
+            % using a blank reservation to force no reservation for this job.
+            vcu_slurm_options.reservation = ''; 
             volume_cleanup_batch = [workdir 'sbatch/' volume_runno '_volume_cleanup_for_CS_recon.bash'];
             vcu_cmd = sprintf('%s %s %s %i', volume_cleanup_exec_path,matlab_path, variables_file);
             batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
@@ -595,6 +603,8 @@ else
                 shipper_slurm_options.p=gatekeeper_queue; % For now, will use gatekeeper queue for volume manager as well
                 shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
                 %shipper_slurm_options.reservation = active_reservation;
+                % using a blank reservation to force no reservation for this job.
+                shipper_slurm_options.reservation = '';
                 shipper_batch = [workdir 'sbatch/' volume_runno '_shipper.bash'];
                 %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
                 batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
@@ -733,6 +743,8 @@ else
         vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
         vm_slurm_options.job_name = [volume_runno '_volume_manager'];
         %vm_slurm_options.reservation = active_reservation;
+        % using a blank reservation to force no reservation for this job.
+        vm_slurm_options.reservation = '';
         volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
         vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec_path,matlab_path, recon_file,volume_runno, volume_number,base_workdir);
         batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
