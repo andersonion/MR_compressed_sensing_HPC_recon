@@ -15,7 +15,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
-  
+   
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -147,6 +147,10 @@ end
 % the number of iteration blocks -1 (becuase Re_init :) ) 
 % both iteration_strategy, and re_init_count are done after this, with no
 % further direct use.
+%
+% To make the block size uneven we should make an array of iteration
+% blocks, much like we do with TVWeight and xfmWeight.
+%
 if ~options.iteration_strategy
     % previous default, would like to changing it to bj's found "good" value of
     % 10 with 4 re-inits(50 total iterations) but dont want to disrupt
