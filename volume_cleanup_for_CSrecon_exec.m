@@ -414,7 +414,7 @@ if ~options.keep_work && ~options.process_headfiles_only
             rm_cmd=sprintf('rm -rf %s',work_subfolder);
             system(rm_cmd);
         else
-
+            
             log_msg =sprintf('Work folder %s already appears to have been removed. No action will be taken.\n',work_subfolder);
             yet_another_logger(log_msg,log_mode,log_file);
         end
@@ -423,7 +423,8 @@ if ~options.keep_work && ~options.process_headfiles_only
         yet_another_logger(log_msg,log_mode,log_file);
     end
 end
-
-deploy_procpar_handlers(volume_variable_file);
+%% LEAKY PROCPAR HANDLERS FOR SOME REASON!
+% its not clear why yet, but this deploy procpar handlers command leaks 
+% deploy_procpar_handlers(volume_variable_file); 
 
 end
