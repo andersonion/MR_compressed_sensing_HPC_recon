@@ -34,42 +34,45 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
         error('Couldnt open file %s%s',file_name,ed);
     end
     
-    % check for special handling with partition and reservation.
+    %% check for special handling with partition and reservation.
     % we'll have partition superseed reservation, eg, if there is a
     % partion, and its not in the reservation, we will set reservation to
-    % blank to prevent its use.
-    if ( isfield(slurm_option_struct,'reservation') && ~isempty(slurm_option_struct.reservation) ) ...
-           && isfield(slurm_option_struct,'partition') 
-       [s,o]=system(sprintf('scontrol show reservation %s',slurm_option_struct.reservation));
-       resinfo=struct;
-       %PartitionName=matlab 
-       % scontroloutput is a wierd block of lines with name=value keys.
-       % these loops over each line, breaking apart the name=value keys,
-       % ignoreing any issues in that separation.
-       if s==0
-           ol=strsplit(o,'\n');%olines
-           for ln=1:numel(ol)
-               lp=strsplit(ol{ln},' ');% line parts
-               for pn=1:numel(lp)
-                   if ~isempty(strfind(lp{pn},'='))
-                       nv=strsplit(lp{pn},'=');% name value
-                       if ~isempty(nv{2}) && numel(nv)==2
-                           resinfo.(nv{1})=nv{2};
-                       elseif numel(nv)>2
-                           warning('error parsing partition info');
-                       end
-                   end
-               end
-           end
-       else
-           resinfo.PartionName='';
-       end
-       if ~strcmp(resinfo.PartionName,slurm_option_struct.p)
-           slurm_option_struct.reservation='';
-       end
-   end
+    % blank to prevent its use. This doesnt handle the "normal" env
+    % variables SLURM_RESERVATION and SBATCH_RESERVATION. I think those
+    % should be handled by setting our res struct to inclue them for
+    % uniformity. Not bothering for now. 
+    if isfield(slurm_option_struct,'p') ...
+            && ( isfield(slurm_option_struct,'reservation') && ~isempty(slurm_option_struct.reservation) )
+        [s,o]=system(sprintf('scontrol show reservation %s',slurm_option_struct.reservation));
+        resinfo=struct;
+        %PartitionName=matlab
+        % scontroloutput is a wierd block of lines with name=value keys.
+        % these loops over each line, breaking apart the name=value keys,
+        % ignoreing any issues in that separation.
+        if s==0
+            ol=strsplit(o,'\n');%olines
+            for ln=1:numel(ol)
+                lp=strsplit(ol{ln},' ');% line parts
+                for pn=1:numel(lp)
+                    if ~isempty(strfind(lp{pn},'='))
+                        nv=strsplit(lp{pn},'=');% name value
+                        if ~isempty(nv{2}) && numel(nv)==2
+                            resinfo.(nv{1})=nv{2};
+                        elseif numel(nv)>2
+                            warning('error parsing partition info');
+                        end
+                    end
+                end
+            end
+        else
+            resinfo.PartionName='';
+        end
+        if isempty(regexpi(resinfo.PartionName,['.*' slurm_option_struct.p '.*']))
+            slurm_option_struct.reservation='';
+        end
+    end
     
-    
+    %% Write options to top of bash batch file
     sha_bang = '#!/bin/bash';
     fprintf(fid,'%s\n',sha_bang);
     slurm_fields = fieldnames(slurm_option_struct);
@@ -98,7 +101,7 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
         slurm_string = ['#SBATCH ' s_opt_string slurm_option_value];
         fprintf(fid,'%s\n',slurm_string );
     end    
-    
+    %% write commands to bash batch file
     if iscell(cell_of_commands)
        num_lines =  length(cell_of_commands);
     else
