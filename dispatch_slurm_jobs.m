@@ -22,8 +22,8 @@ if exist(batch_file,'file') % batch_file could just be a naked command
     %%% BATCH FILE.
     % only do this if we have an sbatch file, and there is no reservation
     % string in the current dispatch to minimize collateral damage.
-    if isempty(regexpi(slurm_optiops_string,'.*reservation.*'))
-        [s,o]=system('sed -rn ''s/.*(--reservation.*)/\1/p'' %s',batch_file);
+    if isempty(regexpi(slurm_options_string,'.*reservation.*'))
+        [s,o]=system(sprintf('sed -rn ''s/.*(--reservation.*)/\\1/p'' %s',batch_file));
         if s==0
             slurm_options_string=[slurm_options_string ' ' strtrim(o)];
         end
