@@ -49,8 +49,8 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
         % scontroloutput is a wierd block of lines with name=value keys.
         % these loops over each line, breaking apart the name=value keys,
         % ignoreing any issues in that separation.
-        if s==0
-            ol=strsplit(o,'\n');%olines
+        ol=strsplit(o,'\n');%olines
+        if s==0 && numel(ol)>3
             for ln=1:numel(ol)
                 lp=strsplit(ol{ln},' ');% line parts
                 for pn=1:numel(lp)
@@ -65,9 +65,9 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
                 end
             end
         else
-            resinfo.PartionName='';
+            resinfo.PartitionName='';
         end
-        if isempty(regexpi(resinfo.PartionName,['.*' slurm_option_struct.p '.*']))
+        if isempty(regexpi(resinfo.PartitionName,['.*' slurm_option_struct.p '.*']))
             slurm_option_struct.reservation='';
         end
     end
