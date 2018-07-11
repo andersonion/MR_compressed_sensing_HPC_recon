@@ -5,14 +5,7 @@ function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number)
 
 %% Update of original version (implied _v1)
 if ~isdeployed
-    % {
-    %setup_vars = '/civmnas4/rja20/Z56017.work/Z56017_m0/work/Z56017_m0_setup_variables.mat';
-    %volume_number = '1';
-    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities');
-    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2');
-    %}
-   setup_vars='/civmnas4/rja20/N96041.work/N96041_m6/N96041_m6_setup_variables.mat';
-   volume_number='7'
+    run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
 end
 make_tmp = 0;
 %%   Import Variables
@@ -102,7 +95,8 @@ if (make_workspace)
 
     %% Calculate group scaling from first b0 image
     %if ((~exist(scale_file,'file') || (options.roll_data && ~isfield(m,'shift_modifier'))) && (volume_number==1))
-    if ((~exist(scale_file,'file') || (~isfield(m,'shift_modifier'))) && (volume_number==1))
+    if (volume_number==1) ...
+            && (  ~exist(scale_file,'file') || ~isfield(m,'shift_modifier')  )
         [scaling, scaling_time,shift_modifier,first_corner_voxel] = calculate_CS_scaling(original_mask,data,original_pdf,original_dims(1),options.roll_data);
         m.first_corner_voxel=first_corner_voxel;
         %{
