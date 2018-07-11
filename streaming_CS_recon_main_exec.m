@@ -344,7 +344,7 @@ if ~exist(study_flag,'file')
         end
     end
     %% Might as well process skiptable/mask while we're here
-    % we can check if we've done this before using the who command
+    % we can check if we've done this before using the whos command
     varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
     missing=matfile_missing_vars(recon_file,varlist);
@@ -594,14 +594,16 @@ if ~exist(study_flag,'file')
     %    load(reconfile)
 end % This 'end' belongs to the study_flag check
 if options.fid_archive && local_or_streaming_or_static==3
+    % puller overwrite option
+    poc='';
+    % fid_archive overwrite option
+    foc='';
     if options.overwrite
         poc='-eor';
         foc='-o';
-    else
-        poc='';
-        foc='';
     end
-    pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s',poc,scanner,study,agilent_series,runno,foc,user,runno);
+    pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s', ...
+        poc,scanner,study,agilent_series,runno,foc,user,runno);
     ssh_and_run=sprintf('ssh %s@%s "%s"','omega',options.target_machine,pull_cmd);
     log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
     log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);
@@ -614,6 +616,7 @@ elseif options.fid_archive
     % -james.
 end
 end
+
 function m = specid_to_recon_file(scanner,runno,recon_file)
 % holly horrors this function is bad form! 
 % it combines several disjointed programming styles.
