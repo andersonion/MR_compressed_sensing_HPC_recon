@@ -9,12 +9,12 @@ if ~exist('data_directory','var')
     data_directory=getenv('BIGGUS_DISKUS');
 end
 
-[s,ls_blob]=system(sprintf('ls -d %s/%s.work/%s*/',data_directory,base_runno,base_runno)); % the */ forces a trailing slash.
+[s,ls_blob]=system(sprintf('ls -d %s/%s.work/%s_m*/',data_directory,base_runno,base_runno)); % the */ forces a trailing slash.
 if s==0 % unix status check
     ls_blob=strtrim(ls_blob);
     C=strsplit(ls_blob);
     [~, index] = sort(C);
-    rundirs = C(index);clear C dummy index;
+    rundirs = C(index);clear C index;
     sum=0;
     for ri=1:numel(rundirs)
         if isempty(rundirs{ri})
