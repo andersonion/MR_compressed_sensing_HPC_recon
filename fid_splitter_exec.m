@@ -28,18 +28,14 @@ if sum(work_to_do) > 0
         puller_glusterspaceCS_2(runno,datapath,scanner,study_workdir,mode);
     end
     tic
-    
     try
         fid = fopen(local_fid,'r','ieee-be');
     catch ME
         disp(ME)
     end
-    
-    
+       
     hdr_60byte = fread(fid,30,'int16'); % header
-    
-  
-    if strcmp(bitdepth,'int16');
+        if strcmp(bitdepth,'int16');
        %data= fread(fid,npoints*ntraces, 'int16');% full_fid
        bytes_per_point = 2;
     else
@@ -92,7 +88,12 @@ if sum(work_to_do) > 0
 end
 
 if exist(local_fid, 'file')
+    %{
+    % This should only happen when all the work is all done to prevent
+    annoying issues with missing fid. For now, james is just commenting it
+    out to waste disk space, "All I can say is You're Welcome! ;) .
     system(['rm ' local_fid]);
+    %}
 end
 end
 
