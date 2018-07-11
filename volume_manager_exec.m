@@ -172,7 +172,7 @@ end
 if ~exist(local_archive_tag,'file')
     if ~exist(original_archive_tag,'file')
         write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(3),databuffer.headfile.U_code, ...
-            '.raw',databuffer.headfile.U_civmid,true,images_dir)
+            '.raw',databuffer.headfile.U_civmid,true,images_dir);
     end
     
     system(sprintf('mv %s %s',original_archive_tag,local_archive_tag));
