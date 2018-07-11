@@ -2,11 +2,16 @@
 # a cs recon throttler keeping some N of volumes running at a time. 
 # uses tags deep in result dirs to check if we should add one, 
 # checking interval to be handled by cron job, 
+# 
+# 
+# !!!!!  THIS IS NOT GENERALIZED YET!!!  !!!!!
 #
+# this uses hardcoded scanner, runno, iterstrat, chunk_size
+# kamy, S67962, 10x5, 10
+# 
+# ALSO FORCING LATEST EXEC's
 #
-#
-#
-#
+declare -x CS_CODE_DEV=latest;
 if [ -z "$1" ];then
     concurrent_vols=5;
 else
@@ -25,7 +30,7 @@ else
 fi;
 # get max_volumes
 # grep dti_vols=110
-hf=$(ls -t *headfile|tail -n 1)
+hf=$(ls -t $wkdir/*headfile|tail -n 1)
 #[s,o]=system(sprintf('sed -rn ''s/.*(--reservation.*)/\\1/p'' %s',batch_file));
 if [ ! -f $hf ];then
     echo "Cant operate without a processed headfile ! THIS IS NOT A REPLACMENT FOR STREAMING MODE.";
@@ -80,7 +85,7 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
     # throttle file
     tf="$wkdir/.throttle_$vn";
     if [ ! -f $tf ]; then 
-	#echo "Scheduling vn:$nv";
+	echo "Scheduling vn:$nv";exit;
 	touch $tf
 	streaming_CS_recon kamy S67962 LOCAL FID first_volume=$nv last_volume=$nv iteration_strategy=10x5 planned_ok chunk_size=10
     fi;
@@ -88,4 +93,11 @@ else
     if [ $v -eq 1 ];then echo "Enough running:$in_progress_count >= $concurrent_vols";fi;
 fi;
 
-
+#total_done+scheduled
+let mc=$(echo $started|wc -w )+$th_count;
+if [ $mc -ge $max_vols ]; then
+    echo "Scans done being scheduled, We should stop this cron job now, attempting auto off. Sorry this clobbers all lines for this program.";
+    pname=$(basename $0);echo REMOVING ALL CRON LINES WITH $pname;
+    crontab -l >> $HOME/${pname}_crontab.bak
+    crontab -l |grep -v $pname |crontab -
+fi;
