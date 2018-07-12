@@ -68,20 +68,22 @@ print "\n\n%% You can finish the analysis in matlab now using \n".
     "for rn=1:numel(runs)\n".
     "    [mean_time(rn), total_time(rn), u_sorted_times{rn}, restarts(rn)] = ...\n".
     "         CS_recon_slice_time_analyzer(results_path, runs{rn}, make_plots);\n".
-    "    slice_min(rn)=min(u_sorted_times{rn});\n".
-    "    slice_max(rn)=max(u_sorted_times{rn});\n".
+    "    if numel(u_sorted_times{rn})>0\n".
+    "        slice_min(rn)=min(u_sorted_times{rn});\n".
+    "        slice_max(rn)=max(u_sorted_times{rn});\n".
+    "    end\n".
     "    if make_plots\n".
     "        pause(1);\n".
     "    end\n".
     "end\n".
-    "shortest_slice=min(slice_min);\n".
+    "shortest_slice=min(nonzeros(slice_min));\n".
     "longest_slice =max(slice_max);\n".
     "\n\n".
+    "%% set the slice count,\n".
     "% i need your slice count now, its not apparent from the data we've gatherd here.\n".
-    "% enter slice_count=, then copy the rest in.\n".
-    "% OR try to auto gram from reco.mat file.\n".
-    "%% manual\n".
-    "slice_count=  ;\n".
+    "% we try to pull it from our recon setup files. \n".
+    "% if that fails you can set it manually. .\n".
+    "%with \"slice_count=READOUT_DIMENSION\"  ;\n".
     "%% auto guess\n".
     "wkdir=fileparts(results_path);\n".
     "[~,n]=fileparts(wkdir);\n".
@@ -92,6 +94,7 @@ print "\n\n%% You can finish the analysis in matlab now using \n".
     "    slice_count=reco.(rx).dim_x;\n".
     "end".
     "\n\n".
+    "%% using slice count tell how long a volume will take with various core counts\n".
     "volume_min_sec=slice_count*shortest_slice;\n".
     "volume_max_sec=slice_count*longest_slice;\n".
     "volume_min_time=datestr(volume_min_sec/86400, 'HH:MM:SS.FFF');\n".
@@ -100,7 +103,7 @@ print "\n\n%% You can finish the analysis in matlab now using \n".
     "fprintf('each volume will take (min) %s - %s (max)\\n',volume_min_time,volume_max_time);\n".
     "warning('THIS IS THE PER CORE TIME, DIVIDE BY THE NUMBER OF CORES YOU WILL USE');\n".
     "warning('THIS DOENST COUNT INEFFICIENCIES IN THE PROCESS DUE TO MATLAB EXECs, or setup/save time');\n".
-    "for c=32:32:32*11\n".
+    "for c=32:32:32*10\n".
     "    volume_min_time=datestr(volume_min_sec/86400/c, 'HH:MM:SS.FFF');\n".
     "    volume_max_time=datestr(volume_max_sec/86400/c, 'HH:MM:SS.FFF');\n".
     "    fprintf('with %i cores, each volume will take (min) %s - %s (max)\\n',c,volume_min_time,volume_max_time);\n".
