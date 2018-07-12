@@ -99,6 +99,10 @@ if (make_workspace)
             && (  ~exist(scale_file,'file') || ~isfield(m,'shift_modifier')  )
         [scaling, scaling_time,shift_modifier,first_corner_voxel] = calculate_CS_scaling(original_mask,data,original_pdf,original_dims(1),options.roll_data);
         m.first_corner_voxel=first_corner_voxel;
+        % Write scaling factor to scale file
+        fid = fopen(scale_file,'w');
+        fwrite(fid,scaling,'float');
+        fclose(fid);
         %{
             tic
             current_slice=zeros([size(mask0)],'like',current_data);
@@ -120,14 +124,14 @@ if (make_workspace)
         
         m.shift_modifier=shift_modifier;
         
-        % Write scaling factor to scale file
-        fid = fopen(scale_file,'w');
-        fwrite(fid,scaling,'float');
-        fclose(fid);
     else
         %if (options.roll_data)
+        if isfield(m,'shift_modifier')
            shift_modifier=m.shift_modifier;
+        end
+        if isfield(m,'first_corner_voxel')
            first_corner_voxel=m.first_corner_voxel;
+        end
         %end
     end
     %% Prep data for reconstruction
