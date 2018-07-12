@@ -53,16 +53,18 @@ for vn in $started; do
     sc=$(ls -A $wkdir/*_m$vn/*images/|grep -c SUCCESSFUL);
     if [ $sc -eq 3 ];then
 	completed="$completed $vn";
-	# completed file, can/should remove the throttle for book keeping.
-	let vn=10#$vn+0;# convert from 0 padded string to number.
-	tf="$wkdir/.throttle_$vn";
-	if [ ! -z "$tf" -a -f "$tf" ];then 
-	    rm "$tf";
-	fi;
     fi;
+    # once a volume is started the throttle holding place is no longer needed.
+    # remove the throttle for book keeping.
+    let vn=10#$vn+0;# convert from 0 padded string to number.
+    tf="$wkdir/.throttle_$vn";
+    if [ ! -z "$tf" -a -f "$tf" ];then 
+	rm "$tf";
+    fi;
+
 done
-th_count=$(ls -A $wkdir/ |grep -c .throttle_);
 if [ $v -eq 1 ];then echo "Completed:$completed";fi;
+th_count=$(ls -A $wkdir/ |grep -c .throttle_);
 let in_progress_count=$(echo $started|wc -w )-$(echo  "$completed"| wc -w)+$th_count;
 if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol
