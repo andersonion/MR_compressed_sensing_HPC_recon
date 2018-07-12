@@ -54,7 +54,7 @@ for vn in $started; do
     if [ $sc -eq 3 ];then
 	completed="$completed $vn";
 	# completed file, can/should remove the throttle for book keeping.
-	let vn=$vn+0;# convert from 0 padded string to number.
+	let vn=10#$vn+0;# convert from 0 padded string to number.
 	tf="$wkdir/.throttle_$vn";
 	if [ ! -z "$tf" -a -f "$tf" ];then 
 	    rm "$tf";
@@ -68,7 +68,7 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol
     for((vn=0;$vn<=$max_vols;vn=$vn+1)); do 
 	found=$(echo $started | grep -c $(printf "%0${vn_length}i" $vn) ); 
-	let nv=$vn+1;# handle the 1 vs zero indexing :b
+	let nv=10#$vn+1;# handle the 1 vs zero indexing :b
 	# throttle file
 	tf="$wkdir/.throttle_$vn";
 	if [ "$found" -eq 1 -o -f $tf ];then
@@ -81,11 +81,11 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 	    exit;
 	fi;
     done
-    let nv=$vn+1;# handle the 1 vs zero indexing :b
+    let nv=10#$vn+1;# handle the 1 vs zero indexing :b
     # throttle file
     tf="$wkdir/.throttle_$vn";
     if [ ! -f $tf ]; then 
-	echo "Scheduling vn:$nv";exit;
+	echo "Scheduling vn:$nv";
 	touch $tf
 	streaming_CS_recon kamy S67962 LOCAL FID first_volume=$nv last_volume=$nv iteration_strategy=10x5 planned_ok chunk_size=10
     fi;
@@ -94,7 +94,7 @@ else
 fi;
 
 #total_done+scheduled
-let mc=$(echo $started|wc -w )+$th_count;
+let mc=10#$th_count+$(echo $started|wc -w );
 if [ $mc -ge $max_vols ]; then
     echo "Scans done being scheduled, We should stop this cron job now, attempting auto off. Sorry this clobbers all lines for this program.";
     pname=$(basename $0);echo REMOVING ALL CRON LINES WITH $pname;
