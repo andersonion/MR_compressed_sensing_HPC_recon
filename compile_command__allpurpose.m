@@ -28,6 +28,9 @@ matlab_path = '/cm/shared/apps/MATLAB/R2015b';
 matlab_execs_dir = fullfile(getenv('WORKSTATION_HOME'),'matlab_execs');
 %% var set
 ts=fix(clock);
+% this sprintf has the formatting to print seconds, but we ignore them by
+% selecting only the first 5 elements, the effect is they are just not
+% printed. 
 compile_time=sprintf('%04i%02i%02i_%02i%02i%02i',ts(1:5));
 run compile__pathset.m
 exec_name=[ script_name '_executable'];
@@ -47,7 +50,7 @@ else
 end
 %% prep dir
 compile_dir = fullfile(this_exec_base_dir,compile_time);
-system(['mkdir -m 775 ' compile_dir]);
+system(['mkdir -pm 775 ' compile_dir]);
 %% do the mcc
 disp('Running mcc, this takes a bit...');
 %-R -singleCompThread 
