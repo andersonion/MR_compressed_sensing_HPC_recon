@@ -3,6 +3,9 @@ function slicewise_CSrecon_exec(matlab_workspace,slice_indices,options_file)
 
 if ~isdeployed    
    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 
 %%%

@@ -6,6 +6,9 @@ function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number)
 %% Update of original version (implied _v1)
 if ~isdeployed
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 make_tmp = 0;
 %%   Import Variables

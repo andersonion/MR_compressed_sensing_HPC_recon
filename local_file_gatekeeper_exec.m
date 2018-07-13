@@ -19,6 +19,9 @@ remote_file= '/home/vnmr1/vnmrsys/exp2/acqfil/fid';
 log_file='/glusterspace/S67665_70.work/S67665_70.recon_log'
 
 interval='5';
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 
 out_code = 1; % Default is failure.

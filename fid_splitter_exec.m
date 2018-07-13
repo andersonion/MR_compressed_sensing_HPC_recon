@@ -5,6 +5,8 @@ function fid_splitter_exec(local_fid,variables_file )
 % Written by BJ Anderson, CIVM
 % 19 September 2017 (but really, 26 October 2017)
 
+% for all execs run this little bit of code which prints start and stop time using magic.
+C___=exec_startup();
 load(variables_file);
 log_mode=1;
 % Check for output fids

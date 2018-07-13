@@ -5,7 +5,11 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
-   
+ 
+
+% for all execs run this little bit of code which prints start and stop time using magic.
+C___=exec_startup();
+
 %%% ORIGINAL COMMENT
 % This may seem stupid, but I need to let Matlab know that I'm going need
 % series to be a variable, and not the builtin function 'series'

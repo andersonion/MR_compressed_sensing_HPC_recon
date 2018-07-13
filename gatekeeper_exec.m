@@ -22,6 +22,9 @@ block_number='12';
 bbytes='52428828'; 
 interval='5';
     %}
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 out_code = 1; % Default is failure.
 user='omega';

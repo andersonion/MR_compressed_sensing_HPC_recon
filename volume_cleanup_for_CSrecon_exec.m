@@ -16,6 +16,9 @@ if ~isdeployed && (~exist('volume_variable_file','var') || isempty(volume_variab
     %variable_iterations=1;
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
     addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 
 

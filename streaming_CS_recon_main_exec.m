@@ -19,6 +19,9 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
+else
+    % for all execs run this little bit of code which prints start and stop time using magic.
+    C___=exec_startup();
 end
 %% clean up what user said to us.
 % since we have some optional positional args, and legacy behavior,
@@ -186,7 +189,7 @@ if numel(options.xfmWeight) ~=  numel(options.TVWeight) ...
     || numel(options.xfmWeight) ~= options.re_init_count+1
     error('mis-match for our re_initalizations and required params, TVWeight and xfmWeight');
 end
-
+ 
 %% Reservation support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
