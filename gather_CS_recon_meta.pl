@@ -28,7 +28,7 @@ chdir "${parent_path}";
 #for folder in $(ls -d ${runno}_m*); do 
 my @runnos=glob($runno."_m*");
 foreach my $folder ( @runnos ){
-    print("dumping $folder\n");
+    print("% collecting $folder\n");
     my $txt_1="$results_path/${folder}_slice_recon_times.txt";
     my $txt_2="$results_path/${folder}_slice_numbers.txt";
     my $txt_3="$results_path/${folder}_iterations.txt";
@@ -103,7 +103,12 @@ print "\n\n%% You can finish the analysis in matlab now using \n".
     "fprintf('each volume will take (min) %s - %s (max)\\n',volume_min_time,volume_max_time);\n".
     "warning('THIS IS THE PER CORE TIME, DIVIDE BY THE NUMBER OF CORES YOU WILL USE');\n".
     "warning('THIS DOENST COUNT INEFFICIENCIES IN THE PROCESS DUE TO MATLAB EXECs, or setup/save time');\n".
-    "for c=32:32:32*10\n".
+    #"core_counts=sort([16:16:16*6, 20:20:20*4]); % our real core count in the cluster, not hyperthreaded.\n".
+    "c_n1=16:16:16*6; c_n2=20:20:20*4;\n".
+    "c_comb=bsxfun(\@plus,c_n1.',c_n2);\n".
+    "core_counts=unique([c_n1(:);c_n2(:);c_comb(:)]);% our real core count in the cluster, not hyperthreaded.\n".
+    "for cc=1:numel(core_counts)\n".
+    "    c=core_counts(cc);\n".
     "    volume_min_time=datestr(volume_min_sec/86400/c, 'HH:MM:SS.FFF');\n".
     "    volume_max_time=datestr(volume_max_sec/86400/c, 'HH:MM:SS.FFF');\n".
     "    fprintf('with %i cores, each volume will take (min) %s - %s (max)\\n',c,volume_min_time,volume_max_time);\n".
