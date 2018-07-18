@@ -109,11 +109,13 @@ else
 end % time keeping
 
 k = 0;
-while ( (k < params.Itnlim) ...
+while ( (k < params.Itnlim) ... || norm(dx(:)) < gradToll 
         || ( variable_iterations ...
         && ( k<=2 && k <= convergence_window) ...
-        && convergence_limit < abs(convergence_metric(k)) ) ...
+        && convergence_limit < abs(convergence_metric(k-1)) ) ...
     )
+% bj droped norm(dx(:)) < gradToll condition, Maybe it should be added to
+% this while? if we do, dont forget to add good parenthesis 
     if verbosity
         iteration_timer = tic;
     end
@@ -125,15 +127,26 @@ while ( (k < params.Itnlim) ...
     t = t0;
     [f1, ~, ~]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params); % [f1, ERRobj, RMSerr]
     lsiter = 0;
-    while ( f1 >  ( f0 - alpha*t*abs(g0(:)'*dx(:)) )  )^2 & (lsiter<maxlsiter)
+    % previous less clear syntax. 
+    %while (f1 > f0 - alpha*t*abs(g0(:)'*dx(:)))^2 & (lsiter<maxlsiter)
+    % new syntax only added parenthesis, and some spaces. 
+    %while ( f1 >  ( f0 - alpha*t*abs(g0(:)'*dx(:)) )  )^2 & (lsiter<maxlsiter)
+    % LOOKS LIKE THIS CONDITIONAL WAS BROKEN WHEN JAMES GOT HERE!!!!!  
+    % ON INVESTICATION, It was broken when BJ got here also. 
+    % the ^2 is a red herring and COMPLETELY USELESS!
+    % Futher cleaned for style now
+    while ( f1 >  ( f0 - alpha*t*abs(g0(:)'*dx(:)) )  ) && (lsiter<maxlsiter)
         lsiter = lsiter + 1;
         t = t * beta;
         [f1, ~, ~]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params); %[f1, ERRobj, RMSerr]
     end
+    % this single print added to make it easier to see that new code is ok.
+    fprintf('%i %g %g %g\n',lsiter,t,f0,f1);
     if lsiter == maxlsiter
         warning('Reached max line search,.... not so good... might have a bug in operators. exiting... ');
         break; % return;
     end
+    %% adjust t0 based on used linear search iters.
     % control the number of line searches by adapting the initial step search
     % should this happen before the first linear search?
     if lsiter > 2
@@ -155,20 +168,21 @@ while ( (k < params.Itnlim) ...
     
     % BJA-2017 Code
     %RMSerr_vector(k)=RMSerr;
-    
-    if k==1
-        f1_prime = f1;
-    end
-    f1_vector(k)=f1/f1_prime;
-    
-    if ((k >= convergence_window) && (k > 2));
-        %c_window_data = RMSerr_vector((k-avgRMS_window + 1):k);
-        c_window_data = f1_vector((k-convergence_window + 1):k);
-        mean_window(k) = mean(c_window_data);
-        %std_window(k) = std(c_window_data);
-        delta_obj(k) =mean_window(k)-mean_window(k-1);
-        %residual(k) = delta_mean(k)-delta_mean(k-1);%std_window(k) - abs(delta_mean_RMSerr(k));
-        convergence_metric(k) = mean_window(k)-2*mean_window(k-1)+mean_window(k-2);
+    if variable_iterations
+        if k==1
+            f1_prime = f1;
+        end
+        f1_vector(k)=f1/f1_prime;
+        
+        if ((k >= convergence_window) && (k > 2));
+            %c_window_data = RMSerr_vector((k-avgRMS_window + 1):k);
+            c_window_data = f1_vector((k-convergence_window + 1):k);
+            mean_window(k) = mean(c_window_data);
+            %std_window(k) = std(c_window_data);
+            delta_obj(k) =mean_window(k)-mean_window(k-1);
+            %residual(k) = delta_mean(k)-delta_mean(k-1);%std_window(k) - abs(delta_mean_RMSerr(k));
+            convergence_metric(k) = mean_window(k)-2*mean_window(k-1)+mean_window(k-2);
+        end
     end
     
     if (verbosity)
@@ -178,7 +192,7 @@ while ( (k < params.Itnlim) ...
         %% loggy bits
         %--------- uncomment for debug purposes ------------------------
         %log_msg = sprintf('%d   obj: %f, RMS: %f, L-S: %d\n', k,f1,RMSerr,lsiter);
-        if ((k > convergence_window) && (k > 2))
+        if variable_iterations && ((k > convergence_window) && (k > 2))
             log_msg = sprintf(['%0'  num2str(numel(num2str(max_iterations)))  'i,\t%03.06f,\t%+.4e,\t%+.4e,\t%0.04f s,\t%0.04f s.\n'], k,f1,delta_obj(k), convergence_metric(k),iteration_time(k),elapsed_time(k));
         else
             log_msg = sprintf(['%0'  num2str(numel(num2str(max_iterations)))  'i,\t%03.06f,\t       %+s,\t      %+s,\t%0.04f s,\t%0.04f s.\n'], k,f1,'N/A','N/A',iteration_time(k),elapsed_time(k));
@@ -208,6 +222,7 @@ end % time keeping
 return;
 end
 
+%% internal functions
 function [FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx] = preobjective(x, dx, params)
 %%
 % precalculates transforms to make line search cheap
