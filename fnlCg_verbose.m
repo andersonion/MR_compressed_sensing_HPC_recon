@@ -211,6 +211,7 @@ end
 function [FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx] = preobjective(x, dx, params)
 %%
 % precalculates transforms to make line search cheap
+% only used once, consider moving code to be inline with that.
 FTXFMtx = params.FT*(params.XFM'*x);
 FTXFMtdx = params.FT*(params.XFM'*dx);
 if params.TVWeight
@@ -251,17 +252,21 @@ function grad = wGradient(x,params)
 %%
 gradXFM = 0;
 gradTV = 0;
-
+ 
+% gOBJ is only used only here. Consider moving code to this position.
 gradObj = gOBJ(x,params);
 if params.xfmWeight
+    % gXFM is only used only here. Consider moving code to this position.
     gradXFM = gXFM(x,params);
 end
 if params.TVWeight
+    % gTV is only used only here. Consider moving code to this position.
     gradTV = gTV(x,params);
 end
 grad = (gradObj +  params.xfmWeight.*gradXFM + params.TVWeight.*gradTV);
 end
 
+%% Remaining functions, gOBJ, gXFM, gTV only used wGradient 1 time.
 function gradObj = gOBJ(x,params)
 %%
 % computes the gradient of the data consistency
