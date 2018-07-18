@@ -36,6 +36,7 @@ load(volume_variable_file);
 %recon_dims(1)=6;
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
+%% foggy loggy doggy 
 if ~exist('log_mode','var')
     log_mode = 1;
 end
@@ -52,12 +53,15 @@ else
     log_file = '';
     log_mode = 3;
 end
+
+%%
 if ~exist('continue_recon_enabled','var')
     continue_recon_enabled=1;
 end
 if ~exist('variable_iterations','var')
     variable_iterations=0;
 end
+%% get scaling file or show error
 scale_file_error =1;
 if exist('scale_file','var')
     num_checks = 30;
@@ -82,6 +86,8 @@ else
     status=variable_to_force_an_error;
     quit force
 end
+
+%% get options into base workspace.
 if ~exist('recon_dims','var')
     recon_dims = original_dims;
 elseif  ~exist('original_dims','var')
@@ -106,6 +112,7 @@ end
 if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
+%%
 if continue_recon_enabled % This should be made default.
     if ~exist('wavelet_dims','var')
         if exist('waveletDims','var')
@@ -119,19 +126,8 @@ if continue_recon_enabled % This should be made default.
     end
     XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
 end
-%full_headfile=aux_param2.headfile;
-%struct1=read_headfile(full_headfile,1);
-%{
-if ~exist('fermi_filter','var')
-    fermi_filter = 0; % Default is no fermi filtering
-end
-if ~exist('w1','var')
-    w1=0.15;
-end
-if ~exist('w2','var')
-    w2=0.75;
-end
-%}
+
+%% check on temp file, try to get amount complete. 
 temp_file_error = 1;
 if exist('temp_file','var')
     num_checks = 30;
@@ -144,9 +140,16 @@ if exist('temp_file','var')
         end
     end
 end
-if ~temp_file_error %exist('temp_file','var') && exist(temp_file,'file')
+error_flag=0;
+if temp_file_error
+    error_flag=1;
+    if ~exist('temp_file','var')
+        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',volume_runno,volume_variable_file);
+    else
+        log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',volume_runno,temp_file);
+    end
+else
     [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(temp_file);
-    
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
         unreconned_slices = length(find(tmp_header<options.Itnlim));
@@ -154,24 +157,16 @@ if ~temp_file_error %exist('temp_file','var') && exist(temp_file,'file')
     if  (unreconned_slices > 0)
         error_flag=1;
         log_msg =sprintf('Volume %s: %i slices appear to be inadequately reconstructed; DYING.\n',volume_runno,unreconned_slices);
-        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-        status=variable_to_force_an_error;
-        %quit force
     else
         log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',volume_runno,number_of_at_least_partially_reconned_slices);
-        yet_another_logger(log_msg,log_mode,log_file);
     end
-else
-    error_flag=1;
-    if ~exist('temp_file','var')
-        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',volume_runno,volume_variable_file);
-    else
-        log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',volume_runno,temp_file);
-    end
-    yet_another_logger(log_msg,log_mode,log_file,error_flag);
+end
+yet_another_logger(log_msg,log_mode,log_file,error_flag);
+if error_flag==1
     status=variable_to_force_an_error;
     quit force
 end
+
 %% Read in temporary data
 log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',volume_runno,temp_file);
 yet_another_logger(log_msg,log_mode,log_file);
@@ -181,22 +176,22 @@ fid=fopen(temp_file,'r');
 header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
-minimal_memory=getenv('CS_minimize_memory')
+minimal_memory=getenv('CS_minimize_memory');
 if isempty(minimal_memory)
     %minimal_memory=0;
     minimal_memory=1; % Flipping the default switch on 5 January 2018
 end
 if minimal_memory
+    %% min memory mode, we only load 1 full CS slice at a time, 
+    % each is reduced to the proscribed acq dim 
+    % and inserted into a full size acq vol before moving on to the next.
+    % Potentially we could do better using a  sparse load but thats a lot of
+    % work.
     already_fermi_filtered=0;
     log_msg =sprintf('%s operating in minimal memory mode',mfilename);
     yet_another_logger(log_msg,log_mode,log_file);
-    %double_down=1
-    %if double_down
     lil_dummy = zeros([1,1],'double');
-    %else
-    %   lil_dummy = zeros([1,1],'single');
-    %end
-    lil_dummy =complex(lil_dummy,lil_dummy);
+    lil_dummy = complex(lil_dummy,lil_dummy);
     data_out=zeros(original_dims,'like',lil_dummy);
     bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
     for ss=1:recon_dims(1)
@@ -204,13 +199,16 @@ if minimal_memory
             log_msg = sprintf('Processing slice %i...\n',ss);
             yet_another_logger(log_msg,log_mode,log_file);
         end
-        data_in=typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
+        % This data read is a bit strange, 
+        % why dont we just read in as double direct? 
+        data_in = typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
         data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
         t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
         clear data_in;
         t_data_out = XFM'*t_data_out;
         t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
-        %% Crop out extra k-space if non-square or non-power of 2, might as well apply fermi filter in k-space, if requested (no QSM requested either)
+        %% Crop out extra k-space if non-square or non-power of 2, 
+        % might as well apply fermi filter in k-space, if requested (no QSM requested either)
         if sum(original_dims == recon_dims) ~= 3
             t_data_out = fftshift(fftn(fftshift(t_data_out)));
             final_slice_out = t_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
@@ -221,7 +219,6 @@ if minimal_memory
         end
         data_out(ss,:,:)= scaling*final_slice_out;
     end
-    fclose(fid);
     
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
@@ -234,8 +231,6 @@ else
         %data_in=fread(fid,inf,'*double');
         data_in=typecast(fread(fid,inf,'*uint8'),'double');
     end
-    fclose(fid);
-    
     
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
@@ -299,6 +294,7 @@ else
     % Permute to final form
     data_out = permute(data_out,[3 1 2 4]);
 end %?
+fclose(fid);
 % Save complex data for QSM BEFORE the possibility of a fermi filter being
 % applied.
 
@@ -340,7 +336,7 @@ if (fermi_filter && ~already_fermi_filtered)
     data_out =fftshift(ifftn(fftshift(data_out)));
 end
 %data_out = abs(data_out);
-if ~isdeployed
+if ~isdeployed && strcmp(getenv('USER'),'rja20')
     figure(12)
     %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
     imagesc(abs(squeeze(data_out(:,:,round(original_dims(3)/2)))))
