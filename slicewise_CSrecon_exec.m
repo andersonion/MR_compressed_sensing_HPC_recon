@@ -5,6 +5,8 @@ if ~isdeployed
    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
+    % REQUIRES THE VARIABLE OR IT WONT WORK, We never have to touch the
+    % variable again directly. 
     C___=exec_startup();
 end
 
@@ -12,55 +14,79 @@ end
 % This eliminates the nested structure of the incoming slice data, and also writes the each
 % slice as they finish instead of waiting until all are done.
 %%%
-
-slice_numbers=[];
-slice_number_strings = strsplit(slice_indices,'_');
-for ss = 1:length(slice_number_strings)
-    temp_string=slice_number_strings{ss};
-    if strcmp(temp_string,'to')
-        begin_slice = str2double(slice_number_strings{ss-1})+1;
-        end_slice = str2double(slice_number_strings{ss+1})-1;
-        temp_vec = begin_slice:1:end_slice;
-    else
-        temp_vec = str2double(temp_string);
-    end
-    slice_numbers = [slice_numbers temp_vec];
-end
-slice_numbers=unique(slice_numbers);
+slice_numbers=parse_slice_indices(slice_indices);clear slice_indices;
 
 %% Make sure the workspace file exist
+% bleh, this whole construct is clumsy.
 log_mode = 3;
 log_file ='';
+error_flag=0;
 if  (~exist(matlab_workspace,'file'))
     error_flag = 1;
     log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
-    yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    if isdeployed
-        quit force
-    end
 else
     a = who('-file',matlab_workspace,'aux_param');
     if ~size(a)
         error_flag = 1;
         log_msg =sprintf('Matlab workspace (''%s'') exists, but parameter ''aux_param'' not found. Dying now.\n',matlab_workspace);
-        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-        if isdeployed
-            quit force
-        end
     end
 end
+if error_flag==1
+    yet_another_logger(log_msg,log_mode,log_file,error_flag);
+    % force a quit when deployed, else return broken
+    if isdeployed; quit('force'); end
+    return;
+end; clear error_flag;
 
-
+%% Load common workspace params
 if exist('options_file','var')
     if exist(options_file,'file')
         load(options_file);
     end
 end
 
-%% Load common workspace params
 tic
-load(matlab_workspace,'aux_param');
-load(matlab_workspace,'param');
+mm = matfile(matlab_workspace,'Writable',false);
+%load(matlab_workspace,'aux_param');
+aux_param=mm.aux_param;
+% expected params
+%{
+               mask: [2048x2048 logical]
+       originalMask: [1152x1152 logical]
+           TVWeight: [0.0012 0.0012 0.0012 0.0012 0.0012]
+          xfmWeight: [0.0020 0.0020 0.0020 0.0020 0.0020]
+       volume_scale: 2.5173
+          scaleFile: '/mnt/civmbigdata/civmBigDataVol/jjc29/S…'
+           tempFile: '/mnt/civmbigdata/civmBigDataVol/jjc29/S…'
+    volume_log_file: '/mnt/civmbigdata/civmBigDataVol/jjc29/S…'
+      original_dims: [1480 1152 1152]
+         recon_dims: [1480 2048 2048]
+        waveletDims: [12 12]
+        waveletType: 'Daubechies'
+              CSpdf: [2048x2048 double]
+             phmask: [2048x2048 double]
+          verbosity: 0
+%}
+%load(matlab_workspace,'param');
+param=mm.param;
+%{
+fieldnames(test_m.param)
+                  FT: []
+                 XFM: []
+                  TV: []
+                data: []
+            TVWeight: 0.0100
+           xfmWeight: 0.0100
+              Itnlim: 50
+            gradToll: 1.0000e-30
+            l1Smooth: 1.0000e-15
+               pNorm: 1
+    lineSearchItnlim: 150
+     lineSearchAlpha: 0.0100
+      lineSearchBeta: 0.6000
+        lineSearchT0: 1
+%}
+
 time_to_load_common_workspace=toc;
 log_mode = 1;
 log_file = aux_param.volume_log_file;
@@ -94,45 +120,32 @@ XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
 
 param.XFM = XFM;
 param.TV=TVOP;
-
+%% set special options of the BJ fnlCg_verbose function
 recon_options=struct;
-
 if ~isdeployed
+    %{
     recon_options.verbosity = 1;
     recon_options.log_file = log_file;
     recon_options.variable_iterations = 1;
+    %}
 else
     if exist('variable_iterations','var')
-        recon_options.variable_iterations = variable_iterations;
-    end
-    
+        recon_options.variable_iterations = variable_iterations; end
     if exist('volume_log_file','var')
-        recon_options.log_file=volume_log_file;
-    end
-    
+        recon_options.log_file=volume_log_file; end
     if exist('log_mode','var')
-        recon_options.log_mode = log_mode;
-    end
-    
+        recon_options.log_mode = log_mode; end
     if exist('verbosity','var')
-        recon_options.verbosity=verbosity;
-    end
-    
+        recon_options.verbosity=verbosity; end
     if exist('make_nii_animation','var')
-        recon_options.make_nii_animation = make_nii_animation;
-    end
-    
+        recon_options.make_nii_animation = make_nii_animation; end
     if exist('convergence_limit','var')
-        recon_options.convergence_limit=convergence_limit;
-    end
+        recon_options.convergence_limit=convergence_limit; end
     if exist('convergence_window','var')
-        recon_options.convergence_window=convergence_window;
-    end
+        recon_options.convergence_window=convergence_window; end
 end
-
-current_Itnlim = param.Itnlim;
-mm = matfile(matlab_workspace,'Writable',false);
-
+%%
+requested_iterations = param.Itnlim;
 %im_result=zeros(dims(2),dims(3),length(slice_numbers));
 %header_size = dims(1);
 %header_size = dims(1)*64;% 8 May 2017, BJA: Change header from binary to local scaling factor
@@ -142,6 +155,7 @@ header_size = 1+recon_dims(1);% 26 September 2017, BJA: 1st uint16 bytes are hea
 for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
     %% read temp_file header for completed work.
+    % this could be done exactly once before looping foreach slice.
     t_id=fopen(temp_file,'r+');
     % Should be the same size as header_size 
     header_length = fread(t_id,1,'uint16'); 
@@ -153,38 +167,37 @@ for index=1:length(slice_numbers)
     fclose(t_id);
     %% decide if we're continuting work or not
     continue_work = 0;
-    c_work_done = work_done(slice_index);
-    % completed_iterations formerly previous_Itnlim
-    completed_iterations = c_work_done; 
+    completed_iterations = work_done(slice_index);
+    % completed_iterations formerly previous_Itnlim(and c_work_done)
     if (completed_iterations > 0);
         %previous_Itnlim = floor(c_work_done/1000000); % 9 May 2017, BJA: Adding ability to continue CS recon with more iterations.
-        if (current_Itnlim > completed_iterations)
-            param.Itnlim = current_Itnlim - completed_iterations;
+        if (requested_iterations > completed_iterations)
+            param.Itnlim = requested_iterations - completed_iterations;
             % current_Itnlim/re_inits 
             continue_work=1;
-            log_msg =sprintf('Slice %i: Previous recon work done (%i iterations); continuing recon up to maximum total of %i iterations.\n',slice_index,completed_iterations,current_Itnlim);
+            log_msg =sprintf('Slice %i: Previous recon work done (%i iterations); continuing recon up to maximum total of %i iterations.\n',slice_index,completed_iterations,requested_iterations);
             yet_another_logger(log_msg,log_mode,log_file);
         end
     else
-        % current is the max n of iterations, ignoring re-init's
+        % requested is the max n of iterations, ignoring re-init's
         % re-initalizaiton is not compatible with keep work for now. 
         % I think we need a conditional of when outerIT>1
-        % I think we say, current_itnlim/outerit.
+        % I think we say, requested_iterations/outerit.
         % completed mod interval, not to worry we dont save partial blocks.
         % current_Itnlim/OuterIt
         
-        param.Itnlim= current_Itnlim / OuterIt;
-        if mod(current_Itnlim,OuterIt)>0 
+        param.Itnlim= requested_iterations / OuterIt;
+        if mod(requested_iterations,OuterIt)>0 
             error('re_init error');
         end
     end
     
-    if ((c_work_done == 0) || (continue_work)) %~work_done(slice_index)
+    if ((completed_iterations == 0) || (continue_work)) %~work_done(slice_index)
         %% Load slice specific data
         
         tic
         
-        if (c_work_done == 0) 
+        if (completed_iterations == 0) 
             %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
             slice_data = complex(mm.real_data(slice_index,:),mm.imag_data(slice_index,:));
             param.data = zeros(size(mask),'like',slice_data); % Ibid
@@ -208,17 +221,7 @@ for index=1:length(slice_numbers)
             % convergence_window is only added after we've done some work.
             % Is that the behavior we want?
             recon_options.convergence_window = 3;
-            %data_offset= header_size + (8*dims(2)*dims(3)*(slice_index-1));
-            s_vector_length = recon_dims(2)*recon_dims(3);
-            data_offset= 2*header_size + (2*8*s_vector_length*(slice_index-1)); % Each slice is double dim_y*dim_z real, then double dim_y*dim_z imaginary
-            t_id=fopen(temp_file,'r+');
-            fseek(t_id,data_offset,-1);
-            reconned_slice=fread(t_id,2*s_vector_length,'double');
-            fclose(t_id);
-            
-            res=complex(reconned_slice(1:s_vector_length),reconned_slice((s_vector_length+1):end));
-            res=reshape(res,[recon_dims(2) recon_dims(3)]);
-            
+            res=CS_tmp_load(temp_file,recon_dims,slice_index);
             %{
             temp_res=sqrt(mask_size)/myscale*temp_res;
             if (sum(dims1-dims)>0)
@@ -230,16 +233,13 @@ for index=1:length(slice_numbers)
             %}
             %res=XFM*res;
             %res =XFM*im_zfwdc ; %pick up where we left off...
-            clear reconned_slice data_offset;
         end
         
         time_to_set_up = toc;
         log_msg =sprintf('Slice %i: Time to set up recon:  %0.2f seconds.\n',slice_index,time_to_set_up);
         yet_another_logger(log_msg,log_mode,log_file);
         
-        %% iterate OuterIt times inner it passed by param as Itnlim
-        %if (split_recon)
-        %
+        %% iterate OuterIt times "inner It" passed in param as Itnlim
         iterations_performed=0;
         for n=1:OuterIt
             param.TVWeight  = TVWeight(n);   % TV penalty
@@ -247,19 +247,11 @@ for index=1:length(slice_numbers)
             [res, inner_its, time_to_recon] = fnlCg_verbose(res, param,recon_options);
             iterations_performed=iterations_performed+inner_its;
         end
-        %time_to_recon = toc;
         
         log_msg =sprintf('Slice %i: Time to reconstruct data (With %i iteration blocks):  %0.2f seconds. \n',slice_index,n,time_to_recon);
         yet_another_logger(log_msg,log_mode,log_file);
-        %{
-        if ~isdeployed
-            plotting_today_BJ = 1;
-        else
-            plotting_today_BJ = 0;
-        end
-        %if plotting_today_BJ
-        %}
-        if ~isdeployed
+        if ~isdeployed && strcmp(getenv('USER'),'rja20')
+            
             %% Plotting today BJ?
             scale_file=aux_param.scaleFile;
             fid_sc = fopen(scale_file,'r');
@@ -315,7 +307,8 @@ for index=1:length(slice_numbers)
         header_length = fread(t_id,1,'uint16'); % Should be the same size as header_size
         work_done = fread(t_id,header_length,'uint16');
         %% Write data
-        if (~work_done(slice_index) || ((continue_work) && (work_done(slice_index) < current_Itnlim)))
+        if (~work_done(slice_index) || ((continue_work) ...
+                && (work_done(slice_index) < requested_iterations)))
             s_vector_length = recon_dims(2)*recon_dims(3);
             data_offset=(2*8*s_vector_length*(slice_index-1));
             fseek(t_id,data_offset,0);
@@ -366,4 +359,21 @@ for index=1:length(slice_numbers)
     end
 end
 return
+end
+function slice_numbers=parse_slice_indices(slice_indices)
+% slice numbers pulled down to its own function to remove temp vars from workspace easier. 
+slice_numbers=[];
+slice_number_strings = strsplit(slice_indices,'_');
+for ss = 1:length(slice_number_strings)
+    temp_string=slice_number_strings{ss};
+    if strcmp(temp_string,'to')
+        begin_slice = str2double(slice_number_strings{ss-1})+1;
+        end_slice = str2double(slice_number_strings{ss+1})-1;
+        temp_vec = begin_slice:1:end_slice;
+    else
+        temp_vec = str2double(temp_string);
+    end
+    slice_numbers = [slice_numbers temp_vec];
+end
+slice_numbers=unique(slice_numbers);
 end
