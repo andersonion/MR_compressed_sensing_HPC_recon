@@ -33,7 +33,7 @@ if ~exist(temp_file,'file')
     if status || (m_file_size ~= file_size)
         fprintf(1,'AAAAAAHHHHH!!! fallocate command failed!  Using dd command instead to initialize .tmp file');
         preallocate=sprintf('dd if=/dev/zero of=%s count=1 bs=1 seek=%i',temp_file,file_size-1);
-        system(preallocate)
+        system(preallocate);
     end
     fid=fopen(temp_file,'r+');
     fwrite(fid,header_length,'uint16');
