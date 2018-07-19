@@ -127,7 +127,7 @@ if continue_recon_enabled % This should be made default.
     XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
 end
 
-%% check on temp file, try to get amount complete. 
+%% check on temp file, try to get amount complete, or exit on fail
 temp_file_error = 1;
 if exist('temp_file','var')
     num_checks = 30;
@@ -274,11 +274,13 @@ else
                 (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2,:);
             clear c_data_out
             if (fermi_filter && ~qsm_fermi_filter)
-                if exist('w1','var')
+                % this check for fermi vars is unnecessary, we always make sure w1
+                % and w2 are set.
+                %if exist('w1','var')
                     data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
-                else
-                    data_out= fermi_filter_isodim2_memfix(data_out);
-                end
+                %else
+                %    data_out= fermi_filter_isodim2_memfix(data_out);
+                %end
                 already_fermi_filtered = 1;
             end
             data_out = fftshift(ifftn(fftshift(data_out)));
