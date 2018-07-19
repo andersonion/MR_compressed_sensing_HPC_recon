@@ -195,7 +195,7 @@ for index=1:length(slice_numbers)
     if ((completed_iterations == 0) || (continue_work)) %~work_done(slice_index)
         %% Load slice specific data
         
-        tic
+        load_start=tic;
         
         if (completed_iterations == 0) 
             %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
@@ -204,11 +204,9 @@ for index=1:length(slice_numbers)
             %param.data = zeros([size(mask)],'like',slice_data);
             param.data(mask(:))=slice_data(:); % Ibid
             
-            time_to_load_sparse_data = toc;
+            time_to_load_sparse_data = toc(load_start);
             log_msg =sprintf('Slice %i: Time to load sparse data:  %0.2f seconds.\n',slice_index,time_to_load_sparse_data);
             yet_another_logger(log_msg,log_mode,log_file);
-            
-            tic
             
             % this compensates the intensity for the undersampling
             im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
@@ -235,16 +233,18 @@ for index=1:length(slice_numbers)
             %res =XFM*im_zfwdc ; %pick up where we left off...
         end
         
-        time_to_set_up = toc;
+        time_to_set_up = toc(load_start);
         log_msg =sprintf('Slice %i: Time to set up recon:  %0.2f seconds.\n',slice_index,time_to_set_up);
         yet_another_logger(log_msg,log_mode,log_file);
         
         %% iterate OuterIt times "inner It" passed in param as Itnlim
         iterations_performed=0;
+        time_to_recon=0;
         for n=1:OuterIt
             param.TVWeight  = TVWeight(n);   % TV penalty
             param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
-            [res, inner_its, time_to_recon] = fnlCg_verbose(res, param,recon_options);
+            [res, inner_its, lin_search_time] = fnlCg_verbose(res, param,recon_options);
+            time_to_recon=time_to_recon+lin_search_time;
             iterations_performed=iterations_performed+inner_its;
         end
         
