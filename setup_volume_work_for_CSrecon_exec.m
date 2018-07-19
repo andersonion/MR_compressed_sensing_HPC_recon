@@ -13,11 +13,6 @@ end
 make_tmp = 0;
 %%   Import Variables
 load(setup_vars);
-
-if ~isdeployed % {
-    options.roll_data = 1;
-end
-
 log_file=volume_log_file;
 log_mode=1;
 %recon_file = variables.recon_file;
@@ -223,7 +218,7 @@ if (make_workspace)
 end
 if (make_tmp)
     %% moved into its own function to facilitate exotic testing.
-    logbits.log_mode=log_mod;
+    logbits.log_mode=log_mode;
     logbits.log_file=log_file;
     CS_allocate_temp_file(original_dims,recon_dims,logbits,work_subfolder,volume_runno,temp_file)
 end
