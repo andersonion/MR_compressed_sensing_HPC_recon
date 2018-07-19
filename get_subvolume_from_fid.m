@@ -63,7 +63,7 @@ file_meta=dir(local_fidpath);%gets metadata, especially file bytes.
 if file_meta.bytes ~= bbytes+header_size
     error('Problem with the copy/transfer! temporary file is %s',remote_temp_fidpath);
 else
-    % sets useful permisions to file, u+g=rw, o=r
+    % file permissions forced to friendly, u+g=rw, o=r
     chmod_cmd=sprintf('chmod 664 %s',local_fidpath);
     system(chmod_cmd); % set perms
     if ~for_locals_only
