@@ -16,6 +16,8 @@ if ~exist('only_non_zeros','var')
 end
 
 if ~exist('double_down','var')
+    % Double_down is inherrently silly. This would be MUCH BETTER if it was
+    % just a string, with a value of either single or double. 
     double_down = 0; 
 end
 
