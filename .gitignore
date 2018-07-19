@@ -1,4 +1,5 @@
 *~
 testing_and_prototyping/
-compile_command_cleanup.bak compile_command_fid_splitter.bak
 *.bak
+*.mat
+*#*#
