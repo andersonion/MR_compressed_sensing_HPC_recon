@@ -1,5 +1,5 @@
 function slicewise_CSrecon_exec(matlab_workspace,slice_indices,options_file)
-
+ 
 
 if ~isdeployed    
    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
@@ -188,7 +188,7 @@ for index=1:length(slice_numbers)
         
         param.Itnlim= requested_iterations / OuterIt;
         if mod(requested_iterations,OuterIt)>0 
-            error('re_init error');
+            error('re_init error,total_it %g not even division of %g',requested_iterations,OuterIt);
         end
     end
     
@@ -241,6 +241,10 @@ for index=1:length(slice_numbers)
         iterations_performed=0;
         time_to_recon=0;
         for n=1:OuterIt
+            if OuterIt>1
+                yet_another_logger(...
+                    sprintf('\t %i iter block # %i\n',param.Itnlim,n),log_mode,log_file);
+            end
             param.TVWeight  = TVWeight(n);   % TV penalty
             param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
             [res, inner_its, lin_search_time] = fnlCg_verbose(res, param,recon_options);
