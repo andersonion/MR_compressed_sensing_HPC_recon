@@ -70,8 +70,29 @@ else
     convergence_window = 10;
 end
 
-x = x0;
+% BJA-2017 code
+f1_vector         = zeros([1 params.Itnlim]);
+mean_window       = zeros([1 params.Itnlim]);
+convergence_metric= zeros([1 params.Itnlim]);
+delta_obj         = zeros([1 params.Itnlim]);
+iteration_time    = zeros([1 params.Itnlim]);
+elapsed_time      = zeros([1 params.Itnlim]);
+% iterations
+if verbosity
+    %% loggy bits
+    if (variable_iterations)
+        log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in VARIABLE ITERATION mode.\n\tmax iterations: %i\n\tconvergence window: %i iterations\n\tconvergence limit: %.4e\n\tconvergence metric: %s\n',max_iterations,convergence_window,convergence_limit,'Second derivative of normalized objective');
+    else
+        log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in FIXED ITERATION mode.\n\tnumber of iterations: %i.\n',max_iterations);
+    end
+    yet_another_logger(log_msg,log_mode,log_file);
+    log_msg = sprintf('Iteration,\t     obj,\tdelta obj,\tconv metric,\titeration time,\telapsed time.\n');
+    yet_another_logger(log_msg,log_mode,log_file);
+else
+    time_zero = tic;
+end % time keeping
 
+max_iterations    = params.Itnlim;
 % line search parameters
 maxlsiter = params.lineSearchItnlim ;
 % gradToll = params.gradToll ; % unused
@@ -79,35 +100,10 @@ alpha = params.lineSearchAlpha;
 beta = params.lineSearchBeta;
 t0 = params.lineSearchT0;
 
+x = x0;
 % copmute g0  = grad(Phi(x))
 g0 = wGradient(x,params);
 dx = -g0;
-
-% BJA-2017 code
-f1_vector=zeros([1 params.Itnlim]);
-
-mean_window=zeros([1 params.Itnlim]);
-convergence_metric=zeros([1 params.Itnlim]);
-delta_obj = zeros([1 params.Itnlim]);
-iteration_time =  zeros([1 params.Itnlim]);
-max_iterations = params.Itnlim;
-elapsed_time = zeros([1 params.Itnlim]);
-% iterations
-if verbosity
-    %% loggy bits
-    if (variable_iterations)
-        log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in VARIABLE ITERATION mode.\n\tmax iterations: %i\n\tconvergence window: %i iterations\n\tconvergence limit: %.4e\n\tconvergence metric: %s\n',max_iterations,convergence_window,convergence_limit,'Second derivative of normalized objective');
-        yet_another_logger(log_msg,log_mode,log_file);
-    else
-        log_msg = sprintf('Performing compressed sensing 2D slice reconstruction in FIXED ITERATION mode.\n\tnumber of iterations: %i.\n',max_iterations);
-        yet_another_logger(log_msg,log_mode,log_file);
-    end
-    log_msg = sprintf('Iteration,\t     obj,\tdelta obj,\tconv metric,\titeration time,\telapsed time.\n');
-    yet_another_logger(log_msg,log_mode,log_file);
-else
-    time_zero = tic;
-end % time keeping
-
 k = 0;
 while ( (k < params.Itnlim) ... || norm(dx(:)) < gradToll 
         || ( variable_iterations ...
@@ -141,10 +137,11 @@ while ( (k < params.Itnlim) ... || norm(dx(:)) < gradToll
         [f1, ~, ~]  =  objective(FTXFMtx, FTXFMtdx, DXFMtx, DXFMtdx,x,dx, t, params); %[f1, ERRobj, RMSerr]
     end
     % this single print added to make it easier to see that new code is ok.
-    fprintf('%i %g %g %g\n',lsiter,t,f0,f1);
+    % it is VERY similar to verbose.
+    % fprintf('%i %i %g %g %g\n',k,lsiter,t,f0,f1);
     if lsiter == maxlsiter
         warning('Reached max line search,.... not so good... might have a bug in operators. exiting... ');
-        break; % return;
+        break; 
     end
     %% adjust t0 based on used linear search iters.
     % control the number of line searches by adapting the initial step search
