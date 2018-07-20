@@ -58,6 +58,8 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
                         nv=strsplit(lp{pn},'=');% name value
                         if ~isempty(nv{2}) && numel(nv)==2
                             resinfo.(nv{1})=nv{2};
+                        elseif strcmp(nv{1},'TRES')
+                            resinfo.(nv{1})=strjoin(nv{2:end},'=');
                         elseif numel(nv)>2
                             warning('error parsing partition info, line:%s, segment:%s',ol{ln},lp{pn});
                         end
