@@ -250,6 +250,8 @@ else
                     puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
                 end
                 %}
+                % Getting subvolume should be the job of volume setup. 
+                % TODO: Move get vol code into setup!
                 if (local_or_streaming_or_static == 1)
                     get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
                 else
