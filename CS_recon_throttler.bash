@@ -9,9 +9,9 @@
 # this uses hardcoded scanner, runno, iterstrat, chunk_size
 # kamy, S67962, 10x5, 10
 # 
-# ALSO FORCING LATEST EXEC's
+# ALSO FORCING EXEC's to specified version
 #
-declare -x CS_CODE_DEV=latest;
+declare -x CS_CODE_DEV=iter_strat_v2;
 if [ -z "$1" ];then
     concurrent_vols=5;
 else
@@ -61,7 +61,6 @@ for vn in $started; do
     if [ ! -z "$tf" -a -f "$tf" ];then 
 	rm "$tf";
     fi;
-
 done
 if [ $v -eq 1 ];then echo "Completed:$completed";fi;
 th_count=$(ls -A $wkdir/ |grep -c .throttle_);
@@ -89,7 +88,7 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
     if [ ! -f $tf ]; then 
 	echo "Scheduling vn:$nv";
 	touch $tf
-	streaming_CS_recon kamy S67962 LOCAL FID first_volume=$nv last_volume=$nv iteration_strategy=10x5 planned_ok chunk_size=10
+	streaming_CS_recon kamy S67962 LOCAL FID first_volume=$nv last_volume=$nv iteration_strategy=10x5 skip_fermi_filter planned_ok chunk_size=10
     fi;
 else
     if [ $v -eq 1 ];then echo "Enough running:$in_progress_count >= $concurrent_vols";fi;
