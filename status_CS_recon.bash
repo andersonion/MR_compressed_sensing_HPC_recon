@@ -6,8 +6,18 @@ if [ -z $1 ];then
     echo "please specify runno!";
     exit;
 fi;
+args="";
+for arg in $@; do 
+    if [ ! -z "$args" ];then
+	args="$args,'$arg'";
+    else
+	args="'$arg'";
+    fi;
+done
+
 cd ${WKS_SHARED}/pipeline_utilities;
-/usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon('$1');exit"
+#echo /usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit";exit;
+/usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit"
 
 # example cron job to send mail to some user.
 #min     hour          day     month weekday
