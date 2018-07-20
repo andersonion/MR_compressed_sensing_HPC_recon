@@ -72,7 +72,7 @@ else
 end
 
 if (make_workspace)
-    tic
+    t_make_workspace=tic;
     %data=single(zeros([floor(npoints/2),n_sampled_points]));
     double_down = 1; % Need to test this feature, if we want to keep double processing for all fft operations, and beyond.
     fid_volume_number =1;
@@ -80,12 +80,12 @@ if (make_workspace)
     max_blocks = 1;
     data = load_fidCS(volume_fid,max_blocks,ntraces/nechoes,npoints,bitdepth,fid_volume_number,original_dims,only_non_zeros,double_down);
     %data = double(data); %This should be replaced by setting double_down to 1.
-    fid_load_time = toc;
+    fid_load_time = toc(t_make_workspace);
     log_msg =sprintf('Volume %s: fid loaded successfully in %0.2f seconds.\n',volume_runno,fid_load_time);
     yet_another_logger(log_msg,log_mode,log_file);
     tic
     data = fftshift(ifft(fftshift(data,1),[],1),1); % take ifft in the fully sampled dimension
-    fft_time=toc;
+    fft_time=toc(t_make_workspace);
     log_msg =sprintf('Volume %s: Fourier transform along fully sampled dimension completed in %0.2f seconds.\n',volume_runno,fft_time);
     yet_another_logger(log_msg,log_mode,log_file);
 
@@ -137,9 +137,13 @@ if (make_workspace)
     if (exist('scaling','var') && (volume_number == 1) && ~(sum((recon_dims - original_dims))))
         volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling; % We've already done the heavy lifting for this calculation, if array size doesn't change.
     else
-        tic
+        t_scale_calc=tic;
         current_slice=zeros([size(mask)],'like',data);
         qq=zeros([1 recon_dims(1)]);
+        % This loop is slow, but memory efficient. We might be able to
+        % smartly do this some other way. 
+        % TODO: for a "chunk" size of work, operate on a whole chunk at a
+        % time. 
         for n = 1:recon_dims(1)
             current_slice(mask(:))=data(n,:);
             temp_data = abs(ifftn(current_slice./CSpdf)); % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
@@ -150,7 +154,7 @@ if (make_workspace)
         %fid = fopen(scale_file,'r');
         %scaling = fread(fid,inf,'float');
         %fclose(fid);
-        optimized_for_memory_time = toc;
+        optimized_for_memory_time = toc(t_scale_calc);
         log_msg =sprintf('Volume %s: volume scaling calculated in %0.2f seconds.\n',volume_runno,optimized_for_memory_time);
         yet_another_logger(log_msg,log_mode,log_file);
     end
@@ -187,7 +191,7 @@ if (make_workspace)
     
     %% Save common variable file
     if ~exist(volume_workspace_file,'file')
-        tic
+        t_vol_save=tic;
         
         if (options.roll_data)
             disp('Attempting to roll data via kspace...')
@@ -211,7 +215,7 @@ if (make_workspace)
         savefast2(volume_workspace_file,'real_data','imag_data');
         save(volume_workspace_file,'aux_param','-append');
         save(volume_workspace_file,'param','-append');
-        time_to_write_master_mat_file=toc;
+        time_to_write_master_mat_file=toc(t_vol_save);
         log_msg =sprintf('Volume %s: master .mat file written in %0.2f seconds.\n',volume_runno,time_to_write_master_mat_file);
         yet_another_logger(log_msg,log_mode,log_file);
     end
@@ -229,7 +233,7 @@ end
 function [scaling,scaling_time,shift_modifier,first_corner_voxel] = calculate_CS_scaling(current_mask,current_data,mypdf0,n_slices,roll_data)
 shift_modifier=[ 0 0 0 ];
 thresh = .999999999; % only clip out very noisy voxels (e.g. zippers, artifacts), and not the eyes
-tic
+t_scale_calc=tic;
 x_dim=n_slices;
 [y_dim,z_dim]=size(current_mask);
 current_slice=zeros([y_dim z_dim],'like',current_data);
@@ -299,7 +303,7 @@ q = quantile(qq,thresh);
 
  
 %end
-scaling_time = toc;
+scaling_time = toc(t_scale_calc);
 scaling = (2^16-1)/q; % we plan on writing out uint16 not int16, though it won't show up well in the database
 scaling = double(scaling);
 end
