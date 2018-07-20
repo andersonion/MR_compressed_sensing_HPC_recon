@@ -74,7 +74,7 @@ if s==0 % unix status check
     end
     %% give the global feedback.
     fprintf('TOTAL progress: %05.2f%%\n',total_completion);
-    if save_ortho_centers
+    if save_ortho_centers && numel(rundata)>0
         %% actually go run the ortho slices
         fprintf('\t %i new volumes completed, orthoslices saving now... \n',numel(rundata));
         t_save=tic;
