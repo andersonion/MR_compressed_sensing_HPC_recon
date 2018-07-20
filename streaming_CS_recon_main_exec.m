@@ -279,6 +279,7 @@ log_msg=sprintf('%s----------\n',log_msg);
 log_msg=sprintf('%sScanner study: %s\n',log_msg, study);
 log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
 log_msg=sprintf('%sUser: %s\n',log_msg,user);
+log_msg=sprintf('%sExec Set: %s\n',log_msg,CS_CODE_DEV);
 yet_another_logger(log_msg,log_mode,log_file);
 % Check to see if a flag_file for complete recon exists
 if ~exist(study_flag,'file')
