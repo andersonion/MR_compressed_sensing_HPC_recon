@@ -20,7 +20,7 @@ cd ${WKS_SHARED}/pipeline_utilities;
 lck_file=$HOME/CS_recon_S6796.lck
 if [ ! -f $lck_file ]; then 
     touch $lck_file
-    /usr/local/bin/matlab -nodesktop -noFigureWindows -r "status_CS_recon($args);exit"
+    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit"
     rm $lck_file; 
 else 
     touch -t $(date -d "1 day ago" +%Y%m%d%H%M.%S) ${HOME}/.queue_anchor_lck_tst
