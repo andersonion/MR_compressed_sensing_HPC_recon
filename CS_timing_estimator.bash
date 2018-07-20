@@ -11,7 +11,7 @@ cd ${WKS_SHARED}/pipeline_utilities;
 # That might be appropriate for once per day on long recons or something.
 gather_CS_recon_meta $1 > ~/gather_tmp.m; # normal call
 #gather_CS_recon_meta $1 $BIGGUS_DISKUS 1 > ~/gather_tmp.m; # with re-collect force
-/usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "run('~/gather_tmp.m');exit;" && rm ~/gather_tmp.m
+/usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "run('~/gather_tmp.m');exit;" && rm ~/gather_tmp.m
 
 # example cron job to send mail to some user.
 #min     hour          day     month weekday
