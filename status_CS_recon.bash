@@ -17,7 +17,7 @@ done
 
 cd ${WKS_SHARED}/pipeline_utilities;
 #echo /usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit";exit;
-lck_file=$HOME/CS_recon_S6796.lck
+lck_file=$HOME/CS_recon_${1}.lck
 if [ ! -f $lck_file ]; then 
     touch $lck_file
     /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit"
