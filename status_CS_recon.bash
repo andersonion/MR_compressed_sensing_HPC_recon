@@ -20,7 +20,8 @@ cd ${WKS_SHARED}/pipeline_utilities;
 lck_file=$HOME/CS_recon_${1}.lck
 if [ ! -f $lck_file ]; then 
     touch $lck_file
-    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit"
+    s_file=$HOME/CS_recon_${1}.status;
+    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > $s_file
     rm $lck_file; 
 else 
     touch -t $(date -d "1 day ago" +%Y%m%d%H%M.%S) ${HOME}/.queue_anchor_lck_tst
@@ -42,9 +43,4 @@ fi;
 #16	5,11,16,21	*	*	*	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run 2>&1 > $s_file; cat $s_file| mail -s "status_CS_recon $t_run" $USER@duke.edu
 # send output with image files
 #15	5,11,16,21	*	*	*	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run Write 2>&1 > $s_file; attachments=$(grep -- '->' ${s_file} |awk '{print $2}'); cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu; for at in  $attachments ; do if [ ! -z "$at" ]; then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $USER@duke.edu ;fi;donep
-
-
-
-
-
 

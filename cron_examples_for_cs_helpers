@@ -9,12 +9,18 @@ MAILTO=$USER@duke.edu
 */10	*	*	*	0-4,6,7	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
 
 # send output without new image files. 
-*/15	18-23	*	*	5	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run 2>&1 > $s_file; cat $s_file| mail -s "status_CS_recon $t_run" $USER@duke.edu
+*/15	18-23	*	*	5	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run 2>&1; cat $s_file| mail -s "status_CS_recon $t_run" $USER@duke.edu
 
-# run timing estimator just on friday
-0	21	*	*	5	source $HOME/.bashrc; CS_timing_estimator S67962 1 2>&1 | mail -s "CS_timing_estimator" $USER@duke.edu
+# run timing estimator just on saturday at 2am
+0	2	*	*	6	source $HOME/.bashrc; CS_timing_estimator S67962 1 2>&1 | mail -s "CS_timing_estimator" $USER@duke.edu
 
+
+#### THESE ARE TOO COMPLICATED FOR CRON TO BE HAPPY WITH THEM!!!
 # send output with image files
-*/15	18-23	*	*	*	source $HOME/.bashrc; t_run="S67963";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run Write 2>&1 > $s_file; attachments=$(grep -- '->' ${s_file} |awk '{print $2}'); cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu; for at in  $attachments ; do if [ ! -z "$at" ]; then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $USER@duke.edu ;fi;done
+#*/15	18-23	*	*	*	source $HOME/.bashrc; t_run="S67963";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run Write 2>&1 > $s_file; attachments=$(grep -- '->' ${s_file} |awk '{print $2}'); cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu; for at in  $attachments ; do if [ ! -z "$at" ]; then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $USER@duke.edu ;fi;done
 
-15	5,11,16,21	*	*	*	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run Write 2>&1 > $s_file; attachments=$(grep -- '->' ${s_file} |awk '{print $2}'); cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu,gjohnson@duke.edu; for at in  $attachments ; do if [ ! -z "$at" ]; then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $USER@duke.edu,gjohnson@duke.edu ;fi;done
+#15	5,11,16,21	*	*	*	source $HOME/.bashrc; t_run="S67962";s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run Write 2>&1 > $s_file; attachments=$(grep -- '->' ${s_file} |awk '{print $2}'); cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu,gjohnson@duke.edu; for at in  $attachments ; do if [ ! -z "$at" ]; then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $USER@duke.edu,gjohnson@duke.edu ;fi;done
+
+#### updated code to have separate mailer script which can be called right after the data collector.
+#53	1	*	*	*	source $HOME/.bashrc;  t_run="S67963"; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu;
+15	5,11,16,21	*	*	*	source $HOME/.bashrc; t_run="S67962"; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu,gjohnson@duke.edu; status_CS_recon_mail $t_run $USER@duke.edu,gjohnson@duke.edu;
