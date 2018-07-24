@@ -26,8 +26,13 @@ if ( -d $parent_path && ! -d ${results_path} ) {
 
 chdir "${parent_path}";
 #for folder in $(ls -d ${runno}_m*); do 
-my @runnos=glob($runno."_m*");
-foreach my $folder ( @runnos ){
+my @runno_things=glob($runno."_m*");
+my @runnos;
+foreach my $folder ( @runno_things ){
+    if ( -f $folder ){ 
+	next;
+    }
+    push(@runnos,$folder);
     print("% collecting $folder\n");
     my $txt_1="$results_path/${folder}_slice_recon_times.txt";
     my $txt_2="$results_path/${folder}_slice_numbers.txt";
