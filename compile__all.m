@@ -7,7 +7,7 @@ parallel=1;
 c_commands=strsplit(c_commands);
 
 if ~parallel
-    %% serial run of compile commands in matlab
+    %% serial run of compile commands in matlab 
     for c=1:numel(c_commands)
         if ~isempty({c})
             try
