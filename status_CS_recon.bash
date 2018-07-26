@@ -21,7 +21,8 @@ lck_file=$HOME/CS_recon_${1}.lck
 if [ ! -f $lck_file ]; then 
     touch $lck_file
     s_file=$HOME/CS_recon_${1}.status;
-    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > $s_file
+    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 |sed 's/[^[:print:]]//g' > $s_file
+
     rm $lck_file; 
 else 
     touch -t $(date -d "1 day ago" +%Y%m%d%H%M.%S) ${HOME}/.queue_anchor_lck_tst
