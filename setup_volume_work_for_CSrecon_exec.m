@@ -282,15 +282,45 @@ q = quantile(qq,thresh);
     
     first_3rd_idx = round(vs/3);
     last_3rd_idx = round(2*vs/3)+1;
-    cof=1.2;%cof=1.1; % Cof=> "coeffecient"
-    lmin(1)=find((x_sum(1:first_3rd_idx(1))<cof*x_min),1,'last');
-    lmin(2)=find((y_sum(1:first_3rd_idx(2))<cof*y_min),1,'last');
-    lmin(3)=find((z_sum(1:first_3rd_idx(3))<cof*z_min),1,'last');
-    
-    umin(1)=find((x_sum(last_3rd_idx(1):end)<cof*x_min),1);
-    umin(2)=find((y_sum(last_3rd_idx(2):end)<cof*y_min),1);
-    umin(3)=find((z_sum(last_3rd_idx(3):end)<cof*z_min),1);
-    
+    coeff=1.2;%coefff=1.1; 
+    % coeff=> "coeffecient" 
+    % a modifier of the min to help us rise above the noise floor. 
+    % in the first third of the data finds the last point, which is coeff
+    % times bigger than the minimum.
+    % lower_min 
+    lmin(1)=find((x_sum(1:first_3rd_idx(1))<coeff*x_min),1,'last');
+    lmin(2)=find((y_sum(1:first_3rd_idx(2))<coeff*y_min),1,'last');
+    lmin(3)=find((z_sum(1:first_3rd_idx(3))<coeff*z_min),1,'last');
+    % in the last third of the data finds the fist point, which is coeff
+    % times bigger than the minimum. upper min values are weird becuse
+    % their value is not initially 1... volsize big,  
+    % rather, 1..(1/3) volsize, to get them expressed in vol_size we must
+    % add the last_3rd_idx again (the points we skipped over in calculation).
+    % upper_min
+    % WARNING: sometimes find returns 0 elements, so used a temp struct 
+    % and exotic condensed conditionals are used to overcome that
+    % TODO: revisit this, including the why it fails... 
+    % we could try/catch this using the old code first, but i'm relatively 
+    % confident the new code cant fail, so thats unnecessary clutter. 
+    %{
+    umin(1)=find((x_sum(last_3rd_idx(1):end)<coeff*x_min),1);
+    umin(2)=find((y_sum(last_3rd_idx(2):end)<coeff*y_min),1);
+    umin(3)=find((z_sum(last_3rd_idx(3):end)<coeff*z_min),1);
+    %}
+    %% funny struct find code to prevent 0 element error
+    clear umin; % when testing this is important or matlab will be a pain. 
+    umin.x=find((x_sum(last_3rd_idx(1):end)<coeff*x_min),1);
+    umin.y=find((y_sum(last_3rd_idx(2):end)<coeff*y_min),1);
+    umin.z=find((z_sum(last_3rd_idx(3):end)<coeff*z_min),1);
+    % potential values for umin are 1.. size(dim)-last_3rd_idx
+    d_f=fieldnames(umin);
+    for fn=1:numel(d_f)
+        if isempty(umin.(d_f{fn}))
+            umin.(d_f{fn})=vs(fn)-last_3rd_idx(fn)+1;
+        end
+    end
+    umin=[umin.x,umin.y,umin.z];
+    %% 
     umin=umin+last_3rd_idx-1;
     
     new_c=round((umin-lmin)/2+lmin);
