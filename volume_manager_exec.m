@@ -172,16 +172,21 @@ if (exist(variables_file2,'file'))
     mf.handle_archive_tag_cmd=handle_archive_tag_cmd;
 end
 
-
+% Write archive tag file before any work done. 
+% This is rather poor form as the purpose of the archive tag file is to
+% mark data which is ready.
+% TODO: move this into the cleanup code.
 if ~exist(local_archive_tag,'file')
     if ~exist(original_archive_tag,'file')
-        write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(3),databuffer.headfile.U_code, ...
+        write_archive_tag_nodev(volume_runno,['/' target_machine 'space'], ...
+            original_dims(3),databuffer.headfile.U_code, ...
             '.raw',databuffer.headfile.U_civmid,true,images_dir);
     end
-    
     system(sprintf('mv %s %s',original_archive_tag,local_archive_tag));
 end
-if (~starting_point) || ((nechoes > 1) && (starting_point == 1))
+
+if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
+    % FID not ready yet, schedule gatekeeper for us.
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
     gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.

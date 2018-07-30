@@ -232,7 +232,7 @@ for index=1:length(slice_numbers)
             %res=XFM*res;
             %res =XFM*im_zfwdc ; %pick up where we left off...
         end
-        
+         
         time_to_set_up = toc(load_start);
         log_msg =sprintf('Slice %i: Time to set up recon:  %0.2f seconds.\n',slice_index,time_to_set_up);
         yet_another_logger(log_msg,log_mode,log_file);
