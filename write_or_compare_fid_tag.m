@@ -1,11 +1,14 @@
-function consistency_status = write_or_compare_fid_tag(input_fid,fid_tag_path,volume_number,scanner,user)
+function consistency_status = write_or_compare_fid_tag( ...
+    input_fid,fid_tag_path,volume_number,scanner,user)
 % busy function handling fid_er_print operations. 
 % would be good to refactor into a get_fid_tag, and a compare_fid_tag.
 %
 
 original_fid_tag_path = fid_tag_path;
 consistency_status = 0;
-local_operation_only=1; % This can run locally just as well, though it is designed for remote deployment (when scanner is specified).
+% This can run locally just as well, though it is designed for remote deployment.
+% (when scanner is specified).
+local_operation_only=1;
 
 if ~exist('volume_number','var')
     volume_number = 1;
@@ -31,8 +34,12 @@ end
 
 if exist('scanner','var')
     local_operation_only=0;
+    fprintf('fid checking remote on: %s',scanner)
     if ~exist('user','var')
         user='omega';
+        fprintf(' with default: %s\n',user);
+    else
+        fprintf(' with: %s\n',user);
     end
     ready=check_subvolume_ready_in_fid_quiet(input_fid,1,1,scanner,user);
 else
@@ -74,6 +81,7 @@ if ready
             % set friendly permisions to file, u+g=rw, o=r
             chmod_cmd=sprintf('chmod 664 %s',fid_tag_path);
             [~,~] = system(chmod_cmd); % set perms
+            [~,~] = system(sprintf('mv %s %s',fid_tag_path,original_fid_tag_path));
         else
             diff_cmd = sprintf('diff -q %s %s',original_fid_tag_path,fid_tag_path);
             [s,diff_result] = system(diff_cmd);
