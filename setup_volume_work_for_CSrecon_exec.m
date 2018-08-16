@@ -133,10 +133,15 @@ if (make_workspace)
         %end
     end
     %% Prep data for reconstruction
-    % Calculate scaling
-    if (exist('scaling','var') && (volume_number == 1) && ~(sum((recon_dims - original_dims))))
-        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling; % We've already done the heavy lifting for this calculation, if array size doesn't change.
+    % Calculate per volume scaling the study scale has already been
+    % calculated.
+    if (exist('scaling','var') && (volume_number == 1) ...
+            && ~(sum((recon_dims - original_dims))))
+        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling; 
     else
+        %% Calculate individual volume scale divisor using quantile... 
+        % this code is suspected of being incorrect by james, with evidence
+        % of poor scaling in recons from gary. 
         t_scale_calc=tic;
         current_slice=zeros([size(mask)],'like',data);
         qq=zeros([1 recon_dims(1)]);
@@ -149,6 +154,8 @@ if (make_workspace)
             temp_data = abs(ifftn(current_slice./CSpdf)); % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
             qq(n)=max(temp_data(:));%quantile(temp_data(:),thresh);
         end
+        % is this equivalent to our old behvior of sorting the whole array, 
+        % and choosing the value 0.005% from the end as our scale target?
         thresh = .999999999;
         volume_scale = sqrt(recon_dims(2)*recon_dims(3))*quantile(qq,thresh);
         %fid = fopen(scale_file,'r');
@@ -232,7 +239,11 @@ end
 %% internal functions
 function [scaling,scaling_time,shift_modifier,first_corner_voxel] = calculate_CS_scaling(current_mask,current_data,mypdf0,n_slices,roll_data)
 shift_modifier=[ 0 0 0 ];
-thresh = .999999999; % only clip out very noisy voxels (e.g. zippers, artifacts), and not the eyes
+% only clip out very noisy voxels (e.g. zippers, artifacts), and not the eyes
+% is this equivalent to our old behvior of sorting the whole array,
+% and choosing the value 0.005% from the end as our scale target?
+% james is COMPLETELY CERTAIN it is not. 
+thresh = .999999999;
 t_scale_calc=tic;
 x_dim=n_slices;
 [y_dim,z_dim]=size(current_mask);
@@ -282,7 +293,7 @@ q = quantile(qq,thresh);
     
     first_3rd_idx = round(vs/3);
     last_3rd_idx = round(2*vs/3)+1;
-    coeff=1.2;%coefff=1.1; 
+    coeff=1.2;%coeff=1.1; 
     % coeff=> "coeffecient" 
     % a modifier of the min to help us rise above the noise floor. 
     % in the first third of the data finds the last point, which is coeff
@@ -336,4 +347,5 @@ q = quantile(qq,thresh);
 scaling_time = toc(t_scale_calc);
 scaling = (2^16-1)/q; % we plan on writing out uint16 not int16, though it won't show up well in the database
 scaling = double(scaling);
+fprintf('CS scale calculation result %g, data will be divided by this value prior to processing, this will hopefully result in a max short int value on completion.\n',scaling);
 end
