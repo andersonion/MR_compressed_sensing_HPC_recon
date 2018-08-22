@@ -137,10 +137,16 @@ if islogical(options.TVWeight)
     options.TVWeight = 0.0012;
 end
 if islogical(options.xfmWeight)
-    %{
+    %%{
+    % this is the value nian has been using, and not the one gary has been
+    % using. 
     options.xfmWeight =0.006;
     %}
-    options.xfmWeight =0.002;
+    %{
+    % this is the value gary has been using, however, not the one nian has
+    % been using.
+    options.xfmWeight =0.002; 
+    %}
 end
 if ~options.hamming_window
     options.hamming_window=32;
