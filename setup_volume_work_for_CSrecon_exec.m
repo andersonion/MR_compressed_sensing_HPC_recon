@@ -135,10 +135,15 @@ if (make_workspace)
     %% Prep data for reconstruction
     % Calculate per volume scaling the study scale has already been
     % calculated.
+    
+    
     if (exist('scaling','var') && (volume_number == 1) ...
             && ~(sum((recon_dims - original_dims))))
-        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling; 
+        % If we've calculated scale and its first volume, and we have same
+        % recon and original dims, (2^16-1)/scaling is the q as calculated.
+        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling;
     else
+
         %% Calculate individual volume scale divisor using quantile... 
         % this code is suspected of being incorrect by james, with evidence
         % of poor scaling in recons from gary. 
@@ -154,19 +159,23 @@ if (make_workspace)
             temp_data = abs(ifftn(current_slice./CSpdf)); % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
             qq(n)=max(temp_data(:));%quantile(temp_data(:),thresh);
         end
-        % is this equivalent to our old behvior of sorting the whole array, 
-        % and choosing the value 0.005% from the end as our scale target?
-        thresh = .999999999;
-        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*quantile(qq,thresh);
-        %fid = fopen(scale_file,'r');
-        %scaling = fread(fid,inf,'float');
-        %fclose(fid);
+        % WARNING: This is not the same as our historical threshold of
+        % 0.995. This causes the volume scale to just be the max of the
+        % data!
+        
+        % We will ditch quantile/thresh, since the original code wanted max
+        % here.
+        %thresh = .999999999;
+        %volume_scale = sqrt(recon_dims(2)*recon_dims(3))*quantile(qq,thresh);
+        volume_scale = sqrt(recon_dims(2)*recon_dims(3))*max(qq);
+        
         optimized_for_memory_time = toc(t_scale_calc);
         log_msg =sprintf('Volume %s: volume scaling calculated in %0.2f seconds.\n',volume_runno,optimized_for_memory_time);
         yet_another_logger(log_msg,log_mode,log_file);
     end
     % scale data such that the maximum image pixel in zf-w/dc is around 1
     % this way, we can use similar lambda for different problems
+    % data is not 0-1.
     data = data/volume_scale;
     mf=matfile(setup_vars,'Writable',true);
     mf.volume_scale = volume_scale;
@@ -243,7 +252,15 @@ shift_modifier=[ 0 0 0 ];
 % is this equivalent to our old behvior of sorting the whole array,
 % and choosing the value 0.005% from the end as our scale target?
 % james is COMPLETELY CERTAIN it is not. 
-thresh = .999999999;
+% After extensive discovery on this code, it is clear that a threshold this
+% high universally results in a simple img max. 
+% Futhermore, we cannot effectively use this value for our later scaling,
+% and we may as well take a simple max of the data here. 
+% Due to the interwoven nature of this realization, this code has been left
+% in place with the "correct" threshold, even though that will still give the max, or
+% nearly the max of the data. 
+%thresh = .999999999;
+thresh = 0.9995;
 t_scale_calc=tic;
 x_dim=n_slices;
 [y_dim,z_dim]=size(current_mask);
@@ -260,7 +277,8 @@ d2=2; % May need to swap these...
 %end
 for n = 1:x_dim
     current_slice(current_mask(:))=current_data(n,:);
-    temp_data = abs(ifftn(current_slice./mypdf0)); % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
+    % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
+    temp_data = abs(ifftn(current_slice./mypdf0)); 
     qq(n)= max(temp_data(:));%quantile(temp_data(:),thresh);
     %if (roll_data)   
         y_sums(:,n)=mean(temp_data,d2);
