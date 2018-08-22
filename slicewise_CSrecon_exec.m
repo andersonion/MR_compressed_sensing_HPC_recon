@@ -159,7 +159,7 @@ for index=1:length(slice_numbers)
     t_id=fopen(temp_file,'r+');
     % Should be the same size as header_size 
     header_length = fread(t_id,1,'uint16'); 
-    % 15 May 2017, BJA; changed header from double to uint16; will indicate number of iterationsperformed
+    % 15 May 2017, BJA; changed header from double to uint16; will indicate number of iterations performed
     %work_done = fread(fid,dims(1),'*uint8');
     work_done = fread(t_id,header_length,'uint16');
     % 8 May 2017, BJA: converting header from binary to double local_scaling
@@ -209,28 +209,27 @@ for index=1:length(slice_numbers)
             yet_another_logger(log_msg,log_mode,log_file);
             
             % this compensates the intensity for the undersampling
+            % experimented with removing this volume scale and found that
+            % destroyed the output. 
+            % according to the original code comments im_zfwdc should be
+            % 0-1 for the whole volume, take care checking here as this is
+            % slice at a time. 
             im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
             ph = exp(1i*angle((ifft2c(param.data.*phmask))));
             param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
-                        
             res=XFM*im_zfwdc;
             clear im_zfwdc ph slice_data; 
         else
-            % convergence_window is only added after we've done some work.
+            % James says: convergence_window is only added after we've done some work.
             % Is that the behavior we want?
+            % BJ says: no, what is happening here is that the convergence
+            % window is being reduced from its default of 10 to 3 when work
+            % is reinitialized.  But the whole convergence algorithm is
+            % questionable anyways (at least how implemented by me).
             recon_options.convergence_window = 3;
+            
             res=CS_tmp_load(temp_file,recon_dims,slice_index);
-            %{
-            temp_res=sqrt(mask_size)/myscale*temp_res;
-            if (sum(dims1-dims)>0)
-                temp_res = fftshift(ifftn(fftshift(temp_res)));
-                res= padarray(temp_res,[dims1(2)-dims(2) dims1(3)-dims(3)]/2,0,'both');
-                res=fftshift(fftn(fftshift(res)));
-                
-            else
-            %}
-            %res=XFM*res;
-            %res =XFM*im_zfwdc ; %pick up where we left off...
+  
         end
          
         time_to_set_up = toc(load_start);
