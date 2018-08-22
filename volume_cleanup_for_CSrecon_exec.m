@@ -21,7 +21,6 @@ else
     C___=exec_startup();
 end
 
-
 % TEMPORARY CODE for backwards compatibility of in-progress scans remove by
 % June 12th, 2018
 if ~exist(volume_variable_file,'file')
@@ -75,7 +74,7 @@ if exist('scale_file','var')
         end
     end
 end
-if ~scale_file_error%exist(scale_file,'file')
+if ~scale_file_error
     fid_sc = fopen(scale_file,'r');
     scaling = fread(fid_sc,inf,'*float');
     fclose(fid_sc);
@@ -181,6 +180,7 @@ if isempty(minimal_memory)
     %minimal_memory=0;
     minimal_memory=1; % Flipping the default switch on 5 January 2018
 end
+BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noise.
 if minimal_memory
     %% min memory mode, we only load 1 full CS slice at a time, 
     % each is reduced to the proscribed acq dim 
@@ -194,15 +194,26 @@ if minimal_memory
     lil_dummy = complex(lil_dummy,lil_dummy);
     data_out=zeros(original_dims,'like',lil_dummy);
     bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
+    % Slice quantiles are not exactly the right answer, so that whole idea
+    % has been scrapped in favor of the old (silly?) sorted array pct, and
+    % its done at the end when we take the magnitude.
+    % slice_quantile=zeros(1,recon_dims(1));
     for ss=1:recon_dims(1)
         if ~mod(ss,10)
             log_msg = sprintf('Processing slice %i...\n',ss);
             yet_another_logger(log_msg,log_mode,log_file);
         end
-        % This data read is a bit strange, 
-        % why dont we just read in as double direct? 
+        % James says: This data read is a bit strange, 
+        % why dont we just read in as double direct?
+        % BJ responds: We made this decision together; it
+        % is more robust this way, as we were running into
+        % issues otherwise (bigendian/littleendian or something
+        % like that).
         data_in = typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
         data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
+        % t is temp data, as in from the temporary file, truly, its our
+        % final product of iterations to be written after the final
+        % waveletting stuff.
         t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
         clear data_in;
         t_data_out = XFM'*t_data_out;
@@ -217,9 +228,16 @@ if minimal_memory
         else
             final_slice_out=t_data_out;
         end
-        data_out(ss,:,:)= scaling*final_slice_out;
+        final_slice_out=scaling*final_slice_out;
+        % slice quantiles added to set final image scaling before
+        % write_civm_image. This is not a great bit of code because it
+        % needs to operate on magnitude data, and has to do an abs in line
+        % here.
+        % On review of quantile operations, this is not okay, nor is it
+        % okay enough to use. 
+        % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
+        data_out(ss,:,:)= final_slice_out;
     end
-    
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -247,22 +265,6 @@ else
         data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2 recon_dims(1)]);
         c_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
         clear data_in;
-        
-        % The following block was moved up to be a better place.
-        %{
-        if ~exist('wavelet_dims','var')
-            if exist('waveletDims','var')
-                wavelet_dims = waveletDims;
-            else
-                wavelet_dims = [12 12];
-            end
-        end
-        if ~exist('wavelet_type','var')
-            wavelet_type = 'Daubechies';
-        end
-        XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
-        %}
-        
         for ss=1:recon_dims(1)
             c_data_out(:,:,ss) = XFM'*c_data_out(:,:,ss);
         end
@@ -297,9 +299,9 @@ else
     data_out = permute(data_out,[3 1 2 4]);
 end %?
 fclose(fid);
-% Save complex data for QSM BEFORE the possibility of a fermi filter being
-% applied.
 
+%% Save complex data for QSM BEFORE the possibility of a fermi filter being
+% applied.
 if write_qsm
     qsm_folder = [workdir '/qsm/'];
     if ~exist(qsm_folder,'dir')
@@ -327,7 +329,8 @@ if ~qsm_fermi_filter
         end
     end
 end
-% Apply Fermi Filter
+
+%% Apply Fermi Filter
 if (fermi_filter && ~already_fermi_filtered)
     data_out = fftshift(fftn(fftshift(data_out)));
     if exist('w1','var')
@@ -344,6 +347,7 @@ if ~isdeployed && strcmp(getenv('USER'),'rja20')
     imagesc(abs(squeeze(data_out(:,:,round(original_dims(3)/2)))))
     colormap gray
 end
+
 %% Save data
 if qsm_fermi_filter
     if write_qsm
@@ -404,7 +408,75 @@ try
 catch roll_err
     disp(roll_err.message);
 end
-databuffer.data = mag_data;
+
+%% sloppy scale calculating at end of process.
+% operating by slice doesnt give the right result (chunk wouldnt either
+% for the same reasons).
+% This causes a memory surge of +1 volume, as best as james can figure, that
+% is unavaoidable.
+% The old fashioned sort code was used instead of quantile due to
+% superstition.
+%{
+if exist('slice_quantile','var')
+    % we operated by slices, we need a "best" guess value to threshold off
+    % the high pixel noise. 
+    % Min would be wrong, becuase there is no guarentee of bright trash
+    % voxels per slice, 
+    % Max is wrong for the same reason. 
+    % Mean could be correct, but feels fuzzy.
+    warning('Slice quantile conversion for max value! This is known to be somewhat bogus! this is in place for evaluation! If you see this message in production notify at james/BJ Immediately!');
+    data_quantile=quantile(slice_quantile,0.75);
+    databuffer.headfile.slice_quantiles=slice_quantile;
+else
+%}
+%data_quantile=quantile(data_out,BRIGHT_NOISE_THRESHOLD);
+%end
+% OLD scale file format is RUNNO_4D_scaling_factor.float.
+% new scalefile will be .RUNNO_civm_raw_scale.float
+% When we have time in the future it would be nice to have only one scale
+% operation, however these are inexpensive in cpu/memory so its not so bad
+% to do it twice.
+final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale.float',runno));
+% have to regenerate volume number because it is not kept, we're using the
+% runno as a proxy. This is more brittle than I'd like however it should be
+% decent.
+%vnt, volume number text
+vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
+if isempty(vt)
+    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
+    vt={'0'};
+end
+volume_number=1+str2double(vt{:});
+scale_target=2^16-1;
+databuffer.headfile.group_max_intensity=max(mag_data(:));
+if volume_number==1 && ~exist(final_scale_file,'file')
+    mag_s=sort(mag_data(:));
+    data_quantile=mag_s(round(numel(mag_s)*BRIGHT_NOISE_THRESHOLD));
+    final_scale=scale_target/data_quantile;
+    clear mag_s;
+    fid_sc = fopen(final_scale_file,'w');
+    % scale write count
+    sc_wc = fwrite(fid_sc,final_scale,'float');
+    fclose(fid_sc);
+    log_msg=sprintf('volume_cleanup: This is the first volume in acq, setting final image scale to %0.14f in %s.\n' ...
+        ,final_scale,final_scale_file);
+    databuffer.headfile.group_max_atpct=data_quantile;
+else
+    % load newscale
+    fid_sc = fopen(final_scale_file,'r');
+    final_scale = fread(fid_sc,inf,'*float');
+    fclose(fid_sc);
+    log_msg=sprintf('volume_cleanup: Volume %i found scale file %s, with value %0.14f.\n' ...
+        ,final_scale_file,final_scale);
+    databuffer.headfile.group_max_atpct=databuffer.headfile.group_max_intensity;
+end
+mag_data=mag_data*final_scale;
+yet_another_logger(log_msg,log_mode,log_file);
+databuffer.headfile.divisor=1/final_scale;% legacy just for confusion :D 
+fprintf('\tMax value chosen for output scale: %0.14f\n',databuffer.headfile.group_max_atpct);
+
+%% save civm_raw
+databuffer.data = mag_data;clear mag_data; % mag_data clear probably unnecessary, this is just in case.
 write_civm_image(databuffer,{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'});
 
 if ~options.keep_work && ~options.process_headfiles_only
