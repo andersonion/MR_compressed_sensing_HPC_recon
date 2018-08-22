@@ -101,7 +101,7 @@ beta = params.lineSearchBeta;
 t0 = params.lineSearchT0;
 
 x = x0;
-% copmute g0  = grad(Phi(x))
+% compute g0  = grad(Phi(x))
 g0 = wGradient(x,params);
 dx = -g0;
 k = 0;
