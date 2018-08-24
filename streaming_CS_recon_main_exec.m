@@ -74,6 +74,7 @@ types.standard_options={...
     'TVWeight',             ''
     'xfmWeight',            ''
     'hamming_window',       ' used in the creation of phmask'
+    'slicewise_norm',       ' normalize the initial image by slice max instead of volume max'
     'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
     };
 types.beta_options={...

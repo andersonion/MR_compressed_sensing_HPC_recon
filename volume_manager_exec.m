@@ -313,6 +313,7 @@ else
             end
             mf = matfile(variables_file,'Writable',true);
             mf.work_subfolder = work_subfolder;
+            mf.volume_number=volume_number;
             mf.recon_file = recon_file;
             mf.procpar_file = procpar_file;
             mf.scale_file = scale_file;
@@ -379,9 +380,15 @@ else
                 t_param=mf2.param;
                 t_param.Itnlim=Itnlim;
                 mf2.param=t_param;
-                if isfield(options,'verbosity')
+                if isfield(opts2,'verbosity')                    
                     t_aux_param=mf2.aux_param;
                     t_aux_param.verbosity=recon_options.verbosity;
+                    mf2.aux_param=t_aux_param;
+                end
+                
+                 if isfield(opts2,'slicewise_norm')                  
+                    t_aux_param=mf2.aux_param;
+                    t_aux_param.slicewise_norm=options.slicewise_norm;
                     mf2.aux_param=t_aux_param;
                 end
             end

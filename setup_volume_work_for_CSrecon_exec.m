@@ -1,4 +1,4 @@
-function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number)
+function setup_volume_work_for_CSrecon_exec(setup_vars,volume_number_string)
 %CS_RECON_CLUSTER_SETUP_WORK_EXEC An executable MATLAB script for setting
 %up each volume of CS reconstruction in order to avoid saturating the
 %master node (in the context of DTI, with many many volumes to recon.
@@ -42,7 +42,12 @@ load(recon_file);
 %    procpar_path = ;
 %end
 %mask = skipint2skiptable(procpar_path); %sampling mask
-volume_number=str2double(volume_number);
+
+% BJ says: I've started writing volume_number to the options (already as
+% double); the following code allows for backwards compatibility
+if ~exist('volume_number','var')
+    volume_number=str2double(volume_number_string);
+end
 %% Immediately check to see if we still need to set up the work (a la volume manager)
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno);
 make_workspace = 0;
@@ -137,7 +142,7 @@ if (make_workspace)
             scaling = (2^16-1)/q; % we plan on writing out uint16 not int16, though it won't show up well in the database
             scaling = double(scaling);
         %}
-        log_msg =sprintf('Volume %s: volume scaling (%f) calculated in %0.2f seconds\n',volume_runno,scaling,scaling_time);
+        log_msg =sprintf('Volume %s: Initial global scaling (%f) calculated in %0.2f seconds\n',volume_runno,scaling,scaling_time);
         yet_another_logger(log_msg,log_mode,log_file);
         %m = matfile(recon_file,'Writable',true); %moved outside of code
         %block
@@ -159,6 +164,9 @@ if (make_workspace)
     % Calculate per volume scaling the study scale has already been
     % calculated.
     
+    % BJ: let's investigate if it makes more since to do slice_scaling
+    % rather than volume_scaling
+    
     
     if (exist('scaling','var') && (volume_number == 1) ...
             && ~(sum((recon_dims - original_dims))))
@@ -166,6 +174,7 @@ if (make_workspace)
         % recon and original dims, (2^16-1)/scaling is the q as calculated.
         volume_scale = sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/scaling;
     else
+    
 
         %% Calculate individual volume scale divisor using quantile... 
         % this code is suspected of being incorrect by james, with evidence
@@ -195,11 +204,20 @@ if (make_workspace)
         optimized_for_memory_time = toc(t_scale_calc);
         log_msg =sprintf('Volume %s: volume scaling calculated in %0.2f seconds.\n',volume_runno,optimized_for_memory_time);
         yet_another_logger(log_msg,log_mode,log_file);
+    
+    
     end
+    % This end pairs with line 143
+    
     % scale data such that the maximum image pixel in zf-w/dc is around 1
     % this way, we can use similar lambda for different problems
     % data is not 0-1.
-    data = data/volume_scale;
+    
+    % BJ (August 2018) Will scale by slice max when the time comes...
+    if ~options.slicewise_norm
+        data = data/volume_scale;
+    end
+    
     mf=matfile(setup_vars,'Writable',true);
     mf.volume_scale = volume_scale;
     %% Define auxillary parameters to pass to compiled job
@@ -231,6 +249,9 @@ if (make_workspace)
     %% Save common variable file
     if ~exist(volume_workspace_file,'file')
         t_vol_save=tic;
+        if isfield(options,'slicewise_norm')
+           aux_param.slicewise_norm=options.slicewise_norm; 
+        end
         if (options.roll_data)
             disp('Attempting to roll data via kspace...')
             Ny=original_dims(2);

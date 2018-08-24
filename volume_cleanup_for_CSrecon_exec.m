@@ -111,6 +111,25 @@ end
 if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
+
+%%
+% James says: have to regenerate volume number because it is not kept, we're using the
+% runno as a proxy. This is more brittle than I'd like however it should be
+% decent.
+%
+% BJ says: I'm updating volume_manager to write the volume_number to the
+% variables file so we will have it on hand...going forward.
+
+if ~exist('volume_number','var')
+%vnt, volume number text
+vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
+if isempty(vt)
+    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
+    vt={'0'};
+end
+volume_number=1+str2double(vt{:});
+end
+
 %%
 if continue_recon_enabled % This should be made default.
     if ~exist('wavelet_dims','var')
@@ -198,6 +217,11 @@ if minimal_memory
     % has been scrapped in favor of the old (silly?) sorted array pct, and
     % its done at the end when we take the magnitude.
     % slice_quantile=zeros(1,recon_dims(1));
+    walker_texas_ranger=0:(volume_scale/256):volume_scale;
+
+    volume_hist=histcounts(0,walker_texas_ranger); % Initialize an empty histogram
+
+    
     for ss=1:recon_dims(1)
         if ~mod(ss,10)
             log_msg = sprintf('Processing slice %i...\n',ss);
@@ -217,7 +241,10 @@ if minimal_memory
         t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
         clear data_in;
         t_data_out = XFM'*t_data_out;
-        t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+        
+        if ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
+           t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+        end    
         %% Crop out extra k-space if non-square or non-power of 2, 
         % might as well apply fermi filter in k-space, if requested (no QSM requested either)
         if sum(original_dims == recon_dims) ~= 3
@@ -237,6 +264,27 @@ if minimal_memory
         % okay enough to use. 
         % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
         data_out(ss,:,:)= final_slice_out;
+        volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),walker_texas_ranger); % Cumulative build a volume histogram
+    end
+    
+    
+    cs_hist=cumsum(volume_hist);
+    thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
+    [a,~]=find(cs_hist'>thresh,1);
+    if (a == length(walker_texas_ranger))
+      a=a-1;
+    end
+
+    not_really_data_quantile=(walker_texas_ranger(a)+walker_texas_ranger(a+1))/2;  
+    suggested_final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',runno));
+    scale_target=2^16-1;
+    suggested_final_scale=scale_target/not_really_data_quantile;
+
+    if (volume_number == 1)
+        fid_sc = fopen(suggested_final_scale_file,'w');
+        % scale write count
+        sc_wc = fwrite(fid_sc,suggested_final_scale,'float');
+        fclose(fid_sc);
     end
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
@@ -278,6 +326,9 @@ else
             if (fermi_filter && ~qsm_fermi_filter)
                 % this check for fermi vars is unnecessary, we always make sure w1
                 % and w2 are set.
+                log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
+                yet_another_logger(log_msg,log_mode,log_file);
+                
                 %if exist('w1','var')
                     data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
                 %else
@@ -332,6 +383,10 @@ end
 
 %% Apply Fermi Filter
 if (fermi_filter && ~already_fermi_filtered)
+    
+    log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
+    yet_another_logger(log_msg,log_mode,log_file);
+    
     data_out = fftshift(fftn(fftshift(data_out)));
     if exist('w1','var')
         data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
@@ -437,19 +492,19 @@ else
 % operation, however these are inexpensive in cpu/memory so its not so bad
 % to do it twice.
 final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale.float',runno));
-% have to regenerate volume number because it is not kept, we're using the
-% runno as a proxy. This is more brittle than I'd like however it should be
-% decent.
-%vnt, volume number text
-vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
-if isempty(vt)
-    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
-    vt={'0'};
-end
-volume_number=1+str2double(vt{:});
+
 scale_target=2^16-1;
 databuffer.headfile.group_max_intensity=max(mag_data(:));
 if volume_number==1 && ~exist(final_scale_file,'file')
+    % BJ says: per /cm/shared/workstation_code_dev/recon/CS_v2/testing_and_prototyping/slicewise_hist_test.m
+    % It looks like slicewise implementation is 3x faster than this code
+    % (e.g. 75s vs 240s for array of 2048x1024x1024)
+    % And for data_quantile (a true misnomer here) I observed a difference
+    % between the two methods to range from 0.117 +/- 0.064%
+    % Given that this is slightly arbitrary, this is MORE than acceptable.
+    % Note that the test relied on a simulated bimodal distribution, not
+    % real MRI data.
+    
     mag_s=sort(mag_data(:));
     data_quantile=mag_s(round(numel(mag_s)*BRIGHT_NOISE_THRESHOLD));
     final_scale=scale_target/data_quantile;

@@ -216,10 +216,18 @@ for index=1:length(slice_numbers)
             % this compensates the intensity for the undersampling
             % experimented with removing this volume scale and found that
             % destroyed the output. 
-            % according to the original code comments im_zfwdc should be
+            % James says: according to the original code comments im_zfwdc should be
             % 0-1 for the whole volume, take care checking here as this is
-            % slice at a time. 
-            im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
+            % slice at a time.
+            % BJ says: Miki, et al. suggest that we can normalize slicewise
+            if aux_param.slicewise_norm
+                im_zfwdc = ifft2c(param.data./CSpdf); % No norm yet
+                slice_scale = max(abs(im_zfwdc(:)));
+                im_zfwdc=im_zfwdc/(slice_scale*slice_scale); % Preserving buggy and better performance
+                param.data=param.data/slice_scale;
+            else
+                im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
+            end
             ph = exp(1i*angle((ifft2c(param.data.*phmask))));
             param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
             res=XFM*im_zfwdc;
@@ -254,6 +262,10 @@ for index=1:length(slice_numbers)
             [res, inner_its, lin_search_time] = fnlCg_verbose(res, param,recon_options);
             time_to_recon=time_to_recon+lin_search_time;
             iterations_performed=iterations_performed+inner_its;
+        end
+        
+        if aux_param.slicewise_norm
+           res=res*slice_scale; 
         end
         
         log_msg =sprintf('Slice %i: Time to reconstruct data (With %i iteration blocks):  %0.2f seconds. \n',slice_index,n,time_to_recon);
