@@ -11,7 +11,7 @@ EXTRA_USERS=",jjc29@duke.edu,rja20@duke.edu,gjohnson@duke.edu"
 #*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
 
 # Scheduler: Every 10 minutes, any day EXCEPT friday.  This line was specifically used before the first volume completed recon,
-             which may no longer  be a requirement for the CS_recon_throttler.
+#            which may no longer  be a requirement for the CS_recon_throttler.
 # Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
 #*/10	*	*	*	0-4,6,7	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
 
@@ -34,7 +34,7 @@ t_run="S67963";
 #53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu;
 
 
-##### THIS IS THE MOST FAVORED SETUP, set t_run and replicate this line.
+##### THIS IS THE MOST FAVORED SETUP, replicate these two lines, and edit the t_run line.
 # Schedule: at 15 past, every 4 hours starting at 6am until 10:15
 # Command: status collection including orthocenter, and send result.
 #t_run="S67962";
