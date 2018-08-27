@@ -217,9 +217,9 @@ if minimal_memory
     % has been scrapped in favor of the old (silly?) sorted array pct, and
     % its done at the end when we take the magnitude.
     % slice_quantile=zeros(1,recon_dims(1));
-    walker_texas_ranger=0:(volume_scale/256):volume_scale;
+    hist_bins=0:(volume_scale/256):volume_scale;
 
-    volume_hist=histcounts(0,walker_texas_ranger); % Initialize an empty histogram
+    volume_hist=histcounts(0,hist_bins); % Initialize an empty histogram
 
     
     for ss=1:recon_dims(1)
