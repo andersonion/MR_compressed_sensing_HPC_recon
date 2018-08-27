@@ -1,6 +1,8 @@
 SHELL=/bin/bash
 MAILTO=$USER@duke.edu
-EXTRA_USERS=",jjc29@duke.edu,rja20@duke.edu,gjohnson@duke.edu"
+EXTRA_USERS=",jjc29@duke.edu,rja20@duke.edu"
+# Only add Al if he asks for it ;) He said "that's fine" for images, so lets just do that.
+IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 
 ###
 # WARNING: Throttler automatically removes itself from cron when its work is complete!!!!
@@ -31,16 +33,16 @@ t_run="S67962"
 # Schedule: at 53 past, at 1am 
 # Command: status collection including orthocenter, and send result
 t_run="S67963" 
-#53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu;
+#53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 
 
 ##### THIS IS THE MOST FAVORED SETUP, replicate these two lines, and edit the t_run line.
 # Schedule: at 15 past, every 4 hours starting at 6am until 10:15
 # Command: status collection including orthocenter, and send result.
 #t_run="S67962"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS;
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 
 t_run="S68028"
-15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS;
+15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 t_run="S68029"
-15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS;
+15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
