@@ -164,8 +164,8 @@ fi;
 #    last_requested=$max_vols;
 #fi;
 # filter log entry removing first volume and last volume to create a template command.
-cmd_template=$(echo $act_log_entry|sed -rn 's/(.*)first_volume=[0-9]+(.*)/\1 \2/p');
-cmd_template=$(echo $cmd_template|sed -rn 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p');
+cmd_template=$(echo -n $act_log_entry|sed -r 's/(.*)first_volume=[0-9]+(.*)/\1 \2/p');
+cmd_template=$(echo -n $cmd_template|sed -r 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p');
 if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol to start, beginning our search at the start. 
     # I think we could begin the search at a higher number, which for our QA problem we want to do.
