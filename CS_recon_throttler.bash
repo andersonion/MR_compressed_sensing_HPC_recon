@@ -165,10 +165,10 @@ fi;
 #fi;
 # filter log entry removing first volume and last volume to create a template command.
 cmd_template=$act_log_entry;
-if [ $(echo $cmd_template |wc -l first_volume ) -gt 0 ];then 
+if [ $(echo "$cmd_template" |grep -c first_volume ) -gt 0 ];then 
     cmd_template=$(echo -n $cmd_template|sed -rn 's/(.*)first_volume=[0-9]+(.*)/\1 \2/p');
 fi;
-if [ $(echo $cmd_template |wc -l last_volume ) -gt 0 ];then 
+if [ $(echo "$cmd_template" |grep -c last_volume ) -gt 0 ];then 
     cmd_template=$(echo -n $cmd_template|sed -rn 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p');
 fi;
 if [ $in_progress_count -lt $concurrent_vols ]; then
