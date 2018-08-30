@@ -59,6 +59,10 @@ if [ -n "$4" ]; then
     max_vols=$4;
 fi;
 
+# how many volumes to skip
+if [ -n "$5" ];then 
+    vol_step=1;
+fi;
 # feed back when verbose
 if [ $v -eq 1 ];then
     echo "base_runno:$base_runno, wkdir:$wkdir";
@@ -141,9 +145,9 @@ let in_progress_count=$(echo $started|wc -w )-$(echo  "$completed"| wc -w)+$th_c
 #act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon.*first_volume=[0-9]+.*last_volume=[0-9]+.*)/\1/p');
 act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon[[:space:]]+.*)/\1/p');
 
-first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]+).*/\1/p');
+#first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]+).*/\1/p');
 if [ -z "$first_requested" ];then
-    first_requested=1;
+first_requested=1;
 fi;
 
 #last_requested=$(echo $act_log_entry|sed -rn 's/.*last_volume=([0-9]+).*/\1/p');
@@ -156,7 +160,7 @@ cmd_template=$(echo $cmd_template|sed -rn 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p'
 if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol to start, beginning our search at the start. 
     # I think we could begin the search at a higher number, which for our QA problem we want to do.
-    for((vn=$first_requested;$vn<=$max_vols;vn=$vn+1)); do 
+    for((vn=$first_requested-1;$vn<=$max_vols;vn=$vn+$vol_step)); do 
 	found=$(echo $started | grep -c $(printf "%0${vn_length}i" $vn) ); 
 	let nv=10#$vn+1;# handle the 1 vs zero indexing :b
 	# throttle file
