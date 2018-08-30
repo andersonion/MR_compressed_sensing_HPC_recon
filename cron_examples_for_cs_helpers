@@ -9,16 +9,17 @@ IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 ###
 # Scheduler: Every 10 minutes
 # Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
-# throttler run all the time
 #*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
 
-# Scheduler: Every 10 minutes
-# Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
-# throttler run all the time
-MAILTO=jjc29@duke.edu
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 3 S68041qa 0 110 
 
+# Scheduler: Every 10 minutes
+# Command: cs_recon throttler, 3 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
+# options are, 2 at a time, base_runno, max_mnum, skip in scheduling.
+MAILTO=jjc29@duke.edu
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 2 S68041 0 110 4 
 MAILTO=$USER@duke.edu
+
+
 # Scheduler: Every 10 minutes, any day EXCEPT friday.  This line was specifically used before the first volume completed recon,
 #            which may no longer  be a requirement for the CS_recon_throttler.
 # Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
@@ -44,7 +45,7 @@ t_run="S67963"
 
 ###
 #  Dev mode send devs status reports, but only send images to others.
-t_run="S68041qa"
+t_run="S68041"
 15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 ###
 
