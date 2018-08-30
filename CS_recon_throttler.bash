@@ -54,7 +54,7 @@ if [ -n "$3" ]; then
     fi;
 fi;
 #echo $3 $v ; exit;
-streaming_mode=0;
+#streaming_mode=0;
 if [ -n "$4" ]; then
     max_vols=$4;
 fi;
@@ -73,8 +73,9 @@ fi;
 if [ $v -eq 1 ];then
     echo "base_runno:$base_runno, wkdir:$wkdir";
     if [ -n "$max_vols" ]; then    
-	echo "max vol over to $max_vols ride set(which we have to do when streaming) ";
+	echo "max vol override to $max_vols ride set(which we have to do when streaming) ";
     fi;
+    echo "using volume step of $vol_step, skipping past $skipped_vols";
 fi;
 
 ###
