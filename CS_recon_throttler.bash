@@ -192,6 +192,8 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 	echo "Scheduling vn:$nv";
 	if [ $v -eq 1 ];then
 	    echo "in 4 seconds";
+	    echo act_log:$act_log_entry;
+	    echo cmd_t:$cmd_template;
 	    sleep 4;
 	fi;
 	touch $tf
@@ -201,10 +203,6 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 # CS_reservation=jjc29_33;
 # proximate new hardcdoded bits.
 # 	streaming_CS_recon	kamy $base_runno S68040_03 ser02 CS_table=CS1152_24x_pa18_pb90 iteration_strategy=10x2 Itnlim=20 xfmWeight=0.002 TVWeight=0.0012 target_machine=delos first_volume=$nv last_volume=$nv planned_ok chunk_size=3 skip_fermi_filter
-	if [ $v -eq 1 ];then
-	    echo act_log:$act_log_entry;
-	    echo cmd_t:$cmd_template;
-	fi;
 	$cmd_template first_volume=$nv last_volume=$nv 
     fi;
     exit;
