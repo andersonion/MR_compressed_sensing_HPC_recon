@@ -60,8 +60,9 @@ if [ -n "$4" ]; then
 fi;
 
 # how many volumes to skip
-if [ -n "$5" ];then 
-    vol_step=1;
+vol_step=1;
+if [ -n "$5" ]; then 
+    vol_step=$5;
 fi;
 
 # skip some n volumes to catch up
@@ -69,11 +70,12 @@ skipped_vols=0;
 if [ -n "$6" ];then
     skipped_vols=$6;
 fi;
+
 # feed back when verbose
 if [ $v -eq 1 ];then
     echo "base_runno:$base_runno, wkdir:$wkdir";
     if [ -n "$max_vols" ]; then    
-	echo "max vol override to $max_vols ride set(which we have to do when streaming) ";
+	echo "max vol override to $max_vols set(which we have to do when streaming) ";
     fi;
     echo "using volume step of $vol_step, skipping past $skipped_vols";
 fi;
