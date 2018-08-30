@@ -172,6 +172,7 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 	# throttle file
 	tf="$wkdir/.throttle_$vn";
 	if [ "$found" -eq 1 -o -f $tf -o $vn -lt $skipped_vols ];then
+	    if [ $v -eq 1 ]; then echo skipping $vn; fi;
 	    # started or in queue. try next.
 	    continue;
 	elif [ "$found" -eq 0 ];then
@@ -186,6 +187,10 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
     tf="$wkdir/.throttle_$vn";
     if [ ! -f $tf ]; then 
 	echo "Scheduling vn:$nv";
+	if [ $v -eq 1 ];then
+	    echo "in 4 seconds";
+	    sleep 4;
+	fi;
 	touch $tf
 # proximate original hardcdoded bits.
 #	streaming_CS_recon kamy S68041qa LOCAL FID first_volume=$nv last_volume=$nv iteration_strategy=10x5 skip_fermi_filter planned_ok chunk_size5=
