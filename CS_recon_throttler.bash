@@ -149,7 +149,7 @@ let in_progress_count=$(echo $started|wc -w )-$(echo  "$completed"| wc -w)+$th_c
 ###
 # This first version forces user to have set first_volume and last_volume, but really we dont wanna do that.
 #act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon.*first_volume=[0-9]+.*last_volume=[0-9]+.*)/\1/p');
-act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon[[:space:]]+.*)/\1/p');
+act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno " $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon[[:space:]]+.*)/\1/p');
 
 #first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]+).*/\1/p');
 if [ -z "$first_requested" ];then
