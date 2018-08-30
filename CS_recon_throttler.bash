@@ -141,18 +141,18 @@ let in_progress_count=$(echo $started|wc -w )-$(echo  "$completed"| wc -w)+$th_c
 #act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon.*first_volume=[0-9]+.*last_volume=[0-9]+.*)/\1/p');
 act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activity_log.txt|tail -n1|sed -rn 's/.*(streaming_CS_recon[[:space:]]+.*)/\1/p');
 
-first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]).*/\1/p');
+first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]+).*/\1/p');
 if [ -z "$first_requested" ];then
     first_requested=1;
 fi;
 
-#last_requested=$(echo $act_log_entry|sed -rn 's/.*last_volume=([0-9]).*/\1/p');
+#last_requested=$(echo $act_log_entry|sed -rn 's/.*last_volume=([0-9]+).*/\1/p');
 #if [ -z "$last_requestd" -o $first_requested=$last_requested ];then
 #    last_requested=$max_vols;
 #fi;
 # filter log entry removing first volume and last volume to create a template command.
-cmd_template=$(echo $act_log_entry|sed -rn 's/(.*)first_volume=[0-9](.*)/\1 \2/p');
-cmd_template=$(echo $cmd_template|sed -rn 's/(.*)last_volume=[0-9](.*)/\1 \2/p');
+cmd_template=$(echo $act_log_entry|sed -rn 's/(.*)first_volume=[0-9]+(.*)/\1 \2/p');
+cmd_template=$(echo $cmd_template|sed -rn 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p');
 if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol to start, beginning our search at the start. 
     # I think we could begin the search at a higher number, which for our QA problem we want to do.
