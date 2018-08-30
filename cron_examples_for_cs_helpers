@@ -12,6 +12,13 @@ IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 # throttler run all the time
 #*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
 
+# Scheduler: Every 10 minutes
+# Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
+# throttler run all the time
+MAILTO=jjc29@duke.edu
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 3 S68041qa 0 110 
+
+MAILTO=$USER@duke.edu
 # Scheduler: Every 10 minutes, any day EXCEPT friday.  This line was specifically used before the first volume completed recon,
 #            which may no longer  be a requirement for the CS_recon_throttler.
 # Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
@@ -35,6 +42,12 @@ t_run="S67962"
 t_run="S67963" 
 #53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 
+###
+#  Dev mode send devs status reports, but only send images to others.
+t_run="S68041qa"
+15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+###
+
 
 ##### THIS IS THE MOST FAVORED SETUP, replicate these two lines, and edit the t_run line.
 # Schedule: at 15 past, every 4 hours starting at 6am until 10:15
@@ -42,7 +55,9 @@ t_run="S67963"
 #t_run="S67962"
 #15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
 
-t_run="S68028"
-15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-t_run="S68029"
-15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#t_run="S68028"
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#t_run="S68029"
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+
+
