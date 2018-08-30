@@ -18,8 +18,8 @@ IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 MAILTO=jjc29@duke.edu
 # b0 checking
 */5	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 S68041 0 110 13 21
-# non b0 checking, will see every third vol
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 110 4 21
+# non b0 checking, will see every fourth vol
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 110 4 19
 MAILTO=$USER@duke.edu
 
 
