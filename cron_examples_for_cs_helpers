@@ -16,7 +16,10 @@ IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 # Command: cs_recon throttler, 3 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
 # options are, 2 at a time, base_runno, max_mnum, skip in scheduling.
 MAILTO=jjc29@duke.edu
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 2 S68041 0 110 4 
+# b0 checking
+*/5	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 S68041 0 110 13 21
+# non b0 checking, will see every third vol
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 110 4 21
 MAILTO=$USER@duke.edu
 
 
