@@ -63,6 +63,12 @@ fi;
 if [ -n "$5" ];then 
     vol_step=1;
 fi;
+
+# skip some n volumes to catch up
+skipped_vols=0;
+if [ -n "$6" ];then
+    skipped_vols=$6;
+fi;
 # feed back when verbose
 if [ $v -eq 1 ];then
     echo "base_runno:$base_runno, wkdir:$wkdir";
@@ -147,7 +153,7 @@ act_log_entry=$(grep -E "streaming_CS_recon.*$base_runno" $BIGGUS_DISKUS/activit
 
 #first_requsted=$(echo $act_log_entry|sed -rn 's/.*first_volume=([0-9]+).*/\1/p');
 if [ -z "$first_requested" ];then
-first_requested=1;
+    first_requested=1;
 fi;
 
 #last_requested=$(echo $act_log_entry|sed -rn 's/.*last_volume=([0-9]+).*/\1/p');
@@ -165,7 +171,7 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 	let nv=10#$vn+1;# handle the 1 vs zero indexing :b
 	# throttle file
 	tf="$wkdir/.throttle_$vn";
-	if [ "$found" -eq 1 -o -f $tf ];then
+	if [ "$found" -eq 1 -o -f $tf -o $vn -lt $skipped_vols ];then
 	    # started or in queue. try next.
 	    continue;
 	elif [ "$found" -eq 0 ];then
