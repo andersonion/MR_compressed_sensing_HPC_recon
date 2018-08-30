@@ -199,10 +199,16 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     gk_slurm_options.reservation = '';
     study_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_gatekeeper.bash'];
     [input_fid,~] =find_input_fidCS(scanner,runno,study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
-    gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', gatekeeper_exec, matlab_path,volume_fid,input_fid,scanner,log_file,volume_number,bbytes);
-    batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
-    running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
-    
+    gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
+        volume_fid, input_fid, scanner, log_file, volume_number, bbytes);
+    gatekeeper_cmd = sprintf('%s %s %s ', gatekeeper_exec, matlab_path,...
+        gatekeeper_args);
+    if ~options.live_run
+        batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
+        running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+    else
+        eval(sprintf('gatekeeper_exec %s',gatekeeper_args));
+    end
     vm_slurm_options=struct;
     vm_slurm_options.v=''; % verbose
     vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -213,13 +219,18 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     % using a blank reservation to force no reservation for this job.
     vm_slurm_options.reservation = '';
     volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
-    vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec_path,matlab_path, recon_file,volume_runno, volume_number,base_workdir);
-    batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
-    or_dependency = '';
-    if ~isempty(running_jobs)
-        or_dependency='afterok-or';
+    vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
+    vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path,vm_args);
+    if ~options.live_run
+        batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
+        or_dependency = '';
+        if ~isempty(running_jobs)
+            or_dependency='afterok-or';
+        end
+        c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
+    else
+        eval(sprintf('volume_manager_exec %s',vm_args));
     end
-    c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
     log_mode = 1;
     log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -323,9 +334,14 @@ else
             % using a blank reservation to force no reservation for this job.
             vsu_slurm_options.reservation = ''; 
             volume_setup_batch = [workdir 'sbatch/' volume_runno '_volume_setup_for_CS_recon.bash'];
-            vsu_cmd = sprintf('%s %s %s %i', volume_setup_exec_path,matlab_path, variables_file, volume_number);
-            batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
-            stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
+            vsu_args=sprintf('%s %i',variables_file, volume_number);
+            vsu_cmd = sprintf('%s %s %s', volume_setup_exec_path,matlab_path, vsu_args);
+            if ~options.live_run
+                batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
+                stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
+            else
+                eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
+            end
         end
         %stage_3_running_jobs='';
         if (starting_point <= 3)
@@ -438,7 +454,8 @@ else
                         end
                     end
                     slicewise_recon_batch = [workdir 'sbatch/' volume_runno '_slice' slice_string '_CS_recon.bash'];
-                    swr_cmd = sprintf('%s %s %s %s %s', slicewise_recon_exec_path,matlab_path, volume_variable_file, slice_string,recon_options_file);
+                    swr_args= sprintf('%s %s %s', volume_variable_file, slice_string,recon_options_file);
+                    swr_cmd = sprintf('%s %s %s', slicewise_recon_exec_path,matlab_path,swr_args);
                     if  stage_2_running_jobs
                         dep_string = stage_2_running_jobs;
                         dep_type = 'afterok-or';
@@ -446,9 +463,13 @@ else
                         dep_string = '';
                         dep_type = '';
                     end
-                    batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
-                    c_running_jobs ='';
-                    [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
+                    if ~options.live_run
+                        batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
+                        c_running_jobs ='';
+                        [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
+                    else
+                        eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
+                    end
                     if c_running_jobs
                         %if stage_3_running_jobs
                         stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
@@ -495,13 +516,18 @@ else
             % using a blank reservation to force no reservation for this job.
             vcu_slurm_options.reservation = ''; 
             volume_cleanup_batch = [workdir 'sbatch/' volume_runno '_volume_cleanup_for_CS_recon.bash'];
-            vcu_cmd = sprintf('%s %s %s %i', volume_cleanup_exec_path,matlab_path, variables_file);
-            batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
-            maybe_im_a_singleton='';
-            if (stage_3_running_jobs)
-                maybe_im_a_singleton='singleton';
+            vcu_args=sprintf('%s',variables_file);
+            vcu_cmd = sprintf('%s %s %s', volume_cleanup_exec_path,matlab_path,vcu_args);
+            if ~options.live_run
+                batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
+                maybe_im_a_singleton='';
+                if (stage_3_running_jobs)
+                    maybe_im_a_singleton='singleton';
+                end
+                stage_4_running_jobs = dispatch_slurm_jobs(batch_file,'',maybe_im_a_singleton);
+            else
+                eval(sprintf('volume_cleanup_for_CSrecon_exec %s',vcu_args));
             end
-            stage_4_running_jobs = dispatch_slurm_jobs(batch_file,'',maybe_im_a_singleton);
         end
     end
     
@@ -542,10 +568,14 @@ else
                 %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
                 batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
                 dep_status='';
-                if stage_4_running_jobs
-                    dep_status='afterok-or';
+                if ~options.live_run
+                    if stage_4_running_jobs
+                        dep_status='afterok-or';
+                    end
+                    stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
+                else
+                    [ship_st,ship_out]=system(batch_file);
                 end
-                stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
             end
         end
     end
@@ -567,12 +597,17 @@ else
         % using a blank reservation to force no reservation for this job.
         vm_slurm_options.reservation = '';
         volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
-        vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec_path,matlab_path, recon_file,volume_runno, volume_number,base_workdir);
-        batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
-        c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,'afternotok');
-        log_mode = 1;
-        log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
-        yet_another_logger(log_msg,log_mode,log_file);
+        vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
+        vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path, vm_args);
+        if ~options.live_run
+            batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
+            c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,'afternotok');
+            log_mode = 1;
+            log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
+            yet_another_logger(log_msg,log_mode,log_file);
+        else
+            eval(sprintf('volume_manager_exec %s',vm_args));
+        end
     end
 end
 

@@ -83,14 +83,15 @@ if (make_workspace)
     fid_load_time = toc(t_make_workspace);
     log_msg =sprintf('Volume %s: fid loaded successfully in %0.2f seconds.\n',volume_runno,fid_load_time);
     yet_another_logger(log_msg,log_mode,log_file);
-    tic
+    t_fft=tic;
     data = fftshift(ifft(fftshift(data,1),[],1),1); % take ifft in the fully sampled dimension
-    fft_time=toc(t_make_workspace);
+    fft_time=toc(t_fft);
     log_msg =sprintf('Volume %s: Fourier transform along fully sampled dimension completed in %0.2f seconds.\n',volume_runno,fft_time);
     yet_another_logger(log_msg,log_mode,log_file);
-
+    if options.CS_preview_data
+        CS_preview_data(original_mask,data,fullfile(workdir,volume_runno));
+    end
     m = matfile(recon_file,'Writable',true);
-
     %% Calculate group scaling from first b0 image
     %if ((~exist(scale_file,'file') || (options.roll_data && ~isfield(m,'shift_modifier'))) && (volume_number==1))
     if (volume_number==1) ...

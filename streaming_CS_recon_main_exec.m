@@ -90,6 +90,8 @@ types.planned_options={...
     'keep_work',           ''
     'email_addresses',      ''
     'verbosity',             ''
+    'live_run',             ' run the code live in matlab, igored when deployed.'
+    'CS_preview_data',      ' save a pre recon orthocenter of kspace and imgspace'
     };
 options=mat_pipe_option_handler(varargin,types);
 % A reminder, mat_pipe_option handler exists to do two things. 
@@ -116,6 +118,10 @@ options=mat_pipe_option_handler(varargin,types);
 % TEMPORARY, until options are fully implemented
 
 %% Current defaults--option handling will be upgraded shortly
+if isdeployed && options.live_run
+    warning('cant live run when deployed :p');
+    options.live_run=0;
+end
 options.verbose=1;% james normally attaches this to the "debug_val" option, 
 % with increasing values of debugging generating more and more outtput.
 log_mode = 2; % Log only to log file.
@@ -228,15 +234,15 @@ pause(3);
 % "versioned" pieces of code.
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 % Gatekeeper support
-gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC');
+gatekeeper_path = getenv('CS_GATEKEEPER_EXEC');
 % set an env var to get latest dev code, or will defacto run stable.
 CS_CODE_DEV=getenv('CS_CODE_DEV');
 if isempty(CS_CODE_DEV)
     CS_CODE_DEV='stable';
 end
-if isempty(gatekeeper_exec)
-    gatekeeper_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/' CS_CODE_DEV '/run_gatekeeper_exec.sh'] ;
-    setenv('CS_GATEKEEPER_EXEC',gatekeeper_exec);
+if isempty(gatekeeper_path)
+    gatekeeper_path = [ '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/' CS_CODE_DEV '/run_gatekeeper_exec.sh'] ;
+    setenv('CS_GATEKEEPER_EXEC',gatekeeper_path);
 end
 gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(gatekeeper_queue)
@@ -247,15 +253,15 @@ cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
 if isempty(cs_full_volume_queue)
     cs_full_volume_queue = 'high_priority';
 end
-fid_splitter_exec = getenv('CS_FID_SPLITTER_EXEC');
-if isempty(fid_splitter_exec)
-    fid_splitter_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/' CS_CODE_DEV '/run_fid_splitter_exec.sh' ];
-    setenv('CS_FID_SPLITTER_EXEC',fid_splitter_exec);
+fid_splitter_path = getenv('CS_FID_SPLITTER_EXEC');
+if isempty(fid_splitter_path)
+    fid_splitter_path = [ '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/' CS_CODE_DEV '/run_fid_splitter_exec.sh' ];
+    setenv('CS_FID_SPLITTER_EXEC',fid_splitter_path);
 end
-volume_manager_exec = getenv('CS_VOLUME_MANAGER_EXEC');
-if isempty(volume_manager_exec)
-    volume_manager_exec = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' CS_CODE_DEV '/run_volume_manager_exec.sh'];
-    setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec);
+volume_manager_path = getenv('CS_VOLUME_MANAGER_EXEC');
+if isempty(volume_manager_path)
+    volume_manager_path = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' CS_CODE_DEV '/run_volume_manager_exec.sh'];
+    setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_path);
 end
 %% Get workdir
 scratch_drive = getenv('BIGGUS_DISKUS');
@@ -512,7 +518,7 @@ if ~exist(study_flag,'file')
                     gk_slurm_options.reservation = '';
                     study_gatekeeper_batch = [workdir '/sbatch/' runno '_gatekeeper.bash'];
                     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', ...
-                        gatekeeper_exec, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
+                        gatekeeper_path, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
                     batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options)
                     running_jobs = dispatch_slurm_jobs( batch_file,slurm_options);
                 end
@@ -530,7 +536,7 @@ if ~exist(study_flag,'file')
                 or_dependency='afterok-or';
             end
             fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
-            fs_cmd = sprintf('%s %s %s %s', fid_splitter_exec,matlab_path, local_fid,recon_file);
+            fs_cmd = sprintf('%s %s %s %s', fid_splitter_path,matlab_path, local_fid,recon_file);
             batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
             fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
         end % End of single volume and MGRE preprocessing.
@@ -582,20 +588,26 @@ if ~exist(study_flag,'file')
             % using a blank reservation to force no reservation for this job.
             vm_slurm_options.reservation = ''; 
             volume_manager_batch = fullfile(volume_dir,'sbatch',[ volume_runno '_volume_manager.bash']);
-            vm_cmd = sprintf('%s %s %s %s %i %s', volume_manager_exec, matlab_path, recon_file,volume_runno, volume_number,workdir);
+            vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,workdir);
+            vm_cmd = sprintf('%s %s %s ', volume_manager_path, ...
+                matlab_path, vm_args);
             %%% James's happy delay patch
             if ~options.process_headfiles_only
                 delay_unit=5;
                 vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
             end
-            batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
-            or_dependency = '';
-            if ~isempty(running_jobs)
-                or_dependency='afterok-or';
+            if ~options.live_run
+                batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
+                or_dependency = '';
+                if ~isempty(running_jobs)
+                    or_dependency='afterok-or';
+                end
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
+                log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
+                yet_another_logger(log_msg,log_mode,log_file);
+            elseif options.live_run
+                eval(sprintf('volume_manager_exec %s',vm_args));
             end
-            c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
-            log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
-            yet_another_logger(log_msg,log_mode,log_file);
         end
     end
     %% Pull fid and procpar, load reconstruction parameter data
