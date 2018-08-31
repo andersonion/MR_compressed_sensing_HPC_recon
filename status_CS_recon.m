@@ -54,7 +54,7 @@ if s==0 % unix status check
         
         progress=progress+pc;
         % switched pc from 100, to 99.5 so that we'll still ortho send if our procpar is hanging.
-        if pc==99.5 && save_ortho_centers
+        if pc>=99.5 && save_ortho_centers
             %% if we've got a complete volume dump an ortho slice?
             % we may be able to use lower pct, like 98, I forget what pct
             % the scp to final costs.

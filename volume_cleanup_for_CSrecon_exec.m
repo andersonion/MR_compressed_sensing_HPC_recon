@@ -10,12 +10,17 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable
 % assumed that the QSM requires unfiltered data.  Bake it in now will not
 % require recompilation later if we need this option.
 misguided_status_code = 0;
-if ~isdeployed && (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
+scale_target=2^16-1;
+
+if ~isdeployed
+    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
+    addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
+    if (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
     volume_variable_file = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
     %volume_scale = 1.4493;
     %variable_iterations=1;
-    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
-    addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
+    end
+
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
@@ -35,6 +40,28 @@ load(volume_variable_file);
 %recon_dims(1)=6;
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
+
+%%
+% James says: have to regenerate volume number because it is not kept, we're using the
+% runno as a proxy. This is more brittle than I'd like however it should be
+% decent.
+%
+% BJ says: I'm updating volume_manager to write the volume_number to the
+% variables file so we will have it on hand...going forward.
+
+if ~exist('volume_number','var')
+%vnt, volume number text
+vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
+if isempty(vt)
+    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
+    vt={'0'};
+end
+volume_number=1+str2double(vt{:});
+end
+
+
+
+
 %% foggy loggy doggy 
 if ~exist('log_mode','var')
     log_mode = 1;
@@ -63,28 +90,34 @@ end
 %% get scaling file or show error
 scale_file_error =1;
 if exist('scale_file','var')
-    num_checks = 30;
-    for tt = 1:num_checks
-        %disp(['tt = ' num2str(tt)])
-        if exist(scale_file,'file')
-            scale_file_error = 0;
-            break;
-        else
-            pause(1)
-        end
+    if (volume_number == 1)
+        scale_file_error = 0;
+    else
+        num_checks = 30;
+        for tt = 1:num_checks
+            %disp(['tt = ' num2str(tt)])
+            if exist(scale_file,'file')
+              scale_file_error = 0;
+             break;
+            else
+                pause(10)
+            end
+        end 
     end
 end
-if ~scale_file_error
-    fid_sc = fopen(scale_file,'r');
-    scaling = fread(fid_sc,inf,'*float');
-    fclose(fid_sc);
-else
-    error_flag = 1;
-    log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',volume_runno,scale_file);
-    yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    status=variable_to_force_an_error;
-    quit force
-end
+
+    if (~scale_file_error) && exist(scale_file,'file')
+        fid_sc = fopen(scale_file,'r');
+        scaling = fread(fid_sc,inf,'*float');
+        fclose(fid_sc);
+    elseif (volume_number > 1)
+        error_flag = 1;
+        log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',volume_runno,scale_file);
+        yet_another_logger(log_msg,log_mode,log_file,error_flag);
+        status=variable_to_force_an_error;
+    	quit force
+    end
+
 
 %% get options into base workspace.
 if ~exist('recon_dims','var')
@@ -112,23 +145,6 @@ if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
 
-%%
-% James says: have to regenerate volume number because it is not kept, we're using the
-% runno as a proxy. This is more brittle than I'd like however it should be
-% decent.
-%
-% BJ says: I'm updating volume_manager to write the volume_number to the
-% variables file so we will have it on hand...going forward.
-
-if ~exist('volume_number','var')
-%vnt, volume number text
-vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
-if isempty(vt)
-    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
-    vt={'0'};
-end
-volume_number=1+str2double(vt{:});
-end
 
 %%
 if continue_recon_enabled % This should be made default.
@@ -194,20 +210,23 @@ fid=fopen(temp_file,'r');
 header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
+
+%BJ says on 28 August 2018: removing code path for when minimal_memory=0;
+%{ 
 minimal_memory=getenv('CS_minimize_memory');
 if isempty(minimal_memory)
     %minimal_memory=0;
     minimal_memory=1; % Flipping the default switch on 5 January 2018
 end
+%}
 BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noise.
-if minimal_memory
+
     %% min memory mode, we only load 1 full CS slice at a time, 
     % each is reduced to the proscribed acq dim 
     % and inserted into a full size acq vol before moving on to the next.
     % Potentially we could do better using a  sparse load but thats a lot of
     % work.
-    already_fermi_filtered=0;
-    log_msg =sprintf('%s operating in minimal memory mode',mfilename);
+    log_msg =sprintf('%s operating in minimal memory mode\n',mfilename);
     yet_another_logger(log_msg,log_mode,log_file);
     lil_dummy = zeros([1,1],'double');
     lil_dummy = complex(lil_dummy,lil_dummy);
@@ -217,10 +236,16 @@ if minimal_memory
     % has been scrapped in favor of the old (silly?) sorted array pct, and
     % its done at the end when we take the magnitude.
     % slice_quantile=zeros(1,recon_dims(1));
-    hist_bins=0:(volume_scale/256):volume_scale;
+    if exist('scaling','var')    % Preparing for the switch to when scaling calc is always done at the end.
+        scaling2 = scale_target/(volume_scale*volume_scale);%sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/volume_scale;
+    else
+        scaling2=volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+    end
+    
+    hist_bins=0:(scaling2/256):scaling2;
 
-    volume_hist=histcounts(0,hist_bins); % Initialize an empty histogram
-
+    volume_hist=histcounts(0,hist_bins); % Initialize an (almost) empty histogram
+    volume_hist(1)=0;
     
     for ss=1:recon_dims(1)
         if ~mod(ss,10)
@@ -242,7 +267,7 @@ if minimal_memory
         clear data_in;
         t_data_out = XFM'*t_data_out;
         
-        if ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
+        if ~isfield(options,'slicewise_norm') || ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
            t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
         end    
         %% Crop out extra k-space if non-square or non-power of 2, 
@@ -255,7 +280,9 @@ if minimal_memory
         else
             final_slice_out=t_data_out;
         end
-        final_slice_out=scaling*final_slice_out;
+        if exist('scaling','var')
+            final_slice_out=scaling*final_slice_out;
+        end
         % slice quantiles added to set final image scaling before
         % write_civm_image. This is not a great bit of code because it
         % needs to operate on magnitude data, and has to do an abs in line
@@ -264,18 +291,29 @@ if minimal_memory
         % okay enough to use. 
         % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
         data_out(ss,:,:)= final_slice_out;
-        volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),walker_texas_ranger); % Cumulative build a volume histogram
+        volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),hist_bins); % Cumulative build a volume histogram
+
+        %{
+        if ~isdeployed && strcmp(getenv('USER'),'rja20') && ~mod(ss,10)
+            figure(60)
+            %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
+            plot(hist_bins(2:end),volume_hist)
+            pause(1)
+        end
+        %}
+        
+    
     end
     
     
     cs_hist=cumsum(volume_hist);
     thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
     [a,~]=find(cs_hist'>thresh,1);
-    if (a == length(walker_texas_ranger))
+    if (a == length(hist_bins))
       a=a-1;
     end
 
-    not_really_data_quantile=(walker_texas_ranger(a)+walker_texas_ranger(a+1))/2;  
+    not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;  
     suggested_final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',runno));
     scale_target=2^16-1;
     suggested_final_scale=scale_target/not_really_data_quantile;
@@ -289,66 +327,7 @@ if minimal_memory
     read_time = toc;
     log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
     yet_another_logger(log_msg,log_mode,log_file);
-else
-    if ~continue_recon_enabled
-        data_in=typecast(fread(fid,inf,'*uint8'),'single');
-        %data_in=typecast(fread(fid,2*dims(1)*dims(2)*dims(3),'*uint8'),'single');
-    else
-        %data_in=fread(fid,inf,'*double');
-        data_in=typecast(fread(fid,inf,'*uint8'),'double');
-    end
-    
-    read_time = toc;
-    log_msg =sprintf('Volume %s: Done reading in temporary data; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
-    yet_another_logger(log_msg,log_mode,log_file);
-    tic
-    already_fermi_filtered = 0;
-    if ~continue_recon_enabled
-        data_out=scaling*complex(data_in(1:2:end),data_in(2:2:end));
-        clear data_in;
-        %% Reshape
-        final_size=[original_dims(2),original_dims(3),original_dims(1)];
-        data_out=reshape(data_out,final_size);
-    else
-        data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2 recon_dims(1)]);
-        c_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
-        clear data_in;
-        for ss=1:recon_dims(1)
-            c_data_out(:,:,ss) = XFM'*c_data_out(:,:,ss);
-        end
-        c_data_out = c_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
-        %% Crop out extra k-space if non-square or non-power of 2, might as well apply fermi filter in k-space, if requested (no QSM requested either)
-        if sum(original_dims == recon_dims) ~= 3
-            c_data_out = fftshift(fftn(fftshift(c_data_out)));
-            data_out = c_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
-                (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2,:);
-            clear c_data_out
-            if (fermi_filter && ~qsm_fermi_filter)
-                % this check for fermi vars is unnecessary, we always make sure w1
-                % and w2 are set.
-                log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
-                yet_another_logger(log_msg,log_mode,log_file);
-                
-                %if exist('w1','var')
-                    data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
-                %else
-                %    data_out= fermi_filter_isodim2_memfix(data_out);
-                %end
-                already_fermi_filtered = 1;
-            end
-            data_out = fftshift(ifftn(fftshift(data_out)));
-        else
-            data_out=c_data_out;
-            clear c_data_out;
-        end
-        data_out= scaling*data_out;
-    end
-    post_proc_time=toc;
-    log_msg =sprintf('Volume %s: Done post-processing reconstructed data; Total elapsed time: %0.2f seconds.\n',volume_runno,post_proc_time);
-    yet_another_logger(log_msg,log_mode,log_file);
-    % Permute to final form
-    data_out = permute(data_out,[3 1 2 4]);
-end %?
+
 fclose(fid);
 
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
@@ -382,7 +361,7 @@ if ~qsm_fermi_filter
 end
 
 %% Apply Fermi Filter
-if (fermi_filter && ~already_fermi_filtered)
+if fermi_filter
     
     log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
     yet_another_logger(log_msg,log_mode,log_file);
@@ -493,7 +472,6 @@ else
 % to do it twice.
 final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale.float',runno));
 
-scale_target=2^16-1;
 databuffer.headfile.group_max_intensity=max(mag_data(:));
 if volume_number==1 && ~exist(final_scale_file,'file')
     % BJ says: per /cm/shared/workstation_code_dev/recon/CS_v2/testing_and_prototyping/slicewise_hist_test.m
@@ -522,7 +500,7 @@ else
     final_scale = fread(fid_sc,inf,'*float');
     fclose(fid_sc);
     log_msg=sprintf('volume_cleanup: Volume %i found scale file %s, with value %0.14f.\n' ...
-        ,final_scale_file,final_scale);
+        ,volume_number,final_scale_file,final_scale);
     databuffer.headfile.group_max_atpct=databuffer.headfile.group_max_intensity;
 end
 mag_data=mag_data*final_scale;

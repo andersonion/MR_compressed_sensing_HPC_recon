@@ -92,6 +92,15 @@ if ~exist(send_archive_tag,'file')
         move_down_a_stage = 1;
         recon_file = [volume_dir '/../*recon.mat'];
         setup_file = [volume_dir '/' volume_runno '_setup_variables.mat'];
+        % BJ says: 27 Aug 2018, setup_file is not backward compatible, will
+        % check to see if it exists and if it doesn't, will look in the
+        % point it to the work directory (old behavior); also, James I told
+        % you exactly this would be the problem.  Neener neener neener.      
+        if ~exist(setup_file,'file')
+            setup_file = [volume_dir '/work/' volume_runno '_setup_variables.mat'];
+        end
+            
+            
         if exist(temp_file,'file') ...
                 && exist(setup_file,'file')
             % Need to remember that we are going to add the headersize as the first bytes
