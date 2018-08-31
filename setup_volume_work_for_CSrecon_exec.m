@@ -89,7 +89,25 @@ if (make_workspace)
     log_msg =sprintf('Volume %s: Fourier transform along fully sampled dimension completed in %0.2f seconds.\n',volume_runno,fft_time);
     yet_another_logger(log_msg,log_mode,log_file);
     if options.CS_preview_data
-        CS_preview_data(original_mask,data,fullfile(workdir,volume_runno));
+        t_preview=tic;
+        warning('Preview data wont do any recon at current.');
+        preview_stamp=fullfile(workdir,'.preview.time');
+        system(sprintf('touch %s',preview_stamp));
+        preview_imgs=CS_preview_data(original_mask,data,fullfile(workdir,volume_runno),options.CS_preview_data);
+        for pn=1:numel(preview_imgs)
+            scp_to_engine=sprintf('scp -p %s omega@%s.dhe.duke.edu:/%sspace/ &',...
+                preview_imgs{pn},options.target_machine,options.target_machine);
+            shell_s=sprintf('if [ %s -nt %s ]; then %s; fi',...
+                preview_imgs{pn}, preview_stamp, scp_to_engine);
+            [s,sout]=system(shell_s);
+            if s~=0 
+                warning('problem sending %s: %s',preview_imgs{pn},sout);
+            end
+        end
+        preview_time=toc(t_preview);
+        log_msg=sprintf('Volume %s: Preview and scp time is %0.2f\n',volume_runno,preview_time);
+        yet_another_logger(log_msg,log_mode,log_file);
+        return;
     end
     m = matfile(recon_file,'Writable',true);
     %% Calculate group scaling from first b0 image
