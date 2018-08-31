@@ -80,6 +80,22 @@ if [ $v -eq 1 ];then
     echo "using volume step of $vol_step, skipping past $skipped_vols";
 fi;
 
+# try to prevent multiple throtters
+if [ -f $wkdir/.throttle.start ];then
+    echo "Throttler problem, $wkdir/.throttle.start exists. please do not run more than one.";
+    exit;
+fi;
+echo "$@" > $wkdir/.throttle.start
+if [ -f $wkdir/.throttle.lck ]; then
+    # this trips when files are different.
+    if ! diff $wkdir/.throttle.lck $wkdir/.throttle.start ; then
+        echo "Cannot have more than one recon throttler per acquisition. Please enhance list mode support JAMES";
+	echo "OR remove $wkdir/.throttle.lck";
+	rm $wkdir/.throttle.start;
+	exit 1;
+    fi;
+fi;
+mv $wkdir/.throttle.start $wkdir/.throttle.lck;
 ###
 # get max_volumes
 ###
