@@ -157,6 +157,13 @@ end
 if ~options.hamming_window
     options.hamming_window=32;
 end
+if options.CS_preview_data
+   if islogical(options.CS_preview_data)
+       options.CS_preview_data='slice';
+   elseif isempty(regexpi(options.CS_preview_data,'slice|volume'));
+       error('bad CS_preview_data value, choose slice or volume');
+   end
+end
 %% iteration determination with glorious complication !
 % uses "temporary" option re_init_count which is 
 % the number of iteration blocks -1 (becuase Re_init :) ) 
