@@ -60,9 +60,17 @@ if [ -n "$4" ]; then
 fi;
 
 # how many volumes to skip
+# or a file with a list of numbers in it which are whitespace separated.
 vol_step=1;
 if [ -n "$5" ]; then 
     vol_step=$5;
+    if [ -f $vol_step ] ;then
+	# this is actually a file ! now what...
+	volume_list=$(for t in $(cat $vol_step|sort -nu); do
+	    echo -n "$t "
+	    done);
+	vol_step="";
+    fi;
 fi;
 
 # skip some n volumes to catch up
@@ -89,7 +97,7 @@ echo "$@" > $wkdir/.throttle.start
 if [ -f $wkdir/.throttle.lck ]; then
     # this trips when files are different.
     if ! diff $wkdir/.throttle.lck $wkdir/.throttle.start ; then
-        echo "Cannot have more than one recon throttler per acquisition. Please enhance list mode support JAMES";
+        echo "Cannot have more than one recon throttler per acquisition. Please use list support make a file with a list of numbrs you want, and specify that instead of step.";
 	echo "OR remove $wkdir/.throttle.lck";
 	rm $wkdir/.throttle.start;
 	exit 1;
@@ -187,16 +195,26 @@ fi;
 if [ $(echo "$cmd_template" |grep -c last_volume ) -gt 0 ];then 
     cmd_template=$(echo -n $cmd_template|sed -rn 's/(.*)last_volume=[0-9]+(.*)/\1 \2/p');
 fi;
+
+
+# If the users didnt give us a list of volumes to run in a file, then make a list of folumes. 
+if [ -z "$volume_list" ];then 
+    volume_list=$(for((vn=$first_requested-1;$vn<=$max_vols;vn=$vn+$vol_step)); do 
+	echo -n " "$vn
+	done);
+fi;
+
 if [ $in_progress_count -lt $concurrent_vols ]; then
     # get next viable vol to start, beginning our search at the start. 
     # I think we could begin the search at a higher number, which for our QA problem we want to do.
-    for((vn=$first_requested-1;$vn<=$max_vols;vn=$vn+$vol_step)); do 
+    #for((vn=$first_requested-1;$vn<=$max_vols;vn=$vn+$vol_step)); do 
+    for vn in $volume_list; do 
 	found=$(echo $started | grep -c $(printf "%0${vn_length}i" $vn) ); 
 	let nv=10#$vn+1;# handle the 1 vs zero indexing :b
 	# throttle file
 	tf="$wkdir/.throttle_$vn";
 	if [ "$found" -eq 1 -o -f $tf -o $vn -lt $skipped_vols ];then
-	    if [ $v -eq 1 ]; then echo skipping $vn; fi;
+	    if [ $v -eq 1 ]; then echo $vn less than $skipped_vols, will not schedule; fi;
 	    # started or in queue. try next.
 	    continue;
 	elif [ "$found" -eq 0 ];then
@@ -206,6 +224,11 @@ if [ $in_progress_count -lt $concurrent_vols ]; then
 	    exit;
 	fi;
     done
+    if [ -z "$act_log_entry" ];then 
+	echo "couldnt find streaming_CS_recon $base_runno in activity_log";
+	exit 1;
+    fi;
+
     let nv=10#$vn+1;# handle the 1 vs zero indexing :b
     # throttle file
     tf="$wkdir/.throttle_$vn";
