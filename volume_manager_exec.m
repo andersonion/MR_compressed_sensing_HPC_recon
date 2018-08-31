@@ -341,10 +341,10 @@ else
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
             else
                 eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
-                if options.CS_preview_data
-                    return;
-                end
             end
+        end
+        if options.CS_preview_data
+            return;
         end
         %stage_3_running_jobs='';
         if (starting_point <= 3)
