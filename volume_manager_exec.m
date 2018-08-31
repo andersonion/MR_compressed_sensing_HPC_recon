@@ -42,7 +42,7 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 active_reservation=get_reservation(options.CS_reservation);
 %% Executables support
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-gatekeeper_exec = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
+gatekeeper_exec_path = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
 gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(gatekeeper_queue)
     gatekeeper_queue = 'slow_master';%'high_priority';
@@ -201,7 +201,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     [input_fid,~] =find_input_fidCS(scanner,runno,study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
         volume_fid, input_fid, scanner, log_file, volume_number, bbytes);
-    gatekeeper_cmd = sprintf('%s %s %s ', gatekeeper_exec, matlab_path,...
+    gatekeeper_cmd = sprintf('%s %s %s ', gatekeeper_exec_path, matlab_path,...
         gatekeeper_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
@@ -341,6 +341,9 @@ else
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
             else
                 eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
+                if options.CS_preview_data
+                    return;
+                end
             end
         end
         %stage_3_running_jobs='';
@@ -463,10 +466,16 @@ else
                         dep_string = '';
                         dep_type = '';
                     end
+                    c_running_jobs ='';
                     if ~options.live_run
                         batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
-                        c_running_jobs ='';
                         [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
+                        if msg1
+                            disp(msg1)
+                        end
+                        if msg2
+                            disp(msg2)
+                        end
                     else
                         eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
                     end
@@ -476,12 +485,6 @@ else
                         %else
                         %    stage_3_running_jobs = c_running_jobs;
                         %end
-                    end
-                    if msg1
-                        disp(msg1)
-                    end
-                    if msg2
-                        disp(msg2)
                     end
                 end
                 if stage_3_running_jobs
