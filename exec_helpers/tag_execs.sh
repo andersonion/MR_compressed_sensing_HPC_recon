@@ -38,8 +38,8 @@ do echo "--$mexec--";
     fi;
     if [ -e $mexec${dest_tag} ];
     then dp=$(readlink $mexec${dest_tag});
-	echo "    has no $current_tag available.";
     else
+	echo "    has no $current_tag available.";
 	dp="${mexec}NOCURRENT";
     fi;
     if [ "$cp" = "$dp" ]; then
