@@ -1,8 +1,9 @@
 SHELL=/bin/bash
 MAILTO=$USER@duke.edu
-EXTRA_USERS=",jjc29@duke.edu,rja20@duke.edu"
+EXTRA_USERS=,jjc29@duke.edu,rja20@duke.edu
 # Only add Al if he asks for it ;) He said "that's fine" for images, so lets just do that.
-IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
+# I think these wont be expanded by cron!
+IMG_USERS=,gjohnson@duke.edu
 
 ###
 # WARNING: Throttler automatically removes itself from cron when its work is complete!!!!
@@ -17,9 +18,9 @@ IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
 # options are, 2 at a time, base_runno, max_mnum, skip in scheduling.
 MAILTO=jjc29@duke.edu
 # b0 checking
-*/5	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 S68041 0 110 13 21
+#5-55/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 28 S68041 0 110 13 21
 # non b0 checking, will see every fourth vol
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 110 4 19
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 103 $BIGGUS_DISKUS/S68041_reco.list 35
 MAILTO=$USER@duke.edu
 
 
@@ -44,12 +45,14 @@ t_run="S67962"
 # Schedule: at 53 past, at 1am 
 # Command: status collection including orthocenter, and send result
 t_run="S67963" 
-#53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS;
 
 ###
 #  Dev mode send devs status reports, but only send images to others.
 t_run="S68041"
-15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS
+15      0-5/1,23  *       *       *       source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS
+
 ###
 
 
@@ -57,78 +60,11 @@ t_run="S68041"
 # Schedule: at 15 past, every 4 hours starting at 6am until 10:15
 # Command: status collection including orthocenter, and send result.
 #t_run="S67962"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS;
 
 #t_run="S68028"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS;
 #t_run="S68029"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-
-
-SHELL=/bin/bash
-MAILTO=$USER@duke.edu
-EXTRA_USERS=",jjc29@duke.edu,rja20@duke.edu"
-# Only add Al if he asks for it ;) He said "that's fine" for images, so lets just do that.
-IMG_USERS="$EXTRA_USERS,gjohnson@duke.edu"
-
-###
-# WARNING: Throttler automatically removes itself from cron when its work is complete!!!!
-###
-# Scheduler: Every 10 minutes
-# Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
-#*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
-
-
-# Scheduler: Every 10 minutes
-# Command: cs_recon throttler, 3 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
-# options are, 2 at a time, base_runno, max_mnum, skip in scheduling.
-MAILTO=jjc29@duke.edu
-# b0 checking
-5-55/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 28 S68041 0 110 13 21
-# non b0 checking, will see every fourth vol
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 8 S68041 0 110 4 19
-MAILTO=$USER@duke.edu
-
-
-# Scheduler: Every 10 minutes, any day EXCEPT friday.  This line was specifically used before the first volume completed recon,
-#            which may no longer  be a requirement for the CS_recon_throttler.
-# Command: cs_recon throttler, 5 volumes at a time. WARNING: THis looks like its functionized HOWEVER THAT IS NOT COMPLETE.
-#*/10	*	*	*	0-4,6,7	source $HOME/.bashrc; CS_recon_throttler 5 $BIGGUS_DISKUS/S67962.work
-
-# Schedule: at 7am
-# Command: timing estimator forcing recollection
-t_run="S67962"
-# 0	7	*	*	*	source $HOME/.bashrc; CS_timing_estimator $t_run 1 2>&1|sed 's/[^[:print:]]//g'| mail -s "CS_timing_estimator" $USER@duke.edu
-
-###
-# command line callable cs status with and without orthocenter previews
-###
-# Schedule: every 15 minutes, from 6-11pm, only on fridays
-# Command: status colleciton and direct mail command(not the fancier status_CS_recon_mail).
-t_run="S67962"
-#*/15	18-23	*	*	5	source $HOME/.bashrc;s_file=$HOME/CS_recon_${t_run}.status;status_CS_recon $t_run 2>&1; cat $s_file| mail -s "status_CS_recon $t_run" $USER@duke.edu
-
-# Schedule: at 53 past, at 1am 
-# Command: status collection including orthocenter, and send result
-t_run="S67963" 
-#53	1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu;  status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-
-###
-#  Dev mode send devs status reports, but only send images to others.
-t_run="S68041"
-15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-###
-
-
-##### THIS IS THE MOST FAVORED SETUP, replicate these two lines, and edit the t_run line.
-# Schedule: at 15 past, every 4 hours starting at 6am until 10:15
-# Command: status collection including orthocenter, and send result.
-#t_run="S67962"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-
-#t_run="S68028"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
-#t_run="S68029"
-#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$IMG_USERS;
+#15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS;
 
 
