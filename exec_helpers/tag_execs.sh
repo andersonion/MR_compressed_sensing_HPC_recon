@@ -26,7 +26,7 @@ cd $(dirname $0);
 update_list="";
 for mexec in */ ;
 do echo "--$mexec--";
-    # interanal vars, 
+    # internal vars,
     # cp is current path, from readlink on the executeable
     # dp is current path, from readlink on the dest_exec
     # when those are equal we know there is no work to do.
