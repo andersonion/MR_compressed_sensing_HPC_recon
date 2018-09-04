@@ -207,6 +207,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
         batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
         running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
     else
+        running_jobs='';
         eval(sprintf('gatekeeper_exec %s',gatekeeper_args));
     end
     vm_slurm_options=struct;
@@ -234,7 +235,11 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     log_mode = 1;
     log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
-    quit force
+    if ~options.live_run
+        quit force
+    else
+        return;
+    end
 else
     stage_1_running_jobs='';
     stage_2_running_jobs='';
