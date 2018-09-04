@@ -18,9 +18,9 @@ IMG_USERS=,gjohnson@duke.edu
 # options are, 2 at a time, base_runno, max_mnum, skip in scheduling.
 MAILTO=jjc29@duke.edu
 # b0 checking
-#5-55/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 28 S68041 0 110 13 21
+#5-55/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 28 S68042 0 110 13 21
 # non b0 checking, will see every fourth vol
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68041 0 103 $BIGGUS_DISKUS/S68041_reco.list 35
+*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68042 0 103 3 84
 MAILTO=$USER@duke.edu
 
 
@@ -49,10 +49,9 @@ t_run="S67963"
 
 ###
 #  Dev mode send devs status reports, but only send images to others.
-t_run="S68041"
+t_run=S68042
 15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS
 15      0-5/1,23  *       *       *       source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS
-
 ###
 
 
