@@ -27,9 +27,9 @@ else
     C___=exec_startup();
 end
 out_code = 1; % Default is failure.
-user='omega';
+scanner_user='omega';
 most_recent_fid_cmd='ls -tr /home/mrraw/*/*.fid/fid | tail -n1';
-remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',user,scanner,most_recent_fid_cmd);
+remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',scanner_user,scanner,most_recent_fid_cmd);
 status = 1;
 logged=0;
 [status,most_recent_fid] = system(remote_most_recent_fid_cmd);
@@ -93,7 +93,7 @@ for tt = 1:max_checks
         remote_size=get_remote_filesize( remote_file,scanner );
         if (remote_size > 0)
             if fid_check
-                ready=check_subvolume_ready_in_fid_quiet(remote_file,block_number,bbytes,scanner,user);
+                ready=check_subvolume_ready_in_fid_quiet(remote_file,block_number,bbytes,scanner,scanner_user);
             else
                 ready =1;
             end
@@ -103,7 +103,7 @@ for tt = 1:max_checks
         break 
     else
         most_recent_fid_cmd='ls -tr /home/mrraw/*/*.fid/fid | tail -n1';
-        remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',user,scanner,most_recent_fid_cmd);        
+        remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',scanner_user,scanner,most_recent_fid_cmd);        
         status = 1;
         [status,c_most_recent_fid] = system(remote_most_recent_fid_cmd);
         if status
