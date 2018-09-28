@@ -40,9 +40,7 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 %CS_recon_parameters: TVWeight,xfmWeight,Itnlim,wavelet_dims,wavelet_type
 %% Reservation support
 active_reservation=get_reservation(options.CS_reservation);
-%% Executables support
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-gatekeeper_exec_path = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
+%% queue settings
 gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(gatekeeper_queue)
     gatekeeper_queue = 'slow_master';%'high_priority';
@@ -55,8 +53,11 @@ cs_recon_queue = getenv('CS_RECON_QUEUE');
 if isempty(cs_recon_queue)
     cs_recon_queue = 'matlab';
 end
-volume_manager_exec_path = getenv('CS_VOLUME_MANAGER_EXEC'); % Error check for isempty?
+%% Executables support
+matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+gatekeeper_exec_path = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
 
+volume_manager_exec_path = getenv('CS_VOLUME_MANAGER_EXEC'); % Error check for isempty?
 if isempty(volume_manager_exec_path) % Temporary fix.
     volume_manager_exec_path =  which(mfilename);
     %volume_manager_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_0904/run_volume_manager_exec.sh';
@@ -91,7 +92,8 @@ if isempty(volume_cleanup_exec_path)
     volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/' CS_CODE_DEV '/run_volume_cleanup_for_CSrecon_exec.sh'];
     setenv('CS_VOLUME_CLEANUP_EXEC',volume_cleanup_exec_path);
 end
-%{ %Moved to deploy_procpar_handlers function
+%{
+%Moved to deploy_procpar_handlers function
 procpar_gatekeeper_exec_path = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); % Error check for isempty?
 if isempty(procpar_gatekeeper_exec_path)
     %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/20171004_1110//run_local_file_gatekeeper_exec.sh';
@@ -107,6 +109,7 @@ if isempty(procpar_cleanup_exec_path)
     setenv('CS_PROCPAR_CLEANUP_EXEC',procpar_cleanup_exec_path);
 end
 %}
+%%
 if ischar(volume_number)
     volume_number=str2double(volume_number);
 end
@@ -124,6 +127,10 @@ end
 % 4 : Run volume cleanup.
 % 5 : Send volume to workstation and write recon_completed flag.
 % 6 : All work done; do nothing.
+
+% Looks like we have a logic glitch where we dont re-run manager unless
+% volume cleanup still has yet to run. SO, lets change that(its at the
+% end!).
 
 
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,agilent_series,bbytes);
@@ -155,6 +162,8 @@ local_archive_tag =   sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix)
 
 
 %TEMPCODE
+%{
+% Commenting out this temp code 2018-09-28 in the omega removal transition
 variables_file2 = [work_subfolder       '/' volume_runno '_setup_variables.mat'];
 if (exist(variables_file2,'file'))
     if ~exist(variables_file,'file')
@@ -171,6 +180,7 @@ if (exist(variables_file2,'file'))
     handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
     mf.handle_archive_tag_cmd=handle_archive_tag_cmd;
 end
+%}
 
 % Write archive tag file before any work done. 
 % This is rather poor form as the purpose of the archive tag file is to
@@ -246,19 +256,21 @@ else
     stage_3_running_jobs='';
     stage_4_running_jobs='';
     stage_5_running_jobs='';
+    stage_5e_running_jobs='';
     
     if (~options.process_headfiles_only)
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
         [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+        %% STAGE1 Scheduling
         if (starting_point <= 1)
             volume_fid = [work_subfolder '/' volume_runno '.fid'];
-            user='';
+            scanner_user='';
             if (local_or_streaming_or_static == 1)
                 fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number);
             else
-                user='omega';
-                fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number,scanner,user);
+                scanner_user='omega';
+                fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number,scanner,scanner_user);
             end
             if fid_consistency
                 %{
@@ -276,13 +288,13 @@ else
                 if (local_or_streaming_or_static == 1)
                     get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
                 else
-                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes,scanner,user);
+                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes,scanner,scanner_user);
                 end
             else
                 log_mode = 1;
                 error_flag = 1;
                 log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid);
-                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',log_msg,input_fid,fid_tag_file,volume_number,scanner,user);
+                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',log_msg,input_fid,fid_tag_file,volume_number,scanner,scanner_user);
                 log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
                 
                 yet_another_logger(log_msg,log_mode,log_file,error_flag);
@@ -290,7 +302,7 @@ else
                 quit force
             end
         end
-        %stage_2_running_jobs='';
+        %% STAGE2 Scheduling
         if (starting_point <= 2)
             % Schedule setup
             %% Make variable file
@@ -351,7 +363,7 @@ else
         if options.CS_preview_data
             return;
         end
-        %stage_3_running_jobs='';
+        %% STAGE3 Scheduling
         if (starting_point <= 3)
             mf = matfile(variables_file,'Writable',true);
             rf = matfile(recon_file);
@@ -364,25 +376,15 @@ else
             if exist(volume_variable_file,'file')
                 mf2=matfile(volume_variable_file,'Writable',true);
                 t_param=mf2.param;
-                
                 t_param.Itnlim=Itnlim;
                 mf2.param=t_param;
                 if isfield(options,'verbosity')
-                    
                     t_aux_param=mf2.aux_param;
                     t_aux_param.verbosity=options.verbosity;
                     mf2.aux_param=t_aux_param;
                 end
             end
-            
             % Schedule slice jobs
-            %{
-            if ~exist('variables_file','var') % This is already being set above--should just delete altogether.
-                variables_file = [workdir '/' volume_runno '_setup_variables.mat'];
-                %variables_file = [work_subfolder volume_runno '_setup_variables.mat'];
-            end
-            %}
-            
             if ~exist('recon_options_file','var')
                 recon_options_file='';
             end
@@ -410,8 +412,9 @@ else
             swr_slurm_options.p=cs_recon_queue;
             swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
             swr_slurm_options.reservation = active_reservation;
-            %Find slices that need to be reconned.
             if exist(temp_file,'file')
+                %Find slices that need to be reconned. 
+                % the temp file only exists if setup has run. 
                 [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
@@ -499,14 +502,32 @@ else
                 end
             end
         end
-        
-        write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
-        handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+        %% craft archive tag commands for later. 
+        write_archive_tag_success_cmd = ...
+            sprintf(['if [[ -f %s ]]; then\n'...
+            '\t  rm %s;\n'...
+            'fi;\n'...
+            'if [[ ${archive_tag_success} -eq 1 ]];\n'...
+            'then\n'...
+            '\t  echo "Archive tag transfer successful!"\n'...
+            '\t  touch %s;\n'...
+            'else\n'...
+            '\t  touch %s; \n'...
+            'fi;'],at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
+        handle_archive_tag_cmd = ...
+            sprintf(['if [[ ! -f %s ]]; then\n'...
+            '\t  archive_tag_success=0;\n'...
+            '\t  if [[ -f %s ]] && [[ -f %s ]]; then\n'...
+            '\t  \t  scp -p %s %s@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n'...
+            '\t  \t  %s;\n'...
+            '\t  fi;\n'...
+            'fi'],at_success_flag, success_flag, hf_success_flag, ...
+            local_archive_tag,getenv('USER'),full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
         mf2 = matfile(variables_file,'Writable',true);
         mf2.handle_archive_tag_cmd=handle_archive_tag_cmd;
-        
+        %% STAGE4 Scheduling
         if (starting_point <= 4)
-            %% Schedule setup via slurm and record jobid for dependency scheduling.
+            %% Schedule via slurm and record jobid for dependency scheduling.
             if ~exist('plural','var')
                 if chunk_size > 1
                     plural = 's';
@@ -537,16 +558,17 @@ else
                 eval(sprintf('volume_cleanup_for_CSrecon_exec %s',vcu_args));
             end
         end
-    end
-    
-    if ~options.process_headfiles_only
+        %% STAGE5 Scheduling
         if (starting_point <= 5)
             if ~options.keep_work
                 % Send to workstation and write completion flag.
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
-                mkdir_cmd = sprintf('ssh omega@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',full_host_name,target_machine,volume_runno,volume_runno);
-                scp_cmd = sprintf('echo "Attempting to transfer data to %s.";scp -r %s omega@%s:/Volumes/%sspace/%s/ && success=1',target_machine,t_images_dir,full_host_name,target_machine,volume_runno);
+                mkdir_cmd = sprintf('ssh %s@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',...
+                    getenv('USER'),full_host_name,target_machine,volume_runno,volume_runno);
+                scp_cmd = sprintf(['echo "Attempting to transfer data to %s.";' ...
+                    'scp -r %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
+                    target_machine,t_images_dir,getenv('USER'),full_host_name,target_machine,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
                 local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
@@ -557,7 +579,7 @@ else
                 n_raw_images = original_dims(3);
                 shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
                 shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-                shipper_cmds{3}=sprintf('freespaceK=`ssh omega@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', full_host_name,  target_machine);
+                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', getenv('USER'), full_host_name,  target_machine);
                 shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
                 shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
                 shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
@@ -587,12 +609,19 @@ else
             end
         end
     end
-    
+    %% STAGE5+ Scheduling
     recon_type = 'CS_v2';
     if (starting_point >= 5)%(starting_point <= 6)
-        c_running_jobs = deploy_procpar_handlers(variables_file);
+        % This is only scheduled at stage 5 because prior to that it wont
+        % work anyway.
+        stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
     end
-    if stage_4_running_jobs
+    
+    % Why is volume manager only re-scheduled if we have stage 4(cleanup)
+    % jobs? That seems like a clear mistake! We should be rescheduling so
+    % long as we're not stage 6.
+    %if stage_4_running_jobs
+    if starting_point < 6
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -609,7 +638,14 @@ else
         vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path, vm_args);
         if ~options.live_run
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
-            c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,'afternotok');
+            %{
+            if stage_4_running_jobs
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,'afternotok');
+            elseif stage_5_running_jobs
+            end
+            %}
+            %% re-configured to run as singleton so lon as we're not stage 6.
+            c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
