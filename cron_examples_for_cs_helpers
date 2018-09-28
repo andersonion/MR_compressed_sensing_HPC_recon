@@ -20,7 +20,8 @@ MAILTO=jjc29@duke.edu
 # b0 checking
 #5-55/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 28 S68042 0 110 13 21
 # non b0 checking, will see every fourth vol
-*/10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 4 S68042 0 103 3 84
+# Pausing our recon for now
+# */10	*	*	*	*	source $HOME/.bashrc; CS_recon_throttler 6 S68042 0 102
 MAILTO=$USER@duke.edu
 
 
@@ -50,8 +51,10 @@ t_run="S67963"
 ###
 #  Dev mode send devs status reports, but only send images to others.
 t_run=S68042
-15	6-22/1	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS
-15      0-5/1,23  *       *       *       source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS
+# status check 15 past hourly but dont send status report, only image, on the hourly.
+15	*	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ;  status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS
+# send status email at 20 past, 5 minute difference to give it time to make a status report and write.
+20	6-22/4	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; cat $s_file| mail -s "status_CS_recon $t_run" $EXTRA_USERS;
 ###
 
 
