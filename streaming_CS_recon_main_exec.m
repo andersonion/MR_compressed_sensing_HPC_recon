@@ -98,7 +98,7 @@ options=mat_pipe_option_handler(varargin,types);
 % 1. provide half decent help for your function. 
 % 2. clean up options to a known state to make option use easier, 
 %    a. all options are defined, and false by default. This lets you do if
-%    option.optname to know if its defined and you have to do soemthing
+%    option.optname to know if its defined and you have to do something
 %    with it. This can lead to weird behavior with default true things. 
 %    b. numeric options are set to best type, and roughly evaluated, 
 %       eg, in the structure arrays are arrays, vectors will be vectors.
@@ -121,9 +121,13 @@ options=mat_pipe_option_handler(varargin,types);
 if isdeployed && options.live_run
     warning('cant live run when deployed :p');
     options.live_run=0;
+elseif ~isdeployed && ~options.live_run
+    warning('Running in matlab, but live run is off, we''ll be scheduling slurm jobs. Are you sure thats what you wanted?');
+    pause(3);
 end
-options.verbose=1;% james normally attaches this to the "debug_val" option, 
+% james normally attaches this to the "debug_val" option, 
 % with increasing values of debugging generating more and more outtput.
+options.verbose=1;
 log_mode = 2; % Log only to log file.
 if options.verbose
     log_mode = 1; % Log to file and standard out/error.
@@ -208,11 +212,16 @@ if numel(options.xfmWeight) ~=  numel(options.TVWeight) ...
     || numel(options.xfmWeight) ~= options.re_init_count+1
     error('mis-match for our re_initalizations and required params, TVWeight and xfmWeight');
 end
- 
+%% user configurable scanner user.
+% only partially implemented :D 
+if ~options.scanner_user
+    scanner_user='omega';
+else
+    scanner_user=options.scanner_user;
+end
 %% Reservation support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
- 
 %% Give options feedback to user, with pause so they can cancel
 fprintf('Ready to start! Here are your selected options\n');
 fprintf('Ctrl+C now to stop and try again\n');
@@ -310,6 +319,14 @@ if ~exist(study_flag,'file')
     else
         m = matfile(recon_file,'Writable',true);
     end
+    %% Test ssh connectivity using our perl program which has robust ssh handling.
+    puller_test=sprintf('puller_simple -oer -f file %s ../../../../home/vnmr1/vnmrsys/tablib/%s %s/%s',...
+        scanner,options.CS_table,workdir,options.CS_table);
+    [s,sout]=system(puller_test);
+    if s~=0
+        error(sout);
+    end
+    
     %% Second First things first: determine number of volumes to be reconned
     local_hdr = fullfile(workdir,[runno '_hdr.fid']);
     [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
@@ -340,7 +357,7 @@ if ~exist(study_flag,'file')
             if (isempty(tables_in_workdir))
                 if (~options.CS_table)
                     %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
-                    list_cs_tables_cmd = [ 'ssh omega@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
+                    list_cs_tables_cmd = [ 'ssh ' scanner_user '@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
                     [~,available_tables]=ssh_call(list_cs_tables_cmd);
                     log_msg = sprintf('Please rerun this code and specify the CS_table to run in streaming mode\n');
                     log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
@@ -448,6 +465,9 @@ if ~exist(study_flag,'file')
                 end
             end
             scanner_host_name=aa.scanner_host_name;
+            if ~exist('scanner_user','var')
+                scanner_user=aa.scanner_user;
+            end
         end
         scanner_name = scanner;
         m.scanner_name=scanner_name;
@@ -498,8 +518,7 @@ if ~exist(study_flag,'file')
                 end
                 if missing_fids
                     block_number=1;
-                    remote_user='omega';
-                    ready=check_subvolume_ready_in_fid_quiet(input_fid,block_number,m.bbytes,scanner,remote_user);
+                    ready=check_subvolume_ready_in_fid_quiet(input_fid,block_number,m.bbytes,scanner,scanner_user);
                 end
                 if ready
                     if ~exist('datapath','var')
@@ -633,7 +652,7 @@ if options.fid_archive && local_or_streaming_or_static==3
     end
     pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s', ...
         poc,scanner,study,agilent_series,runno,foc,user,runno);
-    ssh_and_run=sprintf('ssh %s@%s "%s"','omega',options.target_machine,pull_cmd);
+    ssh_and_run=sprintf('ssh %s@%s "%s"',getenv('USER'),options.target_machine,pull_cmd);
     log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
     log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);
     yet_another_logger(log_msg,log_mode,log_file);
