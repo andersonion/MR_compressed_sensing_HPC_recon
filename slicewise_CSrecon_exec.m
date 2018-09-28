@@ -170,7 +170,7 @@ for index=1:length(slice_numbers)
     % 8 May 2017, BJA: converting header from binary to double local_scaling
     %work_done = fread(fid,dims(1),'double'); 
     fclose(t_id);
-    %% decide if we're continuting work or not
+    %% decide if we're continuing work or not
     continue_work = 0;
     completed_iterations = work_done(slice_index);
     % completed_iterations formerly previous_Itnlim(and c_work_done)
@@ -216,18 +216,10 @@ for index=1:length(slice_numbers)
             % this compensates the intensity for the undersampling
             % experimented with removing this volume scale and found that
             % destroyed the output. 
-            % James says: according to the original code comments im_zfwdc should be
+            % according to the original code comments im_zfwdc should be
             % 0-1 for the whole volume, take care checking here as this is
-            % slice at a time.
-            % BJ says: Miki, et al. suggest that we can normalize slicewise
-            if aux_param.slicewise_norm
-                im_zfwdc = ifft2c(param.data./CSpdf); % No norm yet
-                slice_scale = max(abs(im_zfwdc(:)));
-                im_zfwdc=im_zfwdc/(slice_scale*slice_scale); % Preserving buggy and better performance
-                param.data=param.data/slice_scale;
-            else
-                im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
-            end
+            % slice at a time. 
+            im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
             ph = exp(1i*angle((ifft2c(param.data.*phmask))));
             param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
             res=XFM*im_zfwdc;
@@ -262,10 +254,6 @@ for index=1:length(slice_numbers)
             [res, inner_its, lin_search_time] = fnlCg_verbose(res, param,recon_options);
             time_to_recon=time_to_recon+lin_search_time;
             iterations_performed=iterations_performed+inner_its;
-        end
-        
-        if aux_param.slicewise_norm
-           res=res*slice_scale; 
         end
         
         log_msg =sprintf('Slice %i: Time to reconstruct data (With %i iteration blocks):  %0.2f seconds. \n',slice_index,n,time_to_recon);
@@ -380,7 +368,30 @@ for index=1:length(slice_numbers)
         yet_another_logger(log_msg,log_mode,log_file);
     end
 end
+
+%% 31 August 2018, BJ says: using code from volume cleanup to check if the
+%  slices in this job will appear to be reconned then; if any have failed,
+%  will explicitly fail in hopes of triggering backup jobs instead of
+%  another complete cycle of volume_manager, etc.
+[~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
+apparent_iterations = tmp_header(slice_numbers);
+apparent_failures = slice_numbers(apparent_iterations<requested_iterations);
+num_af=length(apparent_failures);
+if  (num_af > 0)
+    %error_flag=1; % BJ says: I'm honestly not even sure where all our
+    %error logs are ending up at...it reminds of the messages in the
+    %tubes in Lost.
+    for ff = 1:num_af
+        log_msg =sprintf('Slice %i: attempted reconstruction appears to have failed; THROWING FAILURE FLAG.\n',apparent_failures(ff));
+        yet_another_logger(log_msg,log_mode,log_file);
+    end
+    
+    status=variable_to_force_an_error;
+    
+end
+%%
 return
+
 end
 function slice_numbers=parse_slice_indices(slice_indices)
 % slice numbers pulled down to its own function to remove temp vars from workspace easier. 
