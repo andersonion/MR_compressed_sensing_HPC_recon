@@ -95,8 +95,8 @@ if (make_workspace)
         system(sprintf('touch %s',preview_stamp));
         preview_imgs=CS_preview_data(original_mask,data,fullfile(workdir,volume_runno),options.CS_preview_data);
         for pn=1:numel(preview_imgs)
-            scp_to_engine=sprintf('scp -p %s omega@%s.dhe.duke.edu:/%sspace/',...
-                preview_imgs{pn},options.target_machine,options.target_machine);
+            scp_to_engine=sprintf('scp -p %s %s@%s.dhe.duke.edu:/%sspace/',...
+                preview_imgs{pn},getenv('USER'),options.target_machine,options.target_machine);
             shell_s=sprintf('if [ %s -nt %s ]; then %s & fi',...
                 preview_imgs{pn}, preview_stamp, scp_to_engine);
             [s,sout]=system(shell_s);
