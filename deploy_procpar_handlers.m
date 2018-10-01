@@ -102,13 +102,17 @@ if (~exist(procpar_file,'file') || ~exist(headfile,'file'))
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
     procpar_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_procpar_gatekeeper.bash'];
-    procpar_gatekeeper_cmd = sprintf('%s %s %s %s', procpar_gatekeeper_exec_path, matlab_path,[procpar_file ':' headfile],log_file);
-    batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
-    pp_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
-    
-    log_mode = 1;
-    log_msg =sprintf('Procpar data and/or headfile for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,pp_running_jobs);
-    yet_another_logger(log_msg,log_mode,log_file);
+    procpar_gatekeeper_args= sprintf('%s %s',[procpar_file ':' headfile],log_file);
+    procpar_gatekeeper_cmd = sprintf('%s %s %s', procpar_gatekeeper_exec_path, matlab_path,procpar_gatekeeper_args);
+    if ~options.live_run
+        batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
+        pp_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+        log_mode = 1;
+        log_msg =sprintf('Procpar data and/or headfile for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,pp_running_jobs);
+        yet_another_logger(log_msg,log_mode,log_file);
+    else
+        eval(sprintf('local_file_gatekeeper_exec %s',procpar_gatekeeper_args));
+    end
 end
 %% 
 ppcu_slurm_options=struct;
@@ -122,15 +126,27 @@ ppcu_slurm_options.job_name = [runno '_procpar_gatekeeper_and_processor']; % Try
 % using a blank reservation to force no reservation for this job.
 ppcu_slurm_options.reservation = '';
 procpar_cleanup_batch = [workdir 'sbatch/' volume_runno '_procpar_cleanup.bash'];
-ppcu_cmd = sprintf('%s %s %s %s %s %s', procpar_cleanup_exec_path,matlab_path, recon_file,headfile,procpar_file,recon_type );
+ppcu_args=sprintf('%s %s %s %s',recon_file,headfile,procpar_file,recon_type);
+ppcu_cmd = sprintf('%s %s %s', procpar_cleanup_exec_path,matlab_path, ppcu_args);
 dep_string ='';
 %if pp_running_jobs
 %   dep_string = 'afterok';
 %end
 
+shell_cmds={ship_cmd_0 ship_cmd_1 ship_cmd_2 write_hf_success_cmd handle_archive_tag_cmd};
 % 2018-09-28 its not clear the keep_work setting should have an effect
 % here. the if has been disabled. --james
 %if ~options.keep_work
-    batch_file = create_slurm_batch_files(procpar_cleanup_batch,{ppcu_cmd ship_cmd_0 ship_cmd_1 ship_cmd_2 write_hf_success_cmd handle_archive_tag_cmd},ppcu_slurm_options);
+if ~options.live_run
+    batch_file = create_slurm_batch_files(procpar_cleanup_batch,[ppcu_cmd shell_cmds],ppcu_slurm_options);
     c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
-%end
+else
+    eval(sprintf('process_headfile_CS %s',ppcu_args));
+    for cn=1:numel(shell_cmds)
+        [s,sout]=system(sprintf('bash %s',shell_cmds{cn}),'-echo');
+        if s~=0
+            error('failed! %s \n with output\n%s',shell_cmds{cn},sout);
+        end
+    end
+    c_running_jobs='';
+end

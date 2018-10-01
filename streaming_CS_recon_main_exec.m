@@ -90,6 +90,7 @@ types.planned_options={...
     'keep_work',           ''
     'email_addresses',      ''
     'verbosity',             ''
+    'scanner_user',         ' what user do we use to pull from scanner.'
     'live_run',             ' run the code live in matlab, igored when deployed.'
     'CS_preview_data',      ' save a pre recon orthocenter of kspace and imgspace'
     };
@@ -309,8 +310,9 @@ log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
 log_msg=sprintf('%sUser: %s\n',log_msg,user);
 log_msg=sprintf('%sExec Set: %s\n',log_msg,CS_CODE_DEV);
 yet_another_logger(log_msg,log_mode,log_file);
-% Check to see if a flag_file for complete recon exists
+%% do main work and schedule remainder
 if ~exist(study_flag,'file')
+    % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
     recon_file = fullfile(workdir,[runno 'recon.mat']);
@@ -320,11 +322,19 @@ if ~exist(study_flag,'file')
         m = matfile(recon_file,'Writable',true);
     end
     %% Test ssh connectivity using our perl program which has robust ssh handling.
-    puller_test=sprintf('puller_simple -oer -f file %s ../../../../home/vnmr1/vnmrsys/tablib/%s %s/%s',...
+    %{ 
+    % but the scanner is probably fine and not where we'll have trouble
+    % anyway
+    puller_test=sprintf('puller_simple -o -f file %s ../../../../home/vnmr1/vnmrsys/tablib/%s %s/%s',...
         scanner,options.CS_table,workdir,options.CS_table);
     [s,sout]=system(puller_test);
+    %}
+    puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_activity_log.txt ',...
+        getenv('USER'),options.target_machine,options.target_machine);
+    [s,sout]=system(puller_test,'-echo');
     if s~=0
-        error(sout);
+        error('Problem on testing of connection to %s\n%s\n',...
+            options.target_machine,sout);
     end
     
     %% Second First things first: determine number of volumes to be reconned

@@ -486,6 +486,7 @@ else
                         end
                     else
                         eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
+                        starting_point=4;
                     end
                     if c_running_jobs
                         %if stage_3_running_jobs
@@ -513,7 +514,7 @@ else
             '\t  touch %s;\n'...
             'else\n'...
             '\t  touch %s; \n'...
-            'fi;'],at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
+            'fi'],at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
         handle_archive_tag_cmd = ...
             sprintf(['if [[ ! -f %s ]]; then\n'...
             '\t  archive_tag_success=0;\n'...
@@ -556,6 +557,7 @@ else
                 stage_4_running_jobs = dispatch_slurm_jobs(batch_file,'',maybe_im_a_singleton);
             else
                 eval(sprintf('volume_cleanup_for_CSrecon_exec %s',vcu_args));
+                starting_point=5;
             end
         end
         %% STAGE5 Scheduling
@@ -604,24 +606,33 @@ else
                     end
                     stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
                 else
-                    [ship_st,ship_out]=system(batch_file);
+                    [ship_st,ship_out]=system(sprintf('bash %s',batch_file));
+                    if ship_st~=0
+                        error(ship_out);
+                    end
+                end
+                %% STAGE5+ Scheduling
+                %if (starting_point >= 5)%(starting_point <= 6)
+                if (starting_point == 5)%(starting_point <= 6)
+                    % This is only scheduled at stage 5 because prior to that it wont
+                    % work anyway.
+                    stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
+                    %% live run startingpoint advance handling
+                    if exist('ship_st','var')
+                        if ship_st==0
+                            starting_point=6;
+                        end
+                    end
                 end
             end
         end
     end
-    %% STAGE5+ Scheduling
     recon_type = 'CS_v2';
-    if (starting_point >= 5)%(starting_point <= 6)
-        % This is only scheduled at stage 5 because prior to that it wont
-        % work anyway.
-        stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
-    end
-    
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
     % jobs? That seems like a clear mistake! We should be rescheduling so
     % long as we're not stage 6.
     %if stage_4_running_jobs
-    if starting_point < 6
+    if starting_point < COMPLETION_STAGE
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -651,6 +662,7 @@ else
             yet_another_logger(log_msg,log_mode,log_file);
         else
             eval(sprintf('volume_manager_exec %s',vm_args));
+            pause(1);
         end
     end
 end
