@@ -15,7 +15,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
-   
+  
 if ~isdeployed
     %% Get all necessary code for reconstruction
     run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))

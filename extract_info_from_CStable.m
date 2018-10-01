@@ -83,8 +83,9 @@ if ~exist(table_target,'file')
     else
         scanner = 'kamy';
     end
-    
-    pull_table_cmd = [ 'ssh civmcluster1 puller_simple  -o -f file ' scanner ' ''../../../../home/vnmr1/vnmrsys/tablib/' CS_table_name ''' ' target_folder];   
+    % pull_table initially was wrapped in an ssh call.
+    % that is bad form, and makes a spagetti mess.
+    pull_table_cmd = [ 'puller_simple  -o -f file ' scanner ' ''../../../../home/vnmr1/vnmrsys/tablib/' CS_table_name ''' ' target_folder];
     system(pull_table_cmd)
     
     if ~exist(table_target,'file')
