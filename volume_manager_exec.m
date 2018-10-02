@@ -630,7 +630,10 @@ else
     recon_type = 'CS_v2';
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
     % jobs? That seems like a clear mistake! We should be rescheduling so
-    % long as we're not stage 6.
+    % long as we're not stage 6. 
+    % AND we should be dependent on all the rest of the jobs having
+    % terminated eg, dependency=afterany. SO, we should update this code to
+    % build a running list of jobs to be scheduled behind. `
     %if stage_4_running_jobs
     if starting_point < 6
         vm_slurm_options=struct;
