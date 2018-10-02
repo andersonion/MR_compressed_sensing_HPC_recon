@@ -655,10 +655,20 @@ else
             elseif stage_5_running_jobs
             end
             %}
-            %% re-configured to run as singleton so long as we're not stage 5.
-            % and we scheduled procpar jobs.
-            if starting_point==5 && stage_5e_running_jobs
-                c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_5e_running_jobs,'afternotok');
+            %% re-configured to run as singleton unless we scheduled endstage jobs. 
+            % when we schecdule end stage jobs, tell ourselves to run one
+            % more time once they're terminated, note not after failure, or
+            % after success.
+            if stage_4_running_jobs || stage_5_running_jobs || stage_5e_running_jobs
+                dep_jobs='';
+                if stage_5e_running_jobs
+                    dep_jobs=stage_5e_running_jobs;
+                elseif stage_5_running_jobs
+                    dep_jobs=stage_5_running_jobs;
+                elseif stage_4_running_jobs
+                    dep_jobs=stage_4_running_jobs;
+                end
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,'afterany');
             else
                 c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
             end
