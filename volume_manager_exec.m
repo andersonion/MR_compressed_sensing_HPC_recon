@@ -655,8 +655,14 @@ else
             elseif stage_5_running_jobs
             end
             %}
-            %% re-configured to run as singleton so long as we're not stage 6.
-            c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+            %% re-configured to run as singleton so long as we're not stage 5.
+            % and we scheduled procpar jobs.
+            if starting_point==5 && stage_5e_running_jobs
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_5e_running_jobs,'afternotok');
+            else
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+            end
+            
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
