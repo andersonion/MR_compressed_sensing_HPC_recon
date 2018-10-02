@@ -632,7 +632,7 @@ else
     % jobs? That seems like a clear mistake! We should be rescheduling so
     % long as we're not stage 6.
     %if stage_4_running_jobs
-    if starting_point < COMPLETION_STAGE
+    if starting_point < 6
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -655,7 +655,7 @@ else
             elseif stage_5_running_jobs
             end
             %}
-            %% re-configured to run as singleton so lon as we're not stage 6.
+            %% re-configured to run as singleton so long as we're not stage 6.
             c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
