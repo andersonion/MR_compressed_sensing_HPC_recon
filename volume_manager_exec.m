@@ -448,7 +448,10 @@ else
                     slices_to_process = [slices_to_process NaN];
                     temp_size = size(slices_to_process);
                 end
+                %slices to process would be better named chunks, or slabs.
                 slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
+                % slice in this for loop would be better named chunk, or
+                % slab
                 for slice = slices_to_process
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(1)));
                     slice(isnan(slice))=[];
