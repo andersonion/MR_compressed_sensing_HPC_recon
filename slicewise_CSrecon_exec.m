@@ -88,7 +88,12 @@ fieldnames(test_m.param)
 %}
 
 time_to_load_common_workspace=toc;
-log_mode = 1;
+if isdeployed
+    log_mode = 1;
+else
+    % when not deployed the log printing takes significant time.
+    log_mode=2;
+end;
 log_file = aux_param.volume_log_file;
 
 log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
