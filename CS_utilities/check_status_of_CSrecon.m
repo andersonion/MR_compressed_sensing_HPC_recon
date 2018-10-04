@@ -49,6 +49,11 @@ vol_status=100;% starting at complete, keep working it down.
 % vol status is what % from 0-100 are we. 
 % have to assign each stage some % it takes. lets pretend that only slices matter, and they take 90% of the work.
 if ~exist(send_archive_tag,'file')
+    % this 2 pct represents processing the procpar, and images and headfile
+    % to dest engine. We could break this down further, but its probably
+    % not worth it. eg, 1.8% is send data, 0.1% is proces procpar, 0.1% is
+    % send procpar.
+    % Check for output images
     starting_point = 5;
     vol_status=vol_status-0.1;% this represents the last flag to send.
     send_images=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
@@ -64,11 +69,6 @@ if ~exist(send_archive_tag,'file')
     if ~exist(send_headfile,'file')
         vol_status=vol_status-0.1;
     end
-    % this 2 pct represents processing the procpar, and images and headfile
-    % to dest engine. We could break this down further, but its probably
-    % not worth it. eg, 1.8% is send data, 0.1% is proces procpar, 0.1% is
-    % send procpar.
-    % Check for output images
     images_dir = fullfile(volume_dir,[volume_runno 'images']);
     if ~exist(images_dir,'dir')
         finished_slices_count = 0;
@@ -78,9 +78,6 @@ if ~exist(send_archive_tag,'file')
         
         headfile_exists = numel(dir( [images_dir '/*.headfile' ]));
     end
-    
-    
-    
     if (finished_slices_count == 0) || (~headfile_exists) % We assume that all the raw files were written at once, and correctly so.
         starting_point = 4;
         vol_status=vol_status-3;
