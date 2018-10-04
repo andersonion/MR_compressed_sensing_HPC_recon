@@ -230,6 +230,8 @@ fields=fieldnames(options);
 for fn=1:numel(fields)
     if iscell(options.(fields{fn}))
         ot='cell array!';
+    elseif isstruct(options.(fields{fn}))
+        ot='struct!';
     elseif ~ischar(options.(fields{fn}))
         ot=sprintf('%g ',options.(fields{fn}));
     else

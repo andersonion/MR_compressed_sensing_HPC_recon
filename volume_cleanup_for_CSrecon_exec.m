@@ -477,7 +477,12 @@ fprintf('\tMax value chosen for output scale: %0.14f\n',databuffer.headfile.grou
 
 %% save civm_raw
 databuffer.data = mag_data;clear mag_data; % mag_data clear probably unnecessary, this is just in case.
-write_civm_image(databuffer,{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'});
+if ~isfield(options,'unrecognized_fields')
+    options.unrecognized_fields=struct;
+end
+unrecog_cell={'planned_ok'};
+unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
+write_civm_image(databuffer,[{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
 
 if ~options.keep_work && ~options.process_headfiles_only
     if exist(headfile,'file') %Is this the right condition?
