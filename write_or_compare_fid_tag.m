@@ -15,11 +15,31 @@ if ~exist('volume_number','var')
 end
 
 fid_tag_path=sprintf('/tmp/%s_%i_%i.fid',datestr(now,30),volume_number,ceil(rand(1)*10000));
+
+%{
+% force write on volume_number 1 is bad in case of a moved fid file.
 if (volume_number == 1)
     write_mode = 1;
 else
     write_mode = 0;
     if ~exist(original_fid_tag_path,'file')
+        % in case of error give us 30 seconds and retest.
+        pause(30)
+        if ~exist(original_fid_tag_path,'file')
+            log_mode = 3;
+            error_flag = 1;
+            log_msg =sprintf('Original fid_tag path (''%s'') does not exist. Dying now.\n',original_fid_tag_path);
+            yet_another_logger(log_msg,log_mode,'',error_flag);
+            quit force
+        end
+    end
+end
+%}
+write_mode = 0;
+if ~exist(original_fid_tag_path,'file') 
+    if volume_number==1
+        write_mode = 1;
+    else 
         % in case of error give us 30 seconds and retest.
         pause(30)
         if ~exist(original_fid_tag_path,'file')
@@ -78,8 +98,9 @@ if ready
     else
         if write_mode
             consistency_status = 1;
-            % set friendly permisions to file, u+g=rw, o=r
-            chmod_cmd=sprintf('chmod 664 %s',fid_tag_path);
+            % set NON friendly permisions to file
+            % BECAUSE OVERWRITES OF THIS TAG ARE DANGEROUS!
+            chmod_cmd=sprintf('chmod 444 %s',fid_tag_path);
             [~,~] = system(chmod_cmd); % set perms
             [~,~] = system(sprintf('mv %s %s',fid_tag_path,original_fid_tag_path));
         else
