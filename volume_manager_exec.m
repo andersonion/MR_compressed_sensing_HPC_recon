@@ -20,7 +20,7 @@ agilent_series='';
 workdir=[base_workdir '/' volume_runno '/'];
 % Need to figure out how to pass reconfile, scale_file --> just use recon_file!
 load(recon_file);
-
+recon_options=options;
 full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stupid way to fix the unneccessary 'fix' James introduced
 %full_host_name=databuffer.scanner_constants.scanner_host_name; % Just kidding. We can thank James for this red herring.
 
@@ -39,7 +39,7 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 %chunk_size
 %CS_recon_parameters: TVWeight,xfmWeight,Itnlim,wavelet_dims,wavelet_type
 %% Reservation support
-active_reservation=get_reservation(options.CS_reservation);
+active_reservation=get_reservation(recon_options.CS_reservation);
 %% queue settings
 gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(gatekeeper_queue)
@@ -213,7 +213,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
         volume_fid, input_fid, scanner, log_file, volume_number, bbytes);
     gatekeeper_cmd = sprintf('%s %s %s ', gatekeeper_exec_path, matlab_path,...
         gatekeeper_args);
-    if ~options.live_run
+    if ~recon_options.live_run
         batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
         running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
     else
@@ -232,7 +232,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
     vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
     vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path,vm_args);
-    if ~options.live_run
+    if ~recon_options.live_run
         batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
         or_dependency = '';
         if ~isempty(running_jobs)
@@ -245,7 +245,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     log_mode = 1;
     log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
-    if ~options.live_run
+    if ~recon_options.live_run
         quit force
     else
         return;
@@ -258,7 +258,7 @@ else
     stage_5_running_jobs='';
     stage_5e_running_jobs='';
     
-    if (~options.process_headfiles_only)
+    if (~recon_options.process_headfiles_only)
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
         [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
@@ -353,14 +353,14 @@ else
             volume_setup_batch = [workdir 'sbatch/' volume_runno '_volume_setup_for_CS_recon.bash'];
             vsu_args=sprintf('%s %i',variables_file, volume_number);
             vsu_cmd = sprintf('%s %s %s', volume_setup_exec_path,matlab_path, vsu_args);
-            if ~options.live_run
+            if ~recon_options.live_run
                 batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
             else
                 eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
             end
         end
-        if options.CS_preview_data
+        if recon_options.CS_preview_data
             return;
         end
         %% STAGE3 Scheduling
@@ -380,7 +380,7 @@ else
                 mf2.param=t_param;
                 if isfield(options,'verbosity')
                     t_aux_param=mf2.aux_param;
-                    t_aux_param.verbosity=options.verbosity;
+                    t_aux_param.verbosity=recon_options.verbosity;
                     mf2.aux_param=t_aux_param;
                 end
             end
@@ -419,7 +419,7 @@ else
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
                     if isfield(options,'keep_work')
-                        if options.keep_work
+                        if recon_options.keep_work
                             %% Currently iteration limit is not a part of the recon.mat variable group...will need to add it.
                             slices_to_process = find(tmp_header<Itnlim);
                         end
@@ -452,19 +452,23 @@ else
                 slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
                 % slice in this for loop would be better named chunk, or
                 % slab
+                % we could parfor this when we're in live_mode.
                 for slice = slices_to_process
-                    slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(1)));
-                    slice(isnan(slice))=[];
-                    if length(slice)>3
-                        no_con_test = sum(diff(diff(slice)));
+                    sx=slice;
+                %parfor ch_num=1:num_chunks
+                    %sx=slices_to_process(:,ch_num);
+                    slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
+                    sx(isnan(sx))=[];
+                    if length(sx)>3
+                        no_con_test = sum(diff(diff(sx)));
                     else
                         no_con_test = 1;
                     end
-                    for ss = 2:length(slice)
+                    for ss = 2:length(sx)
                         if (no_con_test)
-                            slice_string = [slice_string '_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
-                        elseif (ss==length(slice))
-                            slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(slice(ss)))];
+                            slice_string = [slice_string '_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(ss)))];
+                        elseif (ss==length(sx))
+                            slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(ss)))];
                         end
                     end
                     slicewise_recon_batch = [workdir 'sbatch/' volume_runno '_slice' slice_string '_CS_recon.bash'];
@@ -478,7 +482,7 @@ else
                         dep_type = '';
                     end
                     c_running_jobs ='';
-                    if ~options.live_run
+                    if ~recon_options.live_run
                         batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
                         [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
                         if msg1
@@ -488,12 +492,14 @@ else
                             disp(msg2)
                         end
                     else
-                        eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
-                        starting_point=4;
+                        %eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
+                        slicewise_CSrecon_exec( volume_variable_file, slice_string,recon_options_file);
+                        %slicewise_CSrecon_exec(swr_args)
+                        %starting_point=4;
                     end
                     if c_running_jobs
                         %if stage_3_running_jobs
-                        stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
+                        %stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
                         %else
                         %    stage_3_running_jobs = c_running_jobs;
                         %end
@@ -551,7 +557,7 @@ else
             volume_cleanup_batch = [workdir 'sbatch/' volume_runno '_volume_cleanup_for_CS_recon.bash'];
             vcu_args=sprintf('%s',variables_file);
             vcu_cmd = sprintf('%s %s %s', volume_cleanup_exec_path,matlab_path,vcu_args);
-            if ~options.live_run
+            if ~recon_options.live_run
                 batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
                 maybe_im_a_singleton='';
                 if (stage_3_running_jobs)
@@ -565,7 +571,7 @@ else
         end
         %% STAGE5 Scheduling
         if (starting_point <= 5)
-            if ~options.keep_work
+            if ~recon_options.keep_work
                 % Send to workstation and write completion flag.
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
@@ -603,7 +609,7 @@ else
                 %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
                 batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
                 dep_status='';
-                if ~options.live_run
+                if ~recon_options.live_run
                     if stage_4_running_jobs
                         dep_status='afterok-or';
                     end
@@ -619,7 +625,7 @@ else
                 if (starting_point == 5)%(starting_point <= 6)
                     % This is only scheduled at stage 5 because prior to that it wont
                     % work anyway.
-                    stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
+                    %stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
                     %% live run startingpoint advance handling
                     if exist('ship_st','var')
                         if ship_st==0
@@ -653,7 +659,7 @@ else
         volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
         vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
         vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path, vm_args);
-        if ~options.live_run
+        if ~recon_options.live_run
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
             %{
             if stage_4_running_jobs
@@ -683,6 +689,9 @@ else
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
         else
+            % could add dbstack check to prevent infinite recursion and
+            % stack overflow like behavior.
+            % maybe max out at 50? 
             eval(sprintf('volume_manager_exec %s',vm_args));
             pause(1);
         end
