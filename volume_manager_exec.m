@@ -453,10 +453,10 @@ else
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
-                for slice = slices_to_process
-                    sx=slice;
-                %parfor ch_num=1:num_chunks
-                    %sx=slices_to_process(:,ch_num);
+                %for slice = slices_to_process
+                %    sx=slice;
+                parfor ch_num=1:num_chunks
+                    sx=slices_to_process(:,ch_num);
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
                     sx(isnan(sx))=[];
                     if length(sx)>3

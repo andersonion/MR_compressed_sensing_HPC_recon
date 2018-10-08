@@ -76,9 +76,19 @@ if ready
     % whole fid, because those will change when the acq is done.
     % This is a near replicate of the work done in check subvolume. Would
     % be good to consolidate that, but that is for later.
-    dd_cmd =  ['( dd bs=26 status=noxfer count=1 of=' fid_tag_path ...
-        ' && dd status=noxfer bs=2 skip=1 count=0'...
-        ' && dd status=noxfer bs=74 count=1 of=' fid_tag_path ' conv=notrunc oflag=append ) < ' input_fid ];
+    lin_dd_status=' status=noxfer';
+    lin_of=[' of=' fid_tag_path];
+    lin_append=' oflag=append';
+    mac_of='';
+    if ismac
+        lin_dd_status='';
+        lin_of='';
+        lin_append='';
+        mac_of=['>> ' fid_tag_path];
+    end
+    dd_cmd =  ['( dd bs=26' lin_dd_status ' count=1' lin_of mac_of...
+        ' && dd' lin_dd_status ' bs=2 skip=1 count=0'...
+        ' && dd' lin_dd_status ' bs=74 count=1' lin_of ' conv=notrunc' lin_append ' ) < ' input_fid mac_of];
     
     if local_operation_only
         % runs dd command locally

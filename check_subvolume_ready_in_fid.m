@@ -1,6 +1,8 @@
 function [ready,bhdr]=check_subvolume_ready_in_fid(input_fid,volume_number,bbytes,scanner,user,options)
 % [ready,bhdr]=check_subvolume_ready_in_fid(input_fid,volume_number,bbytes,scanner,user,options)
 %Verify's a subvolume is ready in the remote fid. 
+warning('MULTI CODE PATH MADNESS! WHAT!');
+pause(10);
 types.standard_options={
     'test', ' Are we testing code, will read a local fid to check.'
     };

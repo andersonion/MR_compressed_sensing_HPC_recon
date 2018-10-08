@@ -483,7 +483,7 @@ end
 unrecog_cell={'planned_ok'};
 unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
 write_civm_image(databuffer,[{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
-
+options.keep_work=1;
 if ~options.keep_work && ~options.process_headfiles_only
     if exist(headfile,'file') %Is this the right condition?
         if exist(work_subfolder,'dir')

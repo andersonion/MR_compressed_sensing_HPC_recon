@@ -47,9 +47,19 @@ block_header=28; %agilent block headers are 28 bytes big.
 %     ' | head -c 1 | xxd -b - | tail -c +17 | head -c 1' ];
 % HERE's AN IDEA, JUST GET ALL THE HEADER BYTES, THEN READ THE ONE BYTE :-P
 temp_fidpath=sprintf('/tmp/%s_blk%i_%i.fhd',datestr(now,30),volume_number,ceil(rand(1)*10000));
-header_grab = ['( dd bs='  num2str(header_size) ' status=noxfer count=1 of=' temp_fidpath ...
-    ' && dd status=noxfer bs=' num2str(bbytes)  ' skip=' num2str(volume_number-1) ' count=0'...
-    ' && dd status=noxfer bs=' num2str(block_header) ' count=1 of=' temp_fidpath ' conv=notrunc oflag=append ) < ' input_fid ];
+lin_dd_status=' status=noxfer';
+lin_of=[' of=' temp_fidpath];
+lin_append=' oflag=append';
+mac_of='';
+if ismac 
+    lin_dd_status='';
+    lin_of='';
+    lin_append='';
+    mac_of=['>> ' temp_fidpath];
+end
+header_grab = ['( dd bs='  num2str(header_size)  lin_dd_status ' count=1' lin_of mac_of ...
+    ' && dd ' lin_dd_status ' bs=' num2str(bbytes)  ' skip=' num2str(volume_number-1) ' count=0'...
+    ' && dd ' lin_dd_status ' bs=' num2str(block_header) ' count=1' lin_of ' conv=notrunc' lin_append ' ) < ' input_fid mac_of];
 
 if local_operation_only 
     % runs header scrape command locally
