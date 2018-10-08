@@ -323,11 +323,13 @@ for index=1:length(slice_numbers)
             % switched out these two lines for a one liner to reduce mem overhead.
             % image_to_write = [real(res(:))' imag(res(:))'];
             % fwrite(t_id,image_to_write,'double'); %'n'
-            fwrite(t_id,[real(res(:))' imag(res(:))'],'double')
-            
+            fwrite(t_id,[real(res(:))' imag(res(:))'],'double');
             log_msg =sprintf('Slice %i: Successfully reconstructed and written to %s.\n',slice_index,temp_file);
+            if log_mode==2
+                yet_another_logger(log_msg,1,log_file);
+            else
             yet_another_logger(log_msg,log_mode,log_file);
-            
+            end
             % Write header
             %fseek(fid,(slice_index-1),-1);
             header_info = uint16(completed_iterations+iterations_performed);
