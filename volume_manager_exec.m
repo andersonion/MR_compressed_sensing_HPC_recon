@@ -448,15 +448,15 @@ else
                     slices_to_process = [slices_to_process NaN];
                     temp_size = size(slices_to_process);
                 end
+                s3jobs=cell(1,num_chunks);
                 %slices to process would be better named chunks, or slabs.
                 slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
-                for slice = slices_to_process
-                    sx=slice;
+                for ch_num=1:num_chunks
                 %parfor ch_num=1:num_chunks
-                %    sx=slices_to_process(:,ch_num);
+                    sx=slices_to_process(:,ch_num);
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
                     sx(isnan(sx))=[];
                     if length(sx)>3
@@ -485,6 +485,7 @@ else
                     if ~recon_options.live_run
                         batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
                         [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
+                        s3jobs{ch_num}=c_running_jobs;
                         if msg1
                             disp(msg1)
                         end
@@ -497,18 +498,10 @@ else
                         %slicewise_CSrecon_exec(swr_args)
                         %starting_point=4;
                     end
-                    if c_running_jobs
-                        %if stage_3_running_jobs
-                        %stage_3_running_jobs = [stage_3_running_jobs ':' c_running_jobs];
-                        %else
-                        %    stage_3_running_jobs = c_running_jobs;
-                        %end
-                    end
                 end
-                if stage_3_running_jobs
-                    if strcmp(':',stage_3_running_jobs(1))
-                        stage_3_running_jobs(1)=[];
-                    end
+                stage_3_running_jobs=strjoin(s3jobs,':');
+                if strcmp(':',stage_3_running_jobs(1))
+                    stage_3_running_jobs(1)=[];
                 end
             end
         end
