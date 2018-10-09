@@ -70,9 +70,10 @@ end  % done reading one block
 fclose(fid);
 
 if numel(data_buffer) == prod(voldims)
+    %%%% WHY WHY WHY WHY !!!!! THIS CAUSES SEPARATE CODE PATHS AND MAKES
+    %%%% THE CODE FAIL!
     data_buffer = reshape(data_buffer,voldims); %reshape into 3d array
 else
-    
     if only_non_zeros
         %img = zeros([voldims(1) ntraces],'like',data_buffer);
         %img= reshape(data_buffer,[voldims(1) ntraces]);
