@@ -453,10 +453,10 @@ else
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
-                %for slice = slices_to_process
-                %    sx=slice;
-                parfor ch_num=1:num_chunks
-                    sx=slices_to_process(:,ch_num);
+                for slice = slices_to_process
+                    sx=slice;
+                %parfor ch_num=1:num_chunks
+                %    sx=slices_to_process(:,ch_num);
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
                     sx(isnan(sx))=[];
                     if length(sx)>3
@@ -625,11 +625,14 @@ else
                 if (starting_point == 5)%(starting_point <= 6)
                     % This is only scheduled at stage 5 because prior to that it wont
                     % work anyway.
-                    %stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
-                    %% live run startingpoint advance handling
-                    if exist('ship_st','var')
-                        if ship_st==0
-                            starting_point=6;
+                    if ~recon_options.live_run
+                        stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
+                    else
+                        %% live run starting point advance handling
+                        if exist('ship_st','var')
+                            if ship_st==0
+                                starting_point=6;
+                            end
                         end
                     end
                 end
@@ -673,18 +676,20 @@ else
             % after success.
             if stage_4_running_jobs || stage_5_running_jobs || stage_5e_running_jobs
                 dep_jobs='';
+                %%% these can be combined with strjoin. 
                 if stage_5e_running_jobs
                     dep_jobs=stage_5e_running_jobs;
-                elseif stage_5_running_jobs
-                    dep_jobs=stage_5_running_jobs;
-                elseif stage_4_running_jobs
-                    dep_jobs=stage_4_running_jobs;
+                end
+                if stage_5_running_jobs
+                    dep_jobs=sprintf('%s:%s',dep_jobs,stage_5_running_jobs);
+                end
+                if stage_4_running_jobs
+                    dep_jobs=sprintf('%s:%s',dep_jobs,stage_4_running_jobs);
                 end
                 c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,'afterany');
             else
                 c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
             end
-            
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
