@@ -21,6 +21,7 @@ if ~exist(temp_file,'file')
     if ~strcmp(master_host,host)
         host_str = ['ssh ' master_host];
     end
+    %{
     fallocate_cmd = sprintf('%s fallocate -l %i %s',host_str,file_size,temp_file);
     [status,~]=system(fallocate_cmd);
     pause(2); % We seem to be having problems with dir not seeing the temp_file.
@@ -30,8 +31,9 @@ if ~exist(temp_file,'file')
     else
         m_file_size = fmeta.bytes;
     end
+    %}
     if status || (m_file_size ~= file_size)
-        fprintf(1,'AAAAAAHHHHH!!! fallocate command failed!  Using dd command instead to initialize .tmp file');
+        %fprintf(1,'AAAAAAHHHHH!!! fallocate command failed!  Using dd command instead to initialize .tmp file');
         preallocate=sprintf('dd if=/dev/zero of=%s count=1 bs=1 seek=%i',temp_file,file_size-1);
         system(preallocate);
     end
