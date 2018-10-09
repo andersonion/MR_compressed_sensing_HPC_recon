@@ -78,8 +78,12 @@ if (make_workspace)
     fid_volume_number =1;
     only_non_zeros = 1;
     max_blocks = 1;
+    % Why is there a custom load function here? Shouldnt we just use the
+    % load_fid(agilent_data_path) function?
     data = load_fidCS(volume_fid,max_blocks,ntraces/nechoes,npoints,bitdepth,fid_volume_number,original_dims,only_non_zeros,double_down);
-    %data = double(data); %This should be replaced by setting double_down to 1.
+    if ndims(data)==3
+        data=reshape(data,[size(data,1),size(data,2)*size(data,3)]);
+    end
     fid_load_time = toc(t_make_workspace);
     log_msg =sprintf('Volume %s: fid loaded successfully in %0.2f seconds.\n',volume_runno,fid_load_time);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -227,24 +231,21 @@ if (make_workspace)
     %% Save common variable file
     if ~exist(volume_workspace_file,'file')
         t_vol_save=tic;
-        
         if (options.roll_data)
             disp('Attempting to roll data via kspace...')
             Ny=original_dims(2);
             Nz=original_dims(3);
             ky_profile=(shift_modifier(2)/(Ny))*(1:1:Ny);
-            kz_profile=(shift_modifier(3)/(Nz))*(1:1:Nz);         
+            kz_profile=(shift_modifier(3)/(Nz))*(1:1:Nz);
             [Kyy,Kzz]=meshgrid(ky_profile,kz_profile);
             phase_matrix = exp(-2*pi*1i*(Kyy+Kzz));
             phase_vector=phase_matrix(original_mask(:));
-        
+            
             data=circshift(data,round(shift_modifier(1)));
             for xx=1:original_dims(1);
                 data(xx,:)=phase_vector'.*data(xx,:);
-            end  
-            
+            end
         end
-        
         real_data = real(data);
         imag_data = imag(data);
         savefast2(volume_workspace_file,'real_data','imag_data');
