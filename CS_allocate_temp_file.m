@@ -31,11 +31,14 @@ if ~exist(temp_file,'file')
     else
         m_file_size = fmeta.bytes;
     end
-    %}
     if status || (m_file_size ~= file_size)
+    %}
         %fprintf(1,'AAAAAAHHHHH!!! fallocate command failed!  Using dd command instead to initialize .tmp file');
         preallocate=sprintf('dd if=/dev/zero of=%s count=1 bs=1 seek=%i',temp_file,file_size-1);
-        system(preallocate);
+        [status,sout]=system(preallocate);
+    %end
+    if status~=0
+        error('allocate failed for tmp file with message: %s',sout);
     end
     fid=fopen(temp_file,'r+');
     fwrite(fid,header_length,'uint16');
