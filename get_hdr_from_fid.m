@@ -16,7 +16,7 @@ else
 end
 % command when run remotely (or locally, even) will pull out just one block into a fid file
 lin_dd_status=' status=noxfer';
-if ismac 
+if ismac && local_operation_only
     lin_dd_status='';
 end
 dd_cmd = ['( dd bs='  num2str(header_size) lin_dd_status ' count=1 of=' dd_dest_path ') < ' input_fid ];

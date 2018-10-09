@@ -35,7 +35,7 @@ lin_dd_status=' status=noxfer';
 lin_of=[' of=' dd_dest_path];
 lin_append=' oflag=append';
 mac_of='';
-if ismac 
+if ismac && local_operation_only 
     lin_dd_status='';
     lin_of='';
     lin_append='';
