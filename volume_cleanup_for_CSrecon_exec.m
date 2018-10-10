@@ -483,7 +483,7 @@ end
 unrecog_cell={'planned_ok'};
 unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
 write_civm_image(databuffer,[{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
-if options.live_run2
+if options.live_run
     options.keep_work=1;
 end
 if ~options.keep_work && ~options.process_headfiles_only
