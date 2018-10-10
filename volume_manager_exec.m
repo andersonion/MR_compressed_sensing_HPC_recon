@@ -9,7 +9,7 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 
 % for all execs run this little bit of code which prints start and stop time using magic.
 C___=exec_startup();
-
+ 
 %%% ORIGINAL COMMENT
 % This may seem stupid, but I need to let Matlab know that I'm going need
 % series to be a variable, and not the builtin function 'series'
@@ -667,7 +667,7 @@ else
             % when we schecdule end stage jobs, tell ourselves to run one
             % more time once they're terminated, note not after failure, or
             % after success.
-            if stage_4_running_jobs || stage_5_running_jobs || stage_5e_running_jobs
+            if ~isempty(stage_4_running_jobs) || ~isempty(stage_5_running_jobs) || ~isempty(stage_5e_running_jobs)
                 dep_jobs='';
                 %%% these can be combined with strjoin. 
                 if stage_5e_running_jobs
