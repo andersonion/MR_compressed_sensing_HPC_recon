@@ -679,9 +679,12 @@ else
                 if stage_4_running_jobs
                     dep_jobs=sprintf('%s:%s',dep_jobs,stage_4_running_jobs);
                 end
+                if strcmp(dep_jobs(1),':')
+                    dep_jobs(1)=[];
+                end
                 c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,'afterany');
             else
-                c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
+                c_running_jobs = dispatch_slurm_jobs(batch_file,'','singleton');
             end
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
