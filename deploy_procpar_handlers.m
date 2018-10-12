@@ -85,7 +85,7 @@ if ~exist(procpar_file,'file') ...
         && ( local_or_streaming_or_static ~= 2 ) % && ( (volume_number == n_volumes) || local_or_streaming_or_static ~= 2 )
     mode =2; % Only pull procpar file
     datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
-    puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
+    puller_glusterspaceCS_2(runno,datapath,scanner,study_workdir,mode);
 end
 
 %% set up procpar gatekeeper
