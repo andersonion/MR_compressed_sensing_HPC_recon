@@ -5,7 +5,7 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
- 
+
 
 % for all execs run this little bit of code which prints start and stop time using magic.
 C___=exec_startup();
@@ -196,6 +196,7 @@ if ~exist(local_archive_tag,'file')
 end
 
 if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
+    %% starting point 0/1
     % FID not ready yet, schedule gatekeeper for us.
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
