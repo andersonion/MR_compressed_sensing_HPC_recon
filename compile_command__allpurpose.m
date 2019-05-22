@@ -1,9 +1,10 @@
 %compile me
 function compile_dir=compile_command__allpurpose(source_filename,include_files,exec_env_var)
+j_opts_path='/cm/shared/workstation_code_dev/shared/pipeline_utilities/java.opts';
 %% input handle
-[~,source_name]=fileparts(source_filename);
-[~,tok]=regexpi(source_filename,'(.*)(_exec).m', 'match', 'tokens');
-[~,tok2]=regexpi(source_filename,'(.*).m', 'match', 'tokens');
+[source_dir,source_name]=fileparts(source_filename);
+[~,tok]=regexpi(source_name,'(.*)(_exec.*)(.m)?', 'match', 'tokens');
+[~,tok2]=regexpi(source_name,'(.*)(.m)?', 'match', 'tokens');
 if ~isempty(tok)
     script_name=tok{1}{1};
 elseif ~isempty(tok2)
@@ -11,10 +12,30 @@ elseif ~isempty(tok2)
 else
     error('Please give complete mfilename');
 end
-source_dir='/cm/shared/workstation_code_dev/recon/CS_v2/';
-source_file = fullfile(source_dir ,source_filename);
+if strcmp(source_dir,'')
+    source_dir='/cm/shared/workstation_code_dev/recon/CS_v2/';
+end
+source_file = [fullfile(source_dir ,source_name) '.m'];
+
+include_java = 0;
 
 include_string='';
+required_files=matlab.codetools.requiredFilesAndProducts(source_file);
+
+include_files=[include_files required_files];
+for ff=1:numel(include_files)
+    [s,out]=system(['grep GzipRead ' include_files{ff}]);
+    if ~s && ~strcmp(out,'')
+        include_java =1 ;
+        break
+    end
+end
+
+if include_java
+    include_files=[include_files {'/cm/shared/workstation_code_dev/shared/civm_matlab_common_utils/GzipRead.java'...
+        '/cm/shared/workstation_code_dev/shared/civm_matlab_common_utils/GzipRead.class'}];
+end
+
 if exist('include_files','var') && ~isempty(include_files)
     include_string=sprintf(' -a %s',strjoin(include_files,' -a '));
 else
@@ -40,7 +61,7 @@ latest_path_link = fullfile(this_exec_base_dir,'latest');
 % this is neat, EXCEPT it doesnt account for dependent files!!!!!!!!!!!
 % matlab has auto-dependecny finding, should use that to get list of
 % dependney funcitons so we can do a true exec diff.
-[diff_stat,out]=system(sprintf('f1=%s;f2=%s;ls -l $f1 $f2;diff -qs $f1 $f2',source_file,fullfile(latest_path_link,source_filename)));
+[diff_stat,out]=system(sprintf('f1=%s;f2=%s;ls -l $f1 $f2;diff -qs $f1 $f2',source_file,[fullfile(latest_path_link,source_name) '.m']));
 if ~diff_stat
     disp(sprintf('skipping %s',source_filename));
     compile_dir='NOT COMPILED DUE TO MAIN FILE IS THE SAME';
@@ -48,6 +69,7 @@ if ~diff_stat
 else
     disp(out);
 end
+
 %% prep dir
 compile_dir = fullfile(this_exec_base_dir,compile_time);
 system(['mkdir -pm 775 ' compile_dir]);
@@ -59,14 +81,21 @@ eval(['mcc -N -d  ' compile_dir...
    ' -R nodisplay -R nosplash -R nojvm '...
    ' ' include_string ' '...
    ' ' source_file ';']) 
-%% copy files in so we can do diff check easily(eg check if we need to compile).
-cp_cmd = sprintf('cp -p %s %s %s',source_file,strjoin(include_files,' '),compile_dir);
-system(cp_cmd);
+
+
 %% unpack mcr
 [~,n,~]=fileparts(source_filename);
-first_run_cmd = fullfile(compile_dir ,['/run_' n '.sh ' ]);
-first_run_cmd = [first_run_cmd matlab_path];
+shell_script= fullfile(compile_dir ,['/run_' n '.sh ' ]);
+first_run_cmd = [shell_script matlab_path];
 system(first_run_cmd);
+
+if include_java
+    include_files=[include_files j_opts_path];
+end
+%% copy files in so we can do diff check easily(eg check if we need to compile).
+    cp_cmd = sprintf('cp -p %s %s %s',source_file,strjoin(include_files,' '),compile_dir);
+system(cp_cmd);
+
 %% fix permissions
 permission_fix_cmds = { ...
     sprintf('find %s -type f -exec chmod a+r {} \\; ',compile_dir)
@@ -79,6 +108,26 @@ permission_fix_cmds = { ...
 if s
     disp(r);
 end
+
+
+%% Edit run_*.sh script to put java.opts in right place at runtime (optional)
+if include_java   
+    cp_string='cp -n \${exe_dir}/java.opts \.';
+    rm_string='if [[ -e ./java.opts ]]; then rm ./java_opts ; fi';
+    j_cmd=['perl -pi -e ''s:^(\s*)(eval.*$):${1}' cp_string '\n${1}${2}\n${1}' rm_string '\n:'' ' shell_script ]; 
+    system(j_cmd);
+end
+
+%% Give a proper return code
+
+ret_code='ret_code=\$?';
+rc_cmd=['perl -pi -e ''s/(\s*)(eval.*$)/$1$2\n$1' ret_code '\n/'' ' shell_script ];
+system(rc_cmd);
+
+rc2_cmd=['perl -pi -e ''s/^exit/exit \${ret_code}\n/'' ' shell_script ];
+system(rc2_cmd);
+
+
 %% link to latest
 if exist(latest_path_link,'dir')
     rm_ln_cmd = sprintf('unlink %s',latest_path_link);
