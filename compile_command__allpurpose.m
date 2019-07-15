@@ -21,8 +21,8 @@ include_java = 0;
 
 include_string='';
 required_files=matlab.codetools.requiredFilesAndProducts(source_file);
-
-include_files=[include_files required_files];
+include_files=reshape(include_files,[1,numel(include_files)]);
+include_files=unique([include_files required_files]);
 for ff=1:numel(include_files)
     [s,out]=system(['grep GzipRead ' include_files{ff}]);
     if ~s && ~strcmp(out,'')
