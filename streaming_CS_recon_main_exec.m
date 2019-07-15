@@ -1,6 +1,6 @@
 function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, varargin )
 %  Initially created on 14 September 2017, BJ Anderson, CIVM
-%% SUMMARY
+% SUMMARY
 %  Main code for compressed sensing reconstruction on a computing cluster
 %  running SLURM Version 2.5.7, with data originating from Agilent MRI scanners
 %  running VnmrJ Version 4.0_A.
@@ -195,8 +195,14 @@ if ~options.iteration_strategy
     end
     options.iteration_strategy=sprintf('%ix%i',options.Itnlim/(options.re_init_count+1),options.re_init_count+1);
 else
-    if options.keep_work
-        error('keep_work and iteration_strategy are not tested together');
+    if options.keep_work 
+        msg='keep_work and iteration_strategy are not tested together';
+        if options.debug_mode>=50
+            warning(msg);
+            pause(5);
+	else
+	    error(msg); 
+        end
     end
     options.iteration_strategy=strsplit(options.iteration_strategy,'x');
     ic=str2double(options.iteration_strategy(1));
