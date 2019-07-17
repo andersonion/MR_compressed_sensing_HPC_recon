@@ -1,11 +1,11 @@
 function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable_file,output_size,size_type)
-# function status=VOLUME_CLEANUP_FOR_CSRECON_EXEC(volume_variable_file,output_size,size_type)
-# Volume_cleanup for csrecon, reduces cs recon tmp files to final outputs through write_civm_image.
-# All relevant parameters are burried inside the volume_variable file(take care!)
-# output_size is optional and allows you to specify an alternate size to save the data to.
-#   WARNING: this code DOES NOT update important output variables!
-#   ( this code is rather sloppy in a general sense and could use some extensive cleaning. )
-# size_type is unimplemented! it is aplace holder to change the type of downsizeing from voxelsize to zoom.
+% function status=VOLUME_CLEANUP_FOR_CSRECON_EXEC(volume_variable_file,output_size,size_type)
+% Volume_cleanup for csrecon, reduces cs recon tmp files to final outputs through write_civm_image.
+% All relevant parameters are burried inside the volume_variable file(take care!)
+% output_size is optional and allows you to specify an alternate size to save the data to.
+%   WARNING: this code DOES NOT update important output variables!
+%   ( this code is rather sloppy in a general sense and could use some extensive cleaning. )
+% size_type is unimplemented! it is aplace holder to change the type of downsizeing from voxelsize to zoom.
 %  This an updated version of implied version 1, but with the second version of architecture
 %   Expected changes include: complex single-precision data stored in the
 %   tmp file instead of double-precision magnitude images.
@@ -23,7 +23,7 @@ if ~isdeployed
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
     addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
     if (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
-      warning("using canned parameters because youdidnt specify any!");
+      warning('using canned parameters because youdidnt specify any!');
       pause(3);
     volume_variable_file = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
     %volume_scale = 1.4493;
