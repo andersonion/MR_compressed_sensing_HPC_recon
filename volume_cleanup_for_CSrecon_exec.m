@@ -1,9 +1,16 @@
-function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable_file)
-%%  This an updated version of implied version 1, but with the second version of architecture
+function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable_file,output_size,size_type)
+# function status=VOLUME_CLEANUP_FOR_CSRECON_EXEC(volume_variable_file,output_size,size_type)
+# Volume_cleanup for csrecon, reduces cs recon tmp files to final outputs through write_civm_image.
+# All relevant parameters are burried inside the volume_variable file(take care!)
+# output_size is optional and allows you to specify an alternate size to save the data to.
+#   WARNING: this code DOES NOT update important output variables!
+#   ( this code is rather sloppy in a general sense and could use some extensive cleaning. )
+# size_type is unimplemented! it is aplace holder to change the type of downsizeing from voxelsize to zoom.
+%  This an updated version of implied version 1, but with the second version of architecture
 %   Expected changes include: complex single-precision data stored in the
 %   tmp file instead of double-precision magnitude images.
 %   Decentralized scaling is now handled here instead of during setup
-%a
+%
 % 16 May 2017, BJA: qsm_fermi_filter option is added (default 0) in case we
 % do need the complex data written out a la QSM processing, and decide that
 % we do want the fermi_filtered data instead of the unfiltered data. It is
@@ -16,6 +23,8 @@ if ~isdeployed
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
     addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
     if (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
+      warning("using canned parameters because youdidnt specify any!");
+      pause(3);
     volume_variable_file = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
     %volume_scale = 1.4493;
     %variable_iterations=1;
@@ -41,28 +50,22 @@ load(volume_variable_file);
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
 
-%%
-% James says: have to regenerate volume number because it is not kept, we're using the
-% runno as a proxy. This is more brittle than I'd like however it should be
-% decent.
-%
-% BJ says: I'm updating volume_manager to write the volume_number to the
-% variables file so we will have it on hand...going forward.
-
+%% resolve volume_number
 if ~exist('volume_number','var')
-%vnt, volume number text
-vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
-if isempty(vt)
+  % In the past volume_manager didnt record the volume number to our settings file.
+  % So we'd have to regenerate it using the runno as a proxy. 
+  % That has since been fixed, this code is left behind as exceptional precaution.
+  warning('volume_number missing, using the guess code');
+  %vnt, volume number text
+  vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
+  if isempty(vt)
     warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
     vt={'0'};
+  end
+  volume_number=1+str2double(vt{:});
 end
-volume_number=1+str2double(vt{:});
-end
 
-
-
-
-%% foggy loggy doggy 
+%% log details
 if ~exist('log_mode','var')
     log_mode = 1;
 end
@@ -80,7 +83,7 @@ else
     log_mode = 3;
 end
 
-%%
+%% 
 if ~exist('continue_recon_enabled','var')
     continue_recon_enabled=1;
 end
@@ -90,34 +93,32 @@ end
 %% get scaling file or show error
 scale_file_error =1;
 if exist('scale_file','var')
-    if (volume_number == 1)
+  if (volume_number == 1)
+    scale_file_error = 0;
+  else
+    num_checks = 30;
+    for tt = 1:num_checks
+      %disp(['tt = ' num2str(tt)])
+      if exist(scale_file,'file')
         scale_file_error = 0;
-    else
-        num_checks = 30;
-        for tt = 1:num_checks
-            %disp(['tt = ' num2str(tt)])
-            if exist(scale_file,'file')
-              scale_file_error = 0;
-             break;
-            else
-                pause(10)
-            end
-        end 
-    end
+        break;
+      else
+        pause(10)
+      end
+    end 
+  end
 end
-
-    if (~scale_file_error) && exist(scale_file,'file')
-        fid_sc = fopen(scale_file,'r');
-        scaling = fread(fid_sc,inf,'*float');
-        fclose(fid_sc);
-    elseif (volume_number > 1)
-        error_flag = 1;
-        log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',volume_runno,scale_file);
-        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-        status=variable_to_force_an_error;
-    	quit force
-    end
-
+if (~scale_file_error) && exist(scale_file,'file')
+  fid_sc = fopen(scale_file,'r');
+  scaling = fread(fid_sc,inf,'*float');
+  fclose(fid_sc);
+elseif (volume_number > 1)
+  error_flag = 1;
+  log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',volume_runno,scale_file);
+  yet_another_logger(log_msg,log_mode,log_file,error_flag);
+  status=variable_to_force_an_error;
+  quit force
+end
 
 %% get options into base workspace.
 if ~exist('recon_dims','var')
@@ -144,7 +145,6 @@ end
 if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
-
 
 %%
 if continue_recon_enabled % This should be made default.
@@ -231,6 +231,7 @@ BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noi
     lil_dummy = zeros([1,1],'double');
     lil_dummy = complex(lil_dummy,lil_dummy);
     data_out=zeros(original_dims,'like',lil_dummy);
+    
     bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
     % Slice quantiles are not exactly the right answer, so that whole idea
     % has been scrapped in favor of the old (silly?) sorted array pct, and
@@ -247,6 +248,7 @@ BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noi
     volume_hist=histcounts(0,hist_bins); % Initialize an (almost) empty histogram
     volume_hist(1)=0;
     
+    % do the full set of slices 
     for ss=1:recon_dims(1)
         if ~mod(ss,10)
             log_msg = sprintf('Processing slice %i...\n',ss);
@@ -272,6 +274,8 @@ BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noi
         end    
         %% Crop out extra k-space if non-square or non-power of 2, 
         % might as well apply fermi filter in k-space, if requested (no QSM requested either)
+        % we could mess with output_size and size_type here except that it wouldnt account for dim 1.
+	% so instead we defer to until the 3d complex image when we would fermi-filter.
         if sum(original_dims == recon_dims) ~= 3
             t_data_out = fftshift(fftn(fftshift(t_data_out)));
             final_slice_out = t_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
@@ -335,7 +339,7 @@ fclose(fid);
 if write_qsm
     qsm_folder = [workdir '/qsm/'];
     if ~exist(qsm_folder,'dir')
-        system(['mkdir -m 777 ' qsm_folder]);
+        system(['mkdir ' qsm_folder]);
     end
     qsm_file = [qsm_folder volume_runno '_raw_qsm.mat'];
 end
@@ -360,21 +364,30 @@ if ~qsm_fermi_filter
     end
 end
 
-%% Apply Fermi Filter
-if fermi_filter
-    
+%% Apply Fermi Filter, and/ or reduce sample
+if fermi_filter|| exist('output_size','var')
     log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
     yet_another_logger(log_msg,log_mode,log_file);
     
     data_out = fftshift(fftn(fftshift(data_out)));
-    if exist('w1','var')
-        data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
-    else
-        data_out= fermi_filter_isodim2_memfix(data_out);
+    if exist('output_size','var')
+        if prod(output_size)>numel(data_out)
+            db_inplace(mfilename,'Upsample not understood at the time of writing this and is unimplimented');
+        end
+        % there is probably a cleaner way to do this indexing operation.
+        idx_s=round(0.5*size(data_out)-0.5*output_size)+1;
+        idx_e=round(0.5*size(data_out)+0.5*output_size);
+        data_out=data_out(idx_s(1):idx_e(1),idx_s(2):idx_e(2),idx_s(3):idx_e(3));
+    end
+    if fermi_filter
+        if exist('w1','var')
+            data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
+        else
+            data_out= fermi_filter_isodim2_memfix(data_out);
+        end
     end
     data_out =fftshift(ifftn(fftshift(data_out)));
 end
-%data_out = abs(data_out);
 if ~isdeployed && strcmp(getenv('USER'),'rja20')
     figure(12)
     %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
@@ -404,6 +417,7 @@ if qsm_fermi_filter
         end
     end
 end
+%data_out = abs(data_out);
 mag_data = abs(data_out);
 clear data_out;
 %{
@@ -421,6 +435,9 @@ write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(
         mag_data,'raw',0,1)
 %}
 %% Post 17 May 2018 code:
+% while we take stats of our iterations, these are not currently variable
+% and may not be the information we're after.
+% line search iterations of the minimization are variable, and we dont report those out of the fnl code.
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_mean = mean(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_min = min(tmp_header(:));
