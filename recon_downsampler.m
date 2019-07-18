@@ -66,9 +66,24 @@ for idx_vd=1:numel(vol_dirs)
         out_mat.databuffer=db;
         % have to adjust databuffer not the plain vars.
         % adjust output paths and vars
+        out_mat.runno=rx_out{rn};
         out_mat.images_dir=strrep(out_mat.images_dir,cs_runno,rx_out{rn});
         out_mat.log_file=strrep(out_mat.log_file,cs_runno,rx_out{rn});
-        out_mat.scale_file=strrep(out_mat.scale_file,cs_runno,rx_out{rn});
+        % OLD scale file format is RUNNO_4D_scaling_factor.float.
+        % we need to create it with a content of 1 to prevent problems.
+        out_mat.scale_file=strrep(input_mat.scale_file,cs_runno,rx_out{rn});
+        % new scalefile will be .RUNNO_civm_raw_scale.float
+        % we cant just use the new scale file because the volume-cleanup code would apply that twice *sigh*.
+        %[sp,sn,se]=fileparts(out_mat.scale_file);
+        %out_mat.scale_file=fullfile(sp,sprintf('.%s_civm_raw_scale.float',rx_out{rn}));
+        if ~exist(out_mat.scale_file,'file')
+          fid_sc = fopen(out_mat.scale_file,'w');
+          % scale write count
+          sc_wc = fwrite(fid_sc,1,'float');
+          fclose(fid_sc);
+        end
+
+        
         out_mat.volume_log_file=strrep(out_mat.volume_log_file,cs_runno,rx_out{rn});
         out_mat.volume_runno=db.headfile.U_runno;
         % run volume_cleanup with new outputsize
@@ -78,9 +93,9 @@ for idx_vd=1:numel(vol_dirs)
         end
         cleanup_errors=volume_cleanup_for_CSrecon_exec(out_setup,out_dims)
         % if status good 
-	% note, cleanup doesnt actually do error handling at the time of this writing :(
-	if ~cleanup_errors
-	  system(sprintf('echo %ix > %s/%s',div,vol_dir_out,'.ds_complete'))
-	end
+        % note, cleanup doesnt actually do error handling at the time of this writing :(
+        if ~cleanup_errors
+          system(sprintf('echo %ix > %s/%s',div,vol_dir_out,'.ds_complete'))
+        end
     end
 end
