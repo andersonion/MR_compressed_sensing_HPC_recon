@@ -648,7 +648,12 @@ else
     % terminated eg, dependency=afterany. SO, we should update this code to
     % build a running list of jobs to be scheduled behind. `
     %if stage_4_running_jobs
-    if starting_point < 6
+    % when we keep work, we never finish stage 5 because we never send
+    % data.
+    % That seems okay, so lets watch for that, and not re_schedule volume
+    % manager when keep_work is on and stage is 5+
+    if ( ~recon_options.keep_work && starting_point < 6 ) ...
+            || ( recon_options.keep_work &&  starting_point < 5 )
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
