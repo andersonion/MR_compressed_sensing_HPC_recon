@@ -6,7 +6,7 @@ addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/simulation']);
 addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/threshold']);
 addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/utils']);
 addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/testing_and_prototyping']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/CS_utilities']);
+addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/utility']);
 % common_utils had to be added for cs_recon main
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils']);
 % had to add fermi filter dir to get cleanup to work
