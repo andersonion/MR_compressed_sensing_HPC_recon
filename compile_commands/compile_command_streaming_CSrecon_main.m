@@ -9,9 +9,10 @@ include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m
     '/cm/shared/workstation_code_dev/recon/CS_v2/zpad.m'
     '/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/get_reservation.m'
     };%optional, but required if using exec_env_var, can be empty.
-compile_dir=compile_command__allpurpose('streaming_CS_recon_main_exec.m',include_files);%,exec_env_var);
+function_name='streaming_CS_recon_main_exec.m';
+compile_dir=compile_command__allpurpose(which(function_name),include_files);%,exec_env_var);
 
-code_dir=fileparts(mfilename('fullpath'));
+code_dir=fileparts(mfilename(which(function_name)));
 original_builtin_script = 'run_streaming_CS_recon_main_exec_builtin_path.sh';
 original_builtin_path=fullfile(code_dir,original_builtin_script);
 
