@@ -1,16 +1,17 @@
 % Paths to add to cs_recon execs prior to compiling. 
-addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/simulation']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/threshold']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/sparseMRI_v0.2/utils']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/testing_and_prototyping']);
-addpath([getenv('WORKSTATION_HOME') '/recon/CS_v2/utility']);
+[pdir]=fileparts(pwd);
+addpath(fullfile(pdir,''));
+addpath(fullfile(pdir,'sparseMRI_v0.2'));
+addpath(fullfile(pdir,'sparseMRI_v0.2/simulation'));
+addpath(fullfile(pdir,'sparseMRI_v0.2/threshold'));
+addpath(fullfile(pdir,'sparseMRI_v0.2/utils'));
+addpath(fullfile(pdir,'testing_and_prototyping'));
+addpath(fullfile(pdir,'utility'));
 % common_utils had to be added for cs_recon main
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils']);
 % had to add fermi filter dir to get cleanup to work
 addpath([getenv('WORKSTATION_HOME') '/recon/mat_recon_pipe/filter/fermi/']);
+addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);
 % on finding dirrec was required, added remainder of shared/mathworks
 % pieces.
 addpath([getenv('WORKSTATION_HOME') '/shared/mathworks/align_figure/']);
