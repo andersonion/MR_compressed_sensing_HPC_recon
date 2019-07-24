@@ -4,11 +4,14 @@
 if [ -z "$CS_CODE_DEV" ]; then
     declare -x CS_CODE_DEV=stable;
 fi;
-exec_path="$WORKSTATION_HOME/matlab_execs/streaming_CS_recon_main_executable/$CS_CODE_DEV/run_streaming_CS_recon_main_exec_builtin_path.sh";
+if [ -z "$MATLAB_EXEC_PATH" ]; then
+    declare -x MATLAB_EXEC_PATH=$WORKSTATION_HOME/matlab_execs;
+fi;
+exec_path="$MATLAB_EXEC_PATH/streaming_CS_recon_main_executable/$CS_CODE_DEV/run_streaming_CS_recon_main_exec_builtin_path.sh";
 if [ ! -f $exec_path ]; then 
 echo "ERROR: Missing $CS_CODE_DEV exec!($exec_path)";
 echo "Available exec versions...";
-ls -tr $WORKSTATION_HOME/matlab_execs/streaming_CS_recon_main_executable/
+ls -tr $MATLAB_EXEC_PATH/streaming_CS_recon_main_executable/
 exit;
 fi;
 # added chunk size force to try to make cs_recon easier on the slurm scheduler. 
