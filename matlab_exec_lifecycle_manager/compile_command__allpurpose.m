@@ -115,10 +115,26 @@ latest_path_link = fullfile(this_exec_base_dir,'latest');
 prev_source_file=fullfile(latest_path_link,[source_name '.m']);
 [diff_stat,out]=system(sprintf('f1=%s;f2=%s;ls -l $f1 $f2;diff -qs $f1 $f2',...
     source_file,prev_source_file ));
-% skip a full diff by checking if the main script file is the newest.
-[ls_stat,time_check]=system(sprintf('ls -tr %s %s',source_file,strjoin(include_files,' ')));
-time_check=strsplit(strtrim(time_check));
-if ~diff_stat && ( ~ls_stat && strcmp(time_check{end},source_file) )
+include_diff=0;
+if exist('simple_time_check','var')
+    % skip a full diff by checking if the main script file is the newest.
+    % nice idea, except we'd never reset our output, so if the includes
+    % were ever newer, they'd stay newer : ( 
+    [ls_stat,time_check]=system(sprintf('ls -tr %s %s',source_file,strjoin(include_files,' ')));
+    time_check=strsplit(strtrim(time_check));
+    if ~ls_stat && ~strcmp(time_check{end},source_file)
+        include_diff=1;
+    end
+else
+    incl_out=cell(size(include_files));
+    for ff=1:numel(include_files)
+        [~,in,ie]=fileparts(include_files{ff});
+        prev_include_file=fullfile(latest_path_link,[in ie]);
+        [s,incl_out{ff}]=system(sprintf('diff -qr %s %s',include_files{ff},prev_include_file));
+        include_diff=include_diff+s;
+    end
+end
+if ~diff_stat && ~include_diff
     % if main is not different and it is the newest file.
     disp(sprintf('skipping %s',source_filename));
     compile_dir='NOT COMPILED DUE TO MAIN FILE IS THE SAME';
