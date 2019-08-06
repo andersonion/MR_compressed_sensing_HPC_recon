@@ -212,7 +212,7 @@ end
 %% Edit run_*.sh script to put java.opts in right place at runtime (optional)
 if include_java   
     cp_string='cp -n \${exe_dir}/java.opts \.';
-    rm_string='if [[ -e ./java.opts ]]; then rm ./java_opts ; fi';
+    rm_string='if [[ -e ./java.opts ]]; then rm ./java.opts ; fi';
     j_cmd=['perl -pi -e ''s:^(\s*)(eval.*$):${1}' cp_string '\n${1}${2}\n${1}' ...
         rm_string '\n:'' ' shell_script ];
     system(j_cmd);
