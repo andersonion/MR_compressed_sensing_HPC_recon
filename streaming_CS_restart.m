@@ -30,9 +30,24 @@ cmd=sprintf('streaming_CS_recon %s %s %s %s %s',...
     mfo.CS_table,    sprintf('%ix%x',mf.Itnlim/ic,ic),    mf.xfmWeight(1,1), mf.TVWeight(1,1), ...
     sprintf('target_machine=%s %s',mf.target_machine,opt_text) )... 
     );
-
+%% hack in special live_run support
+live_run=0;
+if ~isempty(regexpi(opt_text,'live_run'))
+    % set "real name" and open paren
+    cmd=strrep(cmd,'streaming_CS_recon ','streaming_CS_recon_main_exec(''');
+    % convert all args to explicit strings ([[:space:]] -> ',')
+    cmd=strrep(cmd,' ',''',''');  
+    % add close paren
+    cmd=sprintf('%s'');',cmd); 
+    live_run=1;
+end
 disp(cmd);
 fprintf('\n\nWill run above command in 4 seconds press ctrl+c to abort\n');
 pause(4)
 %% run cmd
-system(cmd);
+if live_run
+    db_inplace(mfilename,'LIVERUN DEBUGGING, start now')
+    eval(cmd);
+else
+    system(cmd);
+end
