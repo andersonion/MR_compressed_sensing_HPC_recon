@@ -118,12 +118,18 @@ end
 % Open CS table and format into a bit mask (aka skiptable).
 table_target =strtrim(table_target);
 fid=fopen(table_target);
+% potentially could use *char=>logical or uint.
 s=fread(fid,inf,'*char');
 fclose(fid);
 
 
 s = reshape(s',[length(s(:)) 1]); % BJA - Not always dependent on array size.
 s = str2num(s); % Note str2doulbe will NOT work.
+while numel(s)<dim2*dim3
+    warning('TABLE UNDERSIZED! Adding 0''s to fill it out!');
+    s(end+1)=0;
+end
+
 s=s(1:dim2*dim3); % BJA - Trims off any zero padding
 
 skiptable = logical(reshape(s,[dim2 dim3]));
