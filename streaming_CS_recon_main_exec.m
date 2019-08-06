@@ -580,10 +580,15 @@ if ~exist(study_flag,'file')
             if ~isempty(running_jobs)
                 or_dependency='afterok-or';
             end
-            fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
-            fs_cmd = sprintf('%s %s %s %s', fid_splitter_path,matlab_path, local_fid,recon_file);
-            batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
-            fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
+            fs_args= sprintf('%s %s', local_fid,recon_file);
+            fs_cmd = sprintf('%s %s %s', fid_splitter_path,matlab_path,fs_args);
+            if ~options.live_run
+                fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
+                batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
+                fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
+            else
+                eval(sprintf('fid_splitter_exec %s',fs_args));
+            end
         end % End of single volume and MGRE preprocessing.
         % Setup individual volumes to be reconned, with the assumption that
         % its own .fid file exists
@@ -613,7 +618,9 @@ if ~exist(study_flag,'file')
                 mkdir_s(2)=system(['mkdir -m 775 ' vol_sbatch_dir]);
                 mkdir_s(3)=system(['mkdir -m 775 ' work_subfolder]);
                 mkdir_s(4)=system(['mkdir -m 775 ' images_dir]);
-                if(sum(mkdir_s)>0)
+                % becuase mgre fid splitter makes directories, we dont do this
+                % check for mgre
+                if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
                     log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ',volume_runno,volume_dir);
                     yet_another_logger(log_msg,log_mode,log_file,1);
                     quit force
