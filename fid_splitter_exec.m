@@ -35,19 +35,21 @@ if sum(work_to_do) > 0
     catch ME
         disp(ME)
     end
-       
-    hdr_60byte = fread(fid,30,'int16'); % header
-        if strcmp(bitdepth,'int16');
-       %data= fread(fid,npoints*ntraces, 'int16');% full_fid
-       bytes_per_point = 2;
+    
+    if strcmp(bitdepth,'int16');
+        %data= fread(fid,npoints*ntraces, 'int16');% full_fid
+        bytes_per_point = 2;
     else
-       %data = fread(fid,npoints*ntraces,'int32') ; % full_fid
-       bytes_per_point = 4;
+        %data = fread(fid,npoints*ntraces,'int32') ; % full_fid
+        bytes_per_point = 4;
     end
-  
     
+    % read full file trying to be 100% data agnostic because all we want to
+    % do is transcribe the bytes from the input file into the output.
+    % Suspect the trouble here is data blocks are not updated in size when
+    % it comes time to read them... 
+    hdr_60byte = fread(fid,30,'int16');
     data= fread(fid,bytes_per_point*npoints*ntraces, '*uint8');
-    
     fclose(fid);
     
     %data = reshape(data,[npoints nechoes ntraces/nechoes]);
