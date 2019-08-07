@@ -1,0 +1,3 @@
+[submodule "matlab_exec_lifecycle_manager"]
+	path = matlab_exec_lifecycle_manager
+	url = git@github.com:jamesjcook/matlab_exec_lifecycle_manager.git
