@@ -3,13 +3,13 @@
 % of a brain image.
 
 
-% addpath(strcat(pwd,'/utils'));
+addpath(strcat(pwd,'/utils'));
 
 if exist('FWT2_PO') <2
 	error('must have Wavelab installed and in the path');
 end
 
-load('/home/rmd22/Documents/MATLAB/MATLAB_scripts_rmd/CS/sparseMRI_v0.2/brain512.mat');
+load brain512
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
