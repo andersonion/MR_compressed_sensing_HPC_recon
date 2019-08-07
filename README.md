@@ -10,3 +10,22 @@ Relies on sparse MRI v0.2 supporting code from https://people.eecs.berkeley.edu/
 
 Which relies on parts of Wavelab850 from http://www-stat.stanford.edu/~wavelab
 ( http://www-stat.stanford.edu/~wavelab/Wavelab_850/WAVELAB850.ZIP )
+
+TODO: 
+--clean up functions--
+streaming_CS_recon_main_exec::process_CS_mask
+extract_info_from_CStable
+skipint2skiptable
+write_or_compare_fid_tag
+
+
+--eliminate functions--
+specid_to_recon_file - spazzy spam kinda function obfuscating everything
+readprocparCS - redundant with readprocpar
+puller_glusterspaceCS_2 - all around bad
+load_fid_hdr_details  - load_blk_hdr does nearly the same work as should be merged
+
+--Break the mat file var loading obfuscation--
+At a minimum switch to matfile object usage, ideally stop making everything double extra redundant.
+
+--remove redundant abused data structures from matfiles--

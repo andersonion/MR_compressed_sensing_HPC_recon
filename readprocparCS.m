@@ -6,6 +6,10 @@
 %    purpose: reads procpar into matlab variable
 %      usage: procpar = readprocpar;
 %
+%%%
+%%% REDUNDANT FUNCTION COPIED FROM THE NORMAL AGILENT BITS MERGE THEM AND
+%%% REMOVE THIS.
+%%%
 function procpar = readprocparCS(procdir,verbose)
 
 

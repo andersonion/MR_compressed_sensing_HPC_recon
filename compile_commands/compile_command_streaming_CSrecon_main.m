@@ -4,14 +4,15 @@ function compile_command_streaming_CSrecon_main
 %{
 include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m'     
     '/cm/shared/workstation_code_dev/recon/CS_v2/puller_glusterspaceCS_2.m' 
-    '/cm/shared/apps/MATLAB/R2015b/toolbox/signal/signal/hamming.m' 
-    '/cm/shared/apps/MATLAB/R2015b/toolbox/images/images/padarray.m'
     '/cm/shared/workstation_code_dev/recon/CS_v2/extract_info_from_CStable.m'
     '/cm/shared/workstation_code_dev/recon/CS_v2/zpad.m'
     '/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/get_reservation.m'
     };%optional, but required if using exec_env_var, can be empty.
 %}
-include_files={};
+include_files={
+    '/cm/shared/apps/MATLAB/R2015b/toolbox/signal/signal/hamming.m' 
+    '/cm/shared/apps/MATLAB/R2015b/toolbox/images/images/padarray.m'
+    };
 function_name='streaming_CS_recon_main_exec.m';
 compile_dir=compile_command__allpurpose(which(function_name),include_files);%,exec_env_var);
 

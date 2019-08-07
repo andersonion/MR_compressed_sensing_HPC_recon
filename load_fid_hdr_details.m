@@ -1,4 +1,5 @@
-function [npoints,nblocks,ntraces,bitdepth,bytes_per_block,complete_file_size,b_status] = load_fid_hdr_details(fidpath)
+function [npoints,nblocks,ntraces,bitdepth,bytes_per_block,complete_file_size,b_status] ...
+    = load_fid_hdr_details(fidpath)
 % Useful Ref:
 % https://www.agilent.com/cs/library/usermanuals/Public/0199937900a.pdf
 % page 275
