@@ -237,5 +237,5 @@ if s
     disp(r);
 else
     % add a "success" flag so we can better clean up failures.
-    system(spintf('touch %s/compile_success',latest_path_link));
+    system(sprintf('touch %s/compile_success',latest_path_link));
 end
