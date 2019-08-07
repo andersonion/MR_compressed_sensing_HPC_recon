@@ -147,7 +147,7 @@ if ~isempty(str2num(jobid)) % On successful schedule, schedule a backup job.
     if exist(batch_file,'file')
         %% Rename batch files
         if  ~isempty(str2num(jobid))
-            rename_sbatch_cmd = ['cp ' batch_file ' ' default_dir jobid '_' batch_file_name]; % changed 'mv' to 'cp'
+            rename_sbatch_cmd = ['cp -p ' batch_file ' ' default_dir jobid '_' batch_file_name]; % changed 'mv' to 'cp'
             system(rename_sbatch_cmd);
             msg1='';
         end

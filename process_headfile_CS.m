@@ -7,7 +7,7 @@ if exist('procpar_path','var')
     procpar_for_archive = [voldir '/' pp_name pp_ext];
 
     if ~exist(procpar_for_archive,'file')
-        cp_cmd = ['cp ' procpar_path ' ' voldir '/'];
+        cp_cmd = ['cp -p ' procpar_path ' ' voldir '/'];
         system(cp_cmd);
      end
 end

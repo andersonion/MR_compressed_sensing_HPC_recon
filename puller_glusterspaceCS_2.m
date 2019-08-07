@@ -21,8 +21,8 @@ if exist(workpath,'dir') && overwrite==1
 elseif ~exist(workpath,'dir')
     mkdir(workpath);
 end
-fid_pull_cmd=['scp omega@' scanner ':' datapath '/fid ' workpath '/' runno '.fid'];
-procpar_pull_cmd=['scp omega@' scanner ':' datapath '/procpar ' workpath '/' runno '.procpar'];
+fid_pull_cmd=['scp -p omega@' scanner ':' datapath '/fid ' workpath '/' runno '.fid'];
+procpar_pull_cmd=['scp -p omega@' scanner ':' datapath '/procpar ' workpath '/' runno '.procpar'];
 %pull the fid file and the procpar to the work directory if they dont exist
 %if they do exist check filesize
 if (mode == 1) || (mode == 3)

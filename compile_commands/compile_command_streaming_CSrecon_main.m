@@ -1,6 +1,7 @@
 %compile me
 function compile_command_streaming_CSrecon_main
 %exec_env_var='';%optional shell env var to be cleared.
+%{
 include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m'     
     '/cm/shared/workstation_code_dev/recon/CS_v2/puller_glusterspaceCS_2.m' 
     '/cm/shared/apps/MATLAB/R2015b/toolbox/signal/signal/hamming.m' 
@@ -9,6 +10,8 @@ include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m
     '/cm/shared/workstation_code_dev/recon/CS_v2/zpad.m'
     '/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/get_reservation.m'
     };%optional, but required if using exec_env_var, can be empty.
+%}
+include_files={};
 function_name='streaming_CS_recon_main_exec.m';
 compile_dir=compile_command__allpurpose(which(function_name),include_files);%,exec_env_var);
 
@@ -21,5 +24,7 @@ original_builtin_path=fullfile(code_dir,original_builtin_script);
 % unspecified, when developing code, use latest.
 % update_bin_cmd=sprintf('cp %s %s/;rm %s;ln -s %s/%s %s',original_builtin_path,compile_dir,bin_path,compile_dir,original_builtin_script,bin_path)
 % system(update_bin_cmd);
-update_bin_cmd=sprintf('cp %s %s/',original_builtin_path,compile_dir);
-system(update_bin_cmd);
+if exist(compile_dir,'dir')
+    update_bin_cmd=sprintf('cp %s %s/',original_builtin_path,compile_dir);
+    system(update_bin_cmd);
+end

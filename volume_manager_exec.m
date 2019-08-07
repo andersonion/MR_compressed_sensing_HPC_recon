@@ -308,8 +308,11 @@ else
             % Schedule setup
             %% Make variable file
             if ~exist(variables_file,'file')
-                cp_cmd = sprintf('cp %s %s',recon_file, variables_file);
-                system(cp_cmd);
+                cp_cmd = sprintf('cp -p %s %s',recon_file, variables_file);
+                [s,sout]=system(cp_cmd);
+                if s~=0
+                    warning(sout);
+                end
             end
             mf = matfile(variables_file,'Writable',true);
             mf.work_subfolder = work_subfolder;
@@ -579,7 +582,7 @@ else
                 mkdir_cmd = sprintf('ssh %s@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',...
                     getenv('USER'),full_host_name,target_machine,volume_runno,volume_runno);
                 scp_cmd = sprintf(['echo "Attempting to transfer data to %s.";' ...
-                    'scp -r %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
+                    'scp -pr %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
                     target_machine,t_images_dir,getenv('USER'),full_host_name,target_machine,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
