@@ -17,12 +17,12 @@ for nn = 1:nechoes
     c_work_dir = sprintf('%s/%s/work/',study_workdir,volume_runno);
     c_fid = sprintf('%s%s.fid',c_work_dir,volume_runno);
     if exist(c_fid,'file')
-        work_to_do = 0;
+        work_to_do(nn) = 0;
     end
 end
 
 % I <3 this variable construct.
-if sum(work_to_do) > 0
+if sum(work_to_do)
     [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
     datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
     if ~exist(local_fid,'file')
