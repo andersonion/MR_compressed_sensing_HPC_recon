@@ -17,7 +17,7 @@ compile_dir=compile_command__allpurpose(which(function_name),include_files);%,ex
 
 code_dir=fileparts(mfilename(which(function_name)));
 original_builtin_script = 'run_streaming_CS_recon_main_exec_builtin_path.sh';
-original_builtin_path=fullfile(code_dir,original_builtin_script);
+original_builtin_path=fullfile(code_dir,'bin',original_builtin_script);
 
 % This has been modified to use a shell script which checks for CS_CODE_DEV
 % env var, and runs the desired veresion. Defaults to stable if
@@ -25,6 +25,6 @@ original_builtin_path=fullfile(code_dir,original_builtin_script);
 % update_bin_cmd=sprintf('cp %s %s/;rm %s;ln -s %s/%s %s',original_builtin_path,compile_dir,bin_path,compile_dir,original_builtin_script,bin_path)
 % system(update_bin_cmd);
 if exist(compile_dir,'dir')
-    update_bin_cmd=sprintf('cp %s %s/',original_builtin_path,compile_dir);
+    update_bin_cmd=sprintf('cp -p %s %s/',original_builtin_path,compile_dir);
     system(update_bin_cmd);
 end
