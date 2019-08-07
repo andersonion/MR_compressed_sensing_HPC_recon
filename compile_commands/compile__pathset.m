@@ -1,5 +1,5 @@
 % Paths to add to cs_recon execs prior to compiling. 
-[pdir]=fileparts(pwd);
+[pdir]=fileparts(fileparts(mfilename('fullfile')));
 addpath(fullfile(pdir,''));
 addpath(fullfile(pdir,'sparseMRI_v0.2'));
 addpath(fullfile(pdir,'sparseMRI_v0.2/simulation'));
