@@ -38,7 +38,6 @@ function [skiptable, dim2, dim3, pa, pb] = extract_info_from_CStable(procpar_or_
 % Determine if input is a procpar file or a CS_table
 procpar=procpar_or_CStable;
 full_CS_table_path = procpar_or_CStable; % Assume CStable by default.
-
 if strcmp('procpar',procpar(end-6:end))
     % A procpar file should end in 'procpar' ( or be only procpar :D )
     if ~exist(procpar,'file')
@@ -59,10 +58,6 @@ if strcmp('procpar',procpar(end-6:end))
     dim3 = pp.nv2;
 end
 % Build path of local CStable and check for existence
-%{
-CS_table_parts = strsplit(full_CS_table_path,'/');
-CS_table_name = strtrim(CS_table_parts{end});
-%}
 [t_var,CS_table_name]=fileparts(full_CS_table_path);
 if ~exist('target_folder','var')
     target_folder = t_var;
@@ -71,11 +66,6 @@ clear t_var;
 table_target = [target_folder '/' CS_table_name];
 if ~exist(table_target,'file')
     % Guess which scanner is the CStable source based on runno prefix
-    %{
-    split_target = strsplit(target_folder,'/');
-    test_letter = split_target{end}(1);
-    target_folder = [target_folder '/'];
-    %}
     [~,Tname]=fileparts(target_folder);
     if (strcmp(Tname(1),'N'))
         scanner = 'heike';
@@ -84,7 +74,7 @@ if ~exist(table_target,'file')
     end
     % pull_table
     cmd = [ 'puller_simple  -o -f file ' scanner ' ''../../../../home/vnmr1/vnmrsys/tablib/' CS_table_name ''' ' target_folder];
-    [s,sout]=system(cmd); if s~=0; warning(sout); end;clear cmd;
+    [skiptable,sout]=system(cmd); if skiptable~=0; warning(sout); end;clear cmd;
     if ~exist(table_target,'file')
         error('Unable to retrieve CS table: %s.', full_CS_table_path);
     end
@@ -122,57 +112,28 @@ if ~exist('dim3','var')
 end
 pa=str2double(regres{4})/10;
 pb=str2double(regres{5})/10;
-
-%}
-
-%{
-if (~exist('dim2','var') || ~exist('dim3','var'))
-    split_t_name = strsplit(CS_table_name,'_');
-    split_t_name = split_t_name{1}(3:end); % Removes 'CS' prefix.
-    dims_23 = strsplit(split_t_name,'x'); 
-    if (length(dims_23) == 1)
-        dims_23 = [dims_23 dims_23];
-    else
-        dims_23 = dims_23(1:2);
-    end
-    dims_23 = str2double(dims_23);
-    
-    dim2 = dims_23(1);
-    dim3 = dims_23(2);
-end
-% Get pa and pb from table name
-pieces = strsplit(CS_table_name,'_pa');
-pa_pb = strsplit(pieces{2},'_pb');
-pa=str2double(pa_pb{1})/10;
-pb=str2double(pa_pb{2})/10;
-%}
 if (~isnumeric(dim2) || ~isnumeric(dim3))
     error('Unable to derive numeric values for dim2 and/or dim3 from CStable:%s.',full_CS_table_path);
 end
 
-% Open CS table and format into a bit mask (aka skiptable).
+%% Open CS table and format into a bit mask (aka skiptable).
 fid=fopen(table_target);
 % potentially could use *char=>logical or uint.
-s=fread(fid,inf,'*char');
+skiptable=fread(fid,inf,'*char');
 fclose(fid);
-%{
-% a cleaned up version of the original code 
-s = reshape(s,[numel(s) 1]); % BJA - Not always dependent on array size.
-s = str2num(s); % Note str2doulbe will NOT work.
-s = logical(s);
-%}
-% the new comically succinct version. For added hilarity, this converts
-% any unnecessary space chars to 0. which are promptly thrown out.
-s=(s=='1');
+% convert to logical, and converts any unnecessary space chars to 0.
+skiptable=(skiptable=='1');
 %% enforce exact size
-while numel(s)<dim2*dim3
+while numel(skiptable)<dim2*dim3
+    % using a while is not necessary here, however if more than one 0 is
+    % missing this will be extra spammy, which seems like a good thing.
     warning('TABLE UNDERSIZED! Adding 0''s to fill it out!');
-    s(end+1)=0;
+    skiptable(end+1)=0;
 end
-if numel(s)~= dim2*dim3
+if numel(skiptable)~= dim2*dim3
     warning('TABLE oversize! truncating! (You may have had trailing spaces converted to 0.)');
-    s=s(1:dim2*dim3); % BJA - Trims off any zero padding
+    skiptable=skiptable(1:dim2*dim3); % BJA - Trims off any zero padding
 end
-skiptable=reshape(s,[dim2 dim3]);
+skiptable=reshape(skiptable,[dim2 dim3]);
 end
 
