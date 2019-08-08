@@ -18,7 +18,7 @@ if [ ! -z "$3" ];then
     the_pattern=$3;
 fi;
 
-hlpr_dir="$WKS_HOME/recon/CS_v2";
+hlpr_dir="$WKS_HOME/recon/CS_v2/bin";
 stat_queue=$("slurm_queue_snapshot" $the_user);
 
 # find logs of running CS_slice jobs processes, and tail -f them 
