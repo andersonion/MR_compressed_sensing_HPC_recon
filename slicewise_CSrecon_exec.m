@@ -219,6 +219,10 @@ for index=1:length(slice_numbers)
             % according to the original code comments im_zfwdc should be
             % 0-1 for the whole volume, take care checking here as this is
             % slice at a time. 
+            % presumably pdf is point density function. We could instead
+            % use the CS Mask to get the actual density instead of the 
+            % the theoretical. We have sdc3_mat, we've used before.
+            % https://github.com/ISMRM/mri_unbound
             im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
             ph = exp(1i*angle((ifft2c(param.data.*phmask))));
             param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
