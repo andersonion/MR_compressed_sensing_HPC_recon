@@ -66,7 +66,9 @@ if s==0 % unix status check
             end
         end
     end
-    total_completion=progress/(numel(rundata));
+    % intentionally rounded total_completion down so we wont report 100%
+    % until its certain
+    total_completion=floor(progress/(numel(rundata)));
     %% remove entries which are either not done, or preivously saved their ortho slices, 
     for ri=numel(rundata):-1:1
         if ~iscell(rundata{ri})
