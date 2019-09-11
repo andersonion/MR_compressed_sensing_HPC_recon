@@ -108,7 +108,7 @@ if ~exist('dim3','var')
     if isempty(regres{2})
         regres{2}=regres{1};
     end
-    dim2=str2double(regres{2});
+    dim3=str2double(regres{2});
 end
 pa=str2double(regres{4})/10;
 pb=str2double(regres{5})/10;
