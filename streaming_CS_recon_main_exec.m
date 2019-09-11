@@ -279,15 +279,18 @@ if ~exist(study_flag,'file')
     %% First things first: get specid from user!
     % Create or get one ready.
     recon_file = fullfile(workdir,[runno 'recon.mat']);
-    
+    % t_vars will be cleared after this section to maintain the original
+    % code flow and var bloat. Need to revisit this when we have time.
     if ~exist(recon_file,'file')
         [t_db,t_opt]=CS_GUI_mess(scanner,runno,recon_file);
-        t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory,t_opt.param_file);
-        if exist(t_param_file,'file')
-            t_params=read_headfile(t_param_file,0);
-        end
     else
         m = matfile(recon_file,'Writable',true);
+        t_db=m.databuffer;
+        t_opt=m.optstruct;
+    end
+    t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory,t_opt.param_file);
+    if exist(t_param_file,'file')
+        t_params=read_headfile(t_param_file,0);
     end
     %% Give options feedback to user, with pause so they can cancel
     fprintf('Ready to start! Here are your recon options:\n');
