@@ -230,28 +230,6 @@ end
 %% Reservation support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
-%% Give options feedback to user, with pause so they can cancel
-fprintf('Ready to start! Here are your selected options\n');
-fprintf('Ctrl+C now to stop and try again\n');
-fields=fieldnames(options);
-for fn=1:numel(fields)
-    if iscell(options.(fields{fn}))
-        ot='cell array!';
-    elseif isstruct(options.(fields{fn}))
-        ot='struct!';
-    elseif ~ischar(options.(fields{fn}))
-        ot=sprintf('%g ',options.(fields{fn}));
-    else
-        ot=options.(fields{fn});
-    end
-    if islogical(options.(fields{fn})) ...
-            && ~options.(fields{fn})
-        % skip any "off" fields.... may be bad idea, we'll see.
-        continue;
-    end
-    fprintf('\t%s = \t%s\n',fields{fn},ot);
-end; clear fields fn;
-pause(3);
 %% Determine where the matlab executables live
 %  May change this to look to environment variables, or a seperate
 %  head/textfile, which will give us dynamic flexibility if our goal is
@@ -291,45 +269,103 @@ if isempty(volume_manager_path)
 end
 %% Get workdir
 scratch_drive = getenv('BIGGUS_DISKUS');
-workdir = fullfile(scratch_drive,[runno '.work']);
-if ~exist(workdir,'dir');
-    mkdir_cmd = sprintf('mkdir -m 775 %s',workdir);
-    system(mkdir_cmd);
-end
-% Initialize a log file if it doesn't exist yet.
+workdir =  fullfile(scratch_drive,[runno '.work']);
 log_file = fullfile(workdir,[ runno '.recon_log']);
-if ~exist(log_file,'file')
-    system(['touch ' log_file]);
-end
-local_fid=fullfile(workdir,[runno '.fid']);
-study_flag = [workdir '/.' runno '.recon_completed'];
-%% Write initialization info to log file.
-ts=fix(clock);
-t=datetime(ts(1:3));
-month_string = month(t,'name');
-start_date=sprintf('%02i %s %04i',ts(3),month_string{1},ts(1));
-start_time=sprintf('%02i:%02i',ts(4:5));
-user = getenv('USER');
-log_msg =sprintf('\n');
-log_msg=sprintf('%s----------\n',log_msg);
-log_msg=sprintf('%sCompressed sensing reconstruction initialized on: %s at %s.\n',log_msg,start_date, start_time);
-log_msg=sprintf('%s----------\n',log_msg);
-log_msg=sprintf('%sScanner study: %s\n',log_msg, study);
-log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
-log_msg=sprintf('%sUser: %s\n',log_msg,user);
-log_msg=sprintf('%sExec Set: %s\n',log_msg,CS_CODE_DEV);
-yet_another_logger(log_msg,log_mode,log_file);
+local_fid= fullfile(workdir,[runno '.fid']);
+study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 %% do main work and schedule remainder
 if ~exist(study_flag,'file')
     % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
     recon_file = fullfile(workdir,[runno 'recon.mat']);
+    
     if ~exist(recon_file,'file')
-        m = specid_to_recon_file(scanner,runno,recon_file);
+        [t_db,t_opt]=CS_GUI_mess(scanner,runno,recon_file);
+        t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory,t_opt.param_file);
+        if exist(t_param_file,'file')
+            t_params=read_headfile(t_param_file,0);
+        end
     else
         m = matfile(recon_file,'Writable',true);
     end
+    %% Give options feedback to user, with pause so they can cancel
+    fprintf('Ready to start! Here are your recon options:\n');
+    fprintf('  (Ctrl+C to abort)\n');
+    fields=fieldnames(options);
+    for fn=1:numel(fields)
+        if iscell(options.(fields{fn}))
+            ot='cell array!';
+        elseif isstruct(options.(fields{fn}))
+            ot='struct!';
+        elseif ~ischar(options.(fields{fn}))
+            ot=sprintf('%g ',options.(fields{fn}));
+        else
+            ot=options.(fields{fn});
+        end
+        if islogical(options.(fields{fn})) ...
+                && ~options.(fields{fn})
+            % skip any "off" fields.... may be bad idea, we'll see.
+            continue;
+        end
+        fprintf('\t%s = \t%s\n',fields{fn},ot);
+    end; clear fields fn;
+    if exist('t_params','var')
+        fprintf('Here are the recon gui settings\n');
+        fprintf('  to adjust, delete %s\n',t_param_file);
+        fields=fieldnames(t_params);
+        for fn=1:numel(fields)
+            if iscell(t_params.(fields{fn}))
+                ot='cell array!';
+            else
+                ot=t_params.(fields{fn});
+            end
+            fprintf('\t%s = \t%s\n',fields{fn},ot);
+        end
+        clear t_params t_param_file;
+    end
+    %% wait until user affirms they like parameters as seen.
+    while isempty( ...
+            regexpi(input( ...
+            sprintf('Enter (Y)es to continue\n'),'s'), ...
+            '^((y(es)?)|(c(ont(inue)?)?)[\s]*)$','once') ...
+            )
+    end
+    %being a snot and leaving this pause even after the user says yes, 
+    % in case they're extra hasty :P 
+    forced_wait=3;
+    fprintf('Continuing in %i seconds ...\n',forced_wait);
+    pause(forced_wait); 
+    %% Write initialization info to log file.
+    if ~exist(workdir,'dir');
+        mkdir_cmd = sprintf('mkdir -m 775 %s',workdir);
+        system(mkdir_cmd);
+    end
+    if ~exist(log_file,'file')
+        % Initialize a log file if it doesn't exist yet.
+        system(['touch ' log_file]);
+    end
+    ts=fix(clock);
+    t=datetime(ts(1:3));
+    month_string = month(t,'name');
+    start_date=sprintf('%02i %s %04i',ts(3),month_string{1},ts(1));
+    start_time=sprintf('%02i:%02i',ts(4:5));
+    user = getenv('USER');
+    log_msg =sprintf('\n');
+    log_msg=sprintf('%s----------\n',log_msg);
+    log_msg=sprintf('%sCompressed sensing reconstruction initialized on: %s at %s.\n',log_msg,start_date, start_time);
+    log_msg=sprintf('%s----------\n',log_msg);
+    log_msg=sprintf('%sScanner study: %s\n',log_msg, study);
+    log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
+    log_msg=sprintf('%sUser: %s\n',log_msg,user);
+    log_msg=sprintf('%sExec Set: %s\n',log_msg,CS_CODE_DEV);
+    yet_another_logger(log_msg,log_mode,log_file);
+    
+    if ~exist(recon_file,'file')
+        m = specid_to_recon_file(t_db,t_opt,recon_file);
+        clear t_db t_opt;
+    end
+    
     %% Test ssh connectivity using our perl program which has robust ssh handling.
     %{ 
     % but the scanner is probably fine and not where we'll have trouble
@@ -691,30 +727,39 @@ elseif options.fid_archive
 end
 end
 
+function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
+    % a hacky patch around the trouble that the specid_to_recon_file
+    % function is damned dirty.
+    % one trouble is that databuffer is thrown around as a struct, and that
+    % is not right at all, its supposed to be a (large_array) object which many
+    % functions are allowed to update the contents of.
+    % databuffer=large_array;
+    databuffer.engine_constants = load_engine_dependency();
+    databuffer.scanner_constants = load_scanner_dependency(scanner);
+    databuffer.headfile.U_runno = runno;
+    databuffer.headfile.U_scanner = scanner;
+    databuffer.input_headfile = struct; % Load procpar here.
+    databuffer.headfile = combine_struct(databuffer.headfile,databuffer.engine_constants);
+    databuffer.headfile = combine_struct(databuffer.headfile,databuffer.scanner_constants);
+    optstruct.testmode = false;
+    optstruct.debug_mode = 0;
+    optstruct.warning_pause = 0;
+    optstruct.param_file =[runno '.param'];
+    gui_info_collect(databuffer,optstruct);
+end
+
 function m = specid_to_recon_file(scanner,runno,recon_file)
-% holly horrors this function is bad form! 
+% holly horrors this function is bad form!
 % it combines several disjointed programming styles.
-% the name is also terrible! 
+% the name is also terrible!
+% Now I've made it worse by removing the core ugly into it's own function
 m = matfile(recon_file,'Writable',true);
-databuffer.engine_constants = load_engine_dependency();
-databuffer.scanner_constants = load_scanner_dependency(scanner);
-
-%if ~options.target_machine % we want this for automatic host name
-%resolution, but this currently doesn't work!
-%    databuffer.target_constants=load_engine_dependency(options.target_machine);
-%end
-
-databuffer.headfile.U_runno = runno;
-databuffer.headfile.U_scanner = scanner;
-databuffer.input_headfile = struct; % Load procpar here.
-databuffer.headfile = combine_struct(databuffer.headfile,databuffer.engine_constants);
-databuffer.headfile = combine_struct(databuffer.headfile,databuffer.scanner_constants);
-optstruct.testmode = false;
-optstruct.debug_mode = 0;
-optstruct.warning_pause = 0;
-optstruct.param_file =[runno '.param'];
-gui_info_collect(databuffer,optstruct);
-
+if ~isstruct(scanner)
+    [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file);
+else
+    databuffer=scanner;
+    optstruct=runno;
+end
 m.databuffer = databuffer;
 m.optstruct = optstruct;
 end
