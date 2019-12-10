@@ -211,126 +211,122 @@ header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
 
-%BJ says on 28 August 2018: removing code path for when minimal_memory=0;
-%{ 
-minimal_memory=getenv('CS_minimize_memory');
-if isempty(minimal_memory)
-    %minimal_memory=0;
-    minimal_memory=1; % Flipping the default switch on 5 January 2018
-end
-%}
+
 BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noise.
 
-    %% min memory mode, we only load 1 full CS slice at a time, 
-    % each is reduced to the proscribed acq dim 
-    % and inserted into a full size acq vol before moving on to the next.
-    % Potentially we could do better using a  sparse load but thats a lot of
-    % work.
-    log_msg =sprintf('%s operating in minimal memory mode\n',mfilename);
-    yet_another_logger(log_msg,log_mode,log_file);
-    lil_dummy = zeros([1,1],'double');
-    lil_dummy = complex(lil_dummy,lil_dummy);
-    data_out=zeros(original_dims,'like',lil_dummy);
-    
-    bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
-    % Slice quantiles are not exactly the right answer, so that whole idea
-    % has been scrapped in favor of the old (silly?) sorted array pct, and
-    % its done at the end when we take the magnitude.
-    % slice_quantile=zeros(1,recon_dims(1));
-    if exist('scaling','var')    % Preparing for the switch to when scaling calc is always done at the end.
-        scaling2 = scale_target/(volume_scale*volume_scale);%sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/volume_scale;
-    else
-        scaling2=volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+%% min memory mode, we only load 1 full CS slice at a time,
+% each is reduced to the proscribed acq dim
+% and inserted into a full size acq vol before moving on to the next.
+% Potentially we could do better using a  sparse load but thats a lot of
+% work.
+log_msg =sprintf('%s operating in minimal memory mode\n',mfilename);
+yet_another_logger(log_msg,log_mode,log_file);
+%lil-dummy is templating a complex value so zero's will work as expected.
+lil_dummy = zeros([1,1],'double'); lil_dummy = complex(lil_dummy,lil_dummy);
+data_out=zeros(original_dims,'like',lil_dummy);
+
+bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
+% Slice quantiles are not exactly the right answer, so that whole idea
+% has been scrapped in favor of the old (silly?) sorted array pct, and
+% its done at the end when we take the magnitude.
+% slice_quantile=zeros(1,recon_dims(1));
+
+% Preparing for the switch to when scaling calc is always done at the end.
+if exist('scaling','var')   
+    %sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/volume_scale;
+    scaling2 = scale_target/(volume_scale*volume_scale);
+else
+    scaling2=volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+end
+
+hist_bins=0:(scaling2/256):scaling2;
+
+volume_hist=histcounts(0,hist_bins); % Initialize an (almost) empty histogram
+volume_hist(1)=0;
+
+% do the full set of slices
+for ss=1:recon_dims(1)
+    if ~mod(ss,10)
+        log_msg = sprintf('Processing slice %i...\n',ss);
+        yet_another_logger(log_msg,log_mode,log_file);
     end
+    % James says: This data read is a bit strange,
+    % why dont we just read in as double direct?
+    % BJ responds: We made this decision together; it
+    % is more robust this way, as we were running into
+    % issues otherwise (bigendian/littleendian or something
+    % like that).
+    data_in = typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
+    data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
+    % t is temp data, as in from the temporary file, truly, its our
+    % final product of iterations to be written after the final
+    % waveletting stuff.
+    t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
+    clear data_in;
+    t_data_out = XFM'*t_data_out;
     
-    hist_bins=0:(scaling2/256):scaling2;
-
-    volume_hist=histcounts(0,hist_bins); % Initialize an (almost) empty histogram
-    volume_hist(1)=0;
+    if ~isfield(options,'slicewise_norm') || ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
+        t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+    end
+    %% Crop out extra k-space if non-square or non-power of 2,
+    % might as well apply fermi filter in k-space, if requested (no QSM requested either)
+    % we could mess with output_size and size_type here except that it wouldnt account for dim 1.
+    % so instead we defer to until the 3d complex image when we would fermi-filter.
+    if sum(original_dims == recon_dims) ~= 3
+        t_data_out = fftshift(fftn(fftshift(t_data_out)));
+        final_slice_out = t_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
+            (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2);
+        final_slice_out = fftshift(ifftn(fftshift(final_slice_out)));
+    else
+        final_slice_out=t_data_out;
+    end
+    if exist('scaling','var')
+        final_slice_out=scaling*final_slice_out;
+    end
+    % slice quantiles added to set final image scaling before
+    % write_civm_image. This is not a great bit of code because it
+    % needs to operate on magnitude data, and has to do an abs in line
+    % here.
+    % On review of quantile operations, this is not okay, nor is it
+    % okay enough to use.
+    % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
+    data_out(ss,:,:)= final_slice_out;
+    volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),hist_bins); % Cumulative build a volume histogram
     
-    % do the full set of slices 
-    for ss=1:recon_dims(1)
-        if ~mod(ss,10)
-            log_msg = sprintf('Processing slice %i...\n',ss);
-            yet_another_logger(log_msg,log_mode,log_file);
-        end
-        % James says: This data read is a bit strange, 
-        % why dont we just read in as double direct?
-        % BJ responds: We made this decision together; it
-        % is more robust this way, as we were running into
-        % issues otherwise (bigendian/littleendian or something
-        % like that).
-        data_in = typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
-        data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
-        % t is temp data, as in from the temporary file, truly, its our
-        % final product of iterations to be written after the final
-        % waveletting stuff.
-        t_data_out=complex(squeeze(data_in(:,:,1,:)),squeeze(data_in(:,:,2,:)));
-        clear data_in;
-        t_data_out = XFM'*t_data_out;
-        
-        if ~isfield(options,'slicewise_norm') || ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
-           t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
-        end    
-        %% Crop out extra k-space if non-square or non-power of 2, 
-        % might as well apply fermi filter in k-space, if requested (no QSM requested either)
-        % we could mess with output_size and size_type here except that it wouldnt account for dim 1.
-	% so instead we defer to until the 3d complex image when we would fermi-filter.
-        if sum(original_dims == recon_dims) ~= 3
-            t_data_out = fftshift(fftn(fftshift(t_data_out)));
-            final_slice_out = t_data_out((recon_dims(2)-original_dims(2))/2+1:end-(recon_dims(2)-original_dims(2))/2, ...
-                (recon_dims(3)-original_dims(3))/2+1:end-(recon_dims(3)-original_dims(3))/2);
-            final_slice_out = fftshift(ifftn(fftshift(final_slice_out)));
-        else
-            final_slice_out=t_data_out;
-        end
-        if exist('scaling','var')
-            final_slice_out=scaling*final_slice_out;
-        end
-        % slice quantiles added to set final image scaling before
-        % write_civm_image. This is not a great bit of code because it
-        % needs to operate on magnitude data, and has to do an abs in line
-        % here.
-        % On review of quantile operations, this is not okay, nor is it
-        % okay enough to use. 
-        % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
-        data_out(ss,:,:)= final_slice_out;
-        volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),hist_bins); % Cumulative build a volume histogram
-
-        %{
+    %{
         if ~isdeployed && strcmp(getenv('USER'),'rja20') && ~mod(ss,10)
             figure(60)
             %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
             plot(hist_bins(2:end),volume_hist)
             pause(1)
         end
-        %}
-        
-    
-    end
+    %}
     
     
-    cs_hist=cumsum(volume_hist);
-    thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
-    [a,~]=find(cs_hist'>thresh,1);
-    if (a == length(hist_bins))
-      a=a-1;
-    end
+end
 
-    not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;  
-    suggested_final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',runno));
-    scale_target=2^16-1;
-    suggested_final_scale=scale_target/not_really_data_quantile;
 
-    if (volume_number == 1)
-        fid_sc = fopen(suggested_final_scale_file,'w');
-        % scale write count
-        sc_wc = fwrite(fid_sc,suggested_final_scale,'float');
-        fclose(fid_sc);
-    end
-    read_time = toc;
-    log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
-    yet_another_logger(log_msg,log_mode,log_file);
+cs_hist=cumsum(volume_hist);
+thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
+[a,~]=find(cs_hist'>thresh,1);
+if (a == length(hist_bins))
+    a=a-1;
+end
+
+not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;
+suggested_final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',runno));
+scale_target=2^16-1;
+suggested_final_scale=scale_target/not_really_data_quantile;
+
+if (volume_number == 1)
+    fid_sc = fopen(suggested_final_scale_file,'w');
+    % scale write count
+    sc_wc = fwrite(fid_sc,suggested_final_scale,'float');
+    fclose(fid_sc);
+end
+read_time = toc;
+log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
+yet_another_logger(log_msg,log_mode,log_file);
 
 fclose(fid);
 
@@ -487,10 +483,9 @@ else
 % When we have time in the future it would be nice to have only one scale
 % operation, however these are inexpensive in cpu/memory so its not so bad
 % to do it twice.
-final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale.float',runno));
-
+final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_%i_civm_raw_scale.float',runno,options.selected_scale_volume));
 databuffer.headfile.group_max_intensity=max(mag_data(:));
-if volume_number==1 && ~exist(final_scale_file,'file')
+if volume_number==options.selected_scale_volume+1 && ~exist(final_scale_file,'file')
     % BJ says: per /cm/shared/workstation_code_dev/recon/CS_v2/testing_and_prototyping/slicewise_hist_test.m
     % It looks like slicewise implementation is 3x faster than this code
     % (e.g. 75s vs 240s for array of 2048x1024x1024)

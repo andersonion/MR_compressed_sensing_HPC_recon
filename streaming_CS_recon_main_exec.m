@@ -18,7 +18,7 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
   
 if ~isdeployed
     %% Get all necessary code for reconstruction
-    run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
+    % run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
@@ -82,6 +82,7 @@ types.beta_options={...
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
 types.planned_options={...
+    'selected_scale_volume',' default 0, which volume set''s the scale '
     'wavelet_dims',         ''
     'wavelet_type',         ''
     'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
@@ -377,17 +378,29 @@ if ~exist(study_flag,'file')
         scanner,options.CS_table,workdir,options.CS_table);
     [s,sout]=system(puller_test);
     %}
-    puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_activity_log.txt ',...
-        getenv('USER'),options.target_machine,options.target_machine);
+    puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
+        getenv('USER'),options.target_machine,options.target_machine,getenv('USER'));
     [s,sout]=system(puller_test,'-echo');
     if s~=0
         error('Problem on testing of connection to %s\n%s\n',...
             options.target_machine,sout);
+    else 
+        fprintf('Connect to %s succesful\n',options.target_machine);
     end
     
     %% Second First things first: determine number of volumes to be reconned
     local_hdr = fullfile(workdir,[runno '_hdr.fid']);
-    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+    try
+        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+    catch merr
+        if options.debug_mode<50
+            error(merr.message)
+        else
+            warning(merr.message)
+            local_or_streaming_or_static=3;
+            warning('Trouble finding fid, gonna hope a more interesting error stops us later');
+        end
+    end
     if ~exist(local_hdr,'file');
         if (local_or_streaming_or_static == 1)
             get_hdr_from_fid(input_fid,local_hdr);

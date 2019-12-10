@@ -262,7 +262,12 @@ else
     if (~recon_options.process_headfiles_only)
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+        if starting_point<4
+            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+        else
+            input_fid='BOGUS_INPUT_FOR_DONE_WORK';
+            local_or_streaming_or_static=3;
+        end
         %% STAGE1 Scheduling
         if (starting_point <= 1)
             volume_fid = [work_subfolder '/' volume_runno '.fid'];
