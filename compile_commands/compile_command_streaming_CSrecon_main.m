@@ -14,7 +14,7 @@ include_files={
     '/cm/shared/apps/MATLAB/R2015b/toolbox/images/images/padarray.m'
     };
 function_name='streaming_CS_recon_main_exec.m';
-compile_dir=compile_command__allpurpose(which(function_name),include_files);%,exec_env_var);
+compile_dir=compile_command__allpurpose(function_name,include_files);%,exec_env_var);
 
 code_dir=fileparts(which(function_name));
 original_builtin_script = 'run_streaming_CS_recon_main_exec_builtin_path.sh';
