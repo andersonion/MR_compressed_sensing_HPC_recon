@@ -85,34 +85,47 @@ if ~exist(send_archive_tag,'file')
         starting_point = 4;
         vol_status=vol_status-3;
         % Check .tmp file to see if all slices have reconned.
-        work_subfolder = [volume_dir '/work/'];
-        temp_file = [work_subfolder '/' volume_runno '.tmp'];
+        work_subfolder = fullfile(volume_dir, 'work');
+        temp_file = fullfile(work_subfolder, [ volume_runno '.tmp']);
         % the amount of slices remaining as a fraction
         slice_remain_frac= 1;
         move_down_a_stage = 1;
-        recon_file = [volume_dir '/../*recon.mat'];
-        setup_file = [volume_dir '/' volume_runno '_setup_variables.mat'];
+        % This might be acceptable to search for inside the volume_dir
+        % instead of hardcoding to some format.
+        % Future thought...
+        setup_file = fullfile(volume_dir, [ volume_runno '_setup_variables.mat']);
+        %{
         % BJ says: 27 Aug 2018, setup_file is not backward compatible, will
         % check to see if it exists and if it doesn't, will look in the
         % point it to the work directory (old behavior); also, James I told
         % you exactly this would be the problem.  Neener neener neener.      
         if ~exist(setup_file,'file')
-            setup_file = [volume_dir '/work/' volume_runno '_setup_variables.mat'];
+            setup_file = fullfile(volume_dir, 'work', [ volume_runno '_setup_variables.mat' ]);
         end
-            
-            
+        %}
         if exist(temp_file,'file') ...
                 && exist(setup_file,'file')
             % Need to remember that we are going to add the headersize as the first bytes
             [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
-            [s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
-            if s==0
+            try
+                a = who('-file',setup_file,'recon_file');
+                if size(a)
+                    % load(setup_file,'recon_file');clear a;
+                    sf=matfile(setup_file);
+                    recon_file=sf.recon_file;
+                end; clear a sf;
+            catch
+                warning('Setupfile didn''t code recon_file old recons in progress should use the old code');
+                recon_file = fullfile(volume_dir, '..',[ runno '_recon.mat']);
+            end
+            %[s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
+            %if s==0
+            if exist(recon_file,'file')
                 % if system comand sucessful.
-                recon_file=o;
+                %recon_file=o;
                 rf=matfile(recon_file);
                 options=rf.options;
-                Itnlim=options.Itnlim;
-                slices_remaining = length(find(tmp_header<Itnlim));
+                slices_remaining = length(find(tmp_header<options.Itnlim));
                 slice_remain_frac=slices_remaining/numel(tmp_header);
                 move_down_a_stage = 0;
             else
@@ -130,13 +143,19 @@ if ~exist(send_archive_tag,'file')
                 %dummy = load(workspace_file,'aux_param.maskSize'); % Need to try to load an arbitrary variable from the work file
                 % Why doesnt an exist check work here?
                 % How about a var listing using 
-                % whos('-file',workspace_file)
-                dummy_mf = matfile(workspace_file,'Writable',false);
-                tmp_param = dummy_mf.param;
+                %   whos('-file',workspace_file)
+                varinfo=whos('-file',workspace_file);
+                %dummy_mf = matfile(workspace_file,'Writable',false);
+                %tmp_param = dummy_mf.param;
             catch
+            end
+            if ~exist('varinfo','var') ...
+                    || ( ~ismember('imag_data',{varinfo.name}) ...
+                    || ~ismember('real_data',{varinfo.name}) )
+                %~ismember('volume_scale',{varinfo.name})
                 move_down_a_stage = 1;
             end
-            
+                        
             if (move_down_a_stage)
                 starting_point = 2;
                 % Check to see if the volume fid is ready.

@@ -9,9 +9,15 @@ if ~exist('user','var')
     user='omega';
 end
 local_or_streaming_or_static = 3;
-scratch_drive = getenv('BIGGUS_DISKUS'); % Currently, this is /glusterspace.
+scratch_drive = getenv('BIGGUS_DISKUS'); 
 workdir = fullfile(scratch_drive,[runno '.work/']);
-local_fid = [workdir runno '.fid'];
+
+% Simplistic fid name.
+local_fid = [workdir 'fid'];
+if ~exist(local_fid,'file')
+    % Specific fid name 
+    local_fid = [workdir runno '.fid'];
+end
 if exist(local_fid,'file')
     input_fid = local_fid;
     local_or_streaming_or_static = 1;

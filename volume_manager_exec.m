@@ -1,4 +1,5 @@
 function starting_point = volume_manager_exec(recon_file,volume_runno, volume_number,base_workdir)
+% volume_manager_exec(recon_file,volume_runno, volume_number,base_workdir)
 % Manages the  compressed sensing reconstruction of an independent 3D volume
 % % Functions similarly to old code CS_recon_cluster_bj_multithread_v2[a]
 %
@@ -10,18 +11,22 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 % for all execs run this little bit of code which prints start and stop time using magic.
 C___=exec_startup();
  
-%%% ORIGINAL COMMENT
-% This may seem stupid, but I need to let Matlab know that I'm going need
-% series to be a variable, and not the builtin function 'series'
-%%%%f
-% In fact this is stupid, overloading code generates incredible
-% headaches.The variale has been renamed agilent_series. -James.
-agilent_series='';
-workdir=[base_workdir '/' volume_runno '/'];
 % Need to figure out how to pass reconfile, scale_file --> just use recon_file!
-load(recon_file);
-recon_options=options;
-full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stupid way to fix the unneccessary 'fix' James introduced
+%%load(recon_file);
+recon_mat=matfile(recon_file);
+scanner=recon_mat.scanner;
+agilent_study=recon_mat.agilent_study;
+agilent_series=recon_mat.agilent_series;
+runno=recon_mat.runno;
+options=recon_mat.options;
+log_mode=2;
+if options.debug_mode>=10
+    log_mode=1;
+end
+log_file=recon_mat.log_file;
+workdir=fullfile(base_workdir,volume_runno);
+target_machine=options.target_machine;
+target_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stupid way to fix the unneccessary 'fix' James introduced
 %full_host_name=databuffer.scanner_constants.scanner_host_name; % Just kidding. We can thank James for this red herring.
 
 % Recon file should contain
@@ -30,8 +35,8 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 %dim_x,dim_y,dim_z
 %scanner
 %runno
-%study
-%series
+%agilent_study
+%agilent_series
 % processed options
 %options:
 %target_machine
@@ -39,76 +44,13 @@ full_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stup
 %chunk_size
 %CS_recon_parameters: TVWeight,xfmWeight,Itnlim,wavelet_dims,wavelet_type
 %% Reservation support
-active_reservation=get_reservation(recon_options.CS_reservation);
+active_reservation=get_reservation(options.CS_reservation);
 %% queue settings
-gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
-if isempty(gatekeeper_queue)
-    gatekeeper_queue = 'slow_master';%'high_priority';
-end
-cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
-if isempty(cs_full_volume_queue)
-    cs_full_volume_queue = 'slow_master';%'high_priority';
-end
-cs_recon_queue = getenv('CS_RECON_QUEUE');
-if isempty(cs_recon_queue)
-    cs_recon_queue = 'matlab';
-end
+cs_queue=CS_env_queue();
 %% Executables support
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-gatekeeper_exec_path = getenv('CS_GATEKEEPER_EXEC'); % Error check for isempty?
-
-volume_manager_exec_path = getenv('CS_VOLUME_MANAGER_EXEC'); % Error check for isempty?
-if isempty(volume_manager_exec_path) % Temporary fix.
-    volume_manager_exec_path =  which(mfilename);
-    %volume_manager_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/20171003_0904/run_volume_manager_exec.sh';
-    setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_exec_path);
-end
 % set an env var to get latest dev code, or will defacto run stable.
-CS_CODE_DEV=getenv('CS_CODE_DEV');
-if isempty(CS_CODE_DEV)
-    CS_CODE_DEV='stable';
-end
-volume_setup_exec_path = getenv('CS_VOLUME_SETUP_EXEC'); % Error check for isempty?
-if isempty(volume_setup_exec_path)
-    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171026_1816/run_setup_volume_work_for_CSrecon_exec.sh';
-    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/20171030_1349/run_setup_volume_work_for_CSrecon_exec.sh';
-    %volume_setup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/stable/run_setup_volume_work_for_CSrecon_exec.sh';
-    volume_setup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/' CS_CODE_DEV '/run_setup_volume_work_for_CSrecon_exec.sh' ];
-    setenv('CS_VOLUME_SETUP_EXEC',volume_setup_exec_path);
-end
-slicewise_recon_exec_path = getenv('CS_SLICEWISE_RECON_EXEC'); % Error check for isempty?
-
-if isempty(slicewise_recon_exec_path)
-    %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/20171002_1551/run_slicewise_CSrecon_exec.sh';
-    %slicewise_recon_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/stable/run_slicewise_CSrecon_exec.sh';
-    slicewise_recon_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/' CS_CODE_DEV '/run_slicewise_CSrecon_exec.sh'] ;
-    
-    setenv('CS_SLICEWISE_RECON_EXEC',slicewise_recon_exec_path);
-end
-volume_cleanup_exec_path = getenv('CS_VOLUME_CLEANUP_EXEC'); % Error check for isempty?
-if isempty(volume_cleanup_exec_path)
-    %volume_cleanup_exec_path = '/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/20171005_1536/run_volume_cleanup_for_CSrecon_exec.sh';
-    %volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/stable/run_volume_cleanup_for_CSrecon_exec.sh'];
-    volume_cleanup_exec_path = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/' CS_CODE_DEV '/run_volume_cleanup_for_CSrecon_exec.sh'];
-    setenv('CS_VOLUME_CLEANUP_EXEC',volume_cleanup_exec_path);
-end
-%{
-%Moved to deploy_procpar_handlers function
-procpar_gatekeeper_exec_path = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); % Error check for isempty?
-if isempty(procpar_gatekeeper_exec_path)
-    %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/20171004_1110//run_local_file_gatekeeper_exec.sh';
-    %procpar_gatekeeper_exec_path ='/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/stable/run_local_file_gatekeeper_exec.sh';
-    procpar_gatekeeper_exec_path =['/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/' CS_CODE_DEV '/run_local_file_gatekeeper_exec.sh'];
-    setenv('CS_PROCPAR_GATEKEEPER_EXEC',procpar_gatekeeper_exec_path);
-end
-procpar_cleanup_exec_path = getenv('CS_PROCPAR_CLEANUP_EXEC');
-if isempty(procpar_cleanup_exec_path)
-    %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/20171010_1529/run_process_headfile_CS.sh';
-    %procpar_cleanup_exec_path='/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/stable/run_process_headfile_CS.sh';
-    procpar_cleanup_exec_path=['/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/' CS_CODE_DEV '/run_process_headfile_CS.sh'];
-    setenv('CS_PROCPAR_CLEANUP_EXEC',procpar_cleanup_exec_path);
-end
-%}
+matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+cs_execs=CS_env_execs();
 %%
 if ischar(volume_number)
     volume_number=str2double(volume_number);
@@ -133,30 +75,45 @@ end
 % end!).
 
 
-[starting_point, log_msg] = check_status_of_CSrecon(workdir,volume_runno,scanner,runno,study,agilent_series,bbytes);
-log_mode = 1;
+[starting_point, log_msg] = check_status_of_CSrecon(workdir,...
+    volume_runno, ...
+    recon_mat.scanner,...
+    recon_mat.runno,...
+    recon_mat.agilent_study,...
+    recon_mat.agilent_series,...
+    recon_mat.bbytes);
+if ~islogical(options.CS_preview_data)
+    if starting_point>2
+        warning('CS_preview_data artificially reducing start point to 2');
+        starting_point=2;
+    end
+end
 yet_another_logger(log_msg,log_mode,log_file);
 % Initialize a log file if it doesn't exist yet.
-volume_log_file = [workdir '/' volume_runno '.recon_log'];
+volume_log_file =fullfile(workdir, [volume_runno '_recon.log']);
 if ~exist(volume_log_file,'file')
     system(['touch ' volume_log_file]);
 end
-work_subfolder = [workdir '/work/'];
-%variables_file = [work_subfolder     volume_runno '_setup_variables.mat'];
-variables_file = [workdir        '/' volume_runno '_setup_variables.mat'];
-images_dir =     [workdir        '/' volume_runno 'images/'];
-headfile =       [images_dir         volume_runno '.headfile'];
 
-temp_file =      [work_subfolder '/' volume_runno '.tmp'];
-volume_fid =     [work_subfolder '/' volume_runno '.fid'];
 
-hf_fail_flag=         sprintf('%s/.%s_send_headfile_to_%s_FAILED',        images_dir,volume_runno,target_machine);
-hf_success_flag=      sprintf('%s/.%s_send_headfile_to_%s_SUCCESSFUL',    images_dir,volume_runno,target_machine);
-fail_flag=            sprintf('%s/.%s_send_images_to_%s_FAILED',          images_dir,volume_runno,target_machine);
-success_flag=         sprintf('%s/.%s_send_images_to_%s_SUCCESSFUL',      images_dir,volume_runno,target_machine);
-at_fail_flag=         sprintf('%s/.%s_send_archive_tag_to_%s_FAILED',     images_dir,volume_runno,target_machine);
-at_success_flag=      sprintf('%s/.%s_send_archive_tag_to_%s_SUCCESSFUL', images_dir,volume_runno,target_machine);
-original_archive_tag= sprintf('%s/READY_%s',images_dir,volume_runno);
+setup_variables= fullfile(workdir,   [ volume_runno '_setup_variables.mat']);
+images_dir =     fullfile(workdir,   [ volume_runno 'images']);
+headfile =       fullfile(images_dir,[ volume_runno '.headfile']);
+
+work_subfolder = fullfile(workdir, 'work');
+temp_file =      fullfile(work_subfolder,[ volume_runno '.tmp']);
+volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
+volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
+
+
+hf_fail_flag=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,target_machine));
+hf_success_flag=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,target_machine));
+fail_flag=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,target_machine));
+success_flag=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,target_machine));
+at_fail_flag=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,target_machine));
+at_success_flag=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,target_machine));
+
+original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
 local_archive_tag_prefix = [volume_runno '_' target_machine];
 local_archive_tag =   sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
 
@@ -187,35 +144,38 @@ end
 % mark data which is ready.
 % TODO: move this into the cleanup code.
 if ~exist(local_archive_tag,'file')
+    % temporary patch to pull databuffer multi-struct out of the mat file.
+    databuffer=recon_mat.databuffer;
     if ~exist(original_archive_tag,'file')
         write_archive_tag_nodev(volume_runno,['/' target_machine 'space'], ...
-            original_dims(3),databuffer.headfile.U_code, ...
+            recon_mat.dim_z,databuffer.headfile.U_code, ...
             '.raw',databuffer.headfile.U_civmid,true,images_dir);
     end
     system(sprintf('mv %s %s',original_archive_tag,local_archive_tag));
+    clear databuffer;
 end
 
-if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
+if (starting_point == 0) ||  (  (recon_mat.nechoes > 1) && (starting_point == 1)  )
     %% starting point 0/1
     % FID not ready yet, schedule gatekeeper for us.
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
     gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
     gk_slurm_options.mem=512; % memory requested; gatekeeper only needs a miniscule amount.
-    gk_slurm_options.p=gatekeeper_queue;
+    gk_slurm_options.p=cs_queue.gatekeeper;
     %gk_slurm_options.job_name = [volume_runno '_gatekeeper'];
     gk_slurm_options.job_name = [runno '_gatekeeper']; %Trying out singleton behavior
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
-    study_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_gatekeeper.bash'];
-    [input_fid,~] =find_input_fidCS(scanner,runno,study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
+    agilent_study_gatekeeper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
+    [input_fid,~] =find_input_fidCS(scanner,runno,agilent_study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
         volume_fid, input_fid, scanner, log_file, volume_number, bbytes);
-    gatekeeper_cmd = sprintf('%s %s %s ', gatekeeper_exec_path, matlab_path,...
+    gatekeeper_cmd = sprintf('%s %s %s ', cs_execs.gatekeeper, matlab_path,...
         gatekeeper_args);
-    if ~recon_options.live_run
-        batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
+    if ~options.live_run
+        batch_file = create_slurm_batch_files(agilent_study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
         running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
     else
         running_jobs='';
@@ -225,15 +185,15 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     vm_slurm_options.v=''; % verbose
     vm_slurm_options.s=''; % shared; volume manager needs to share resources.
     vm_slurm_options.mem=512; % memory requested; vm only needs a miniscule amount.
-    vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+    vm_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
     vm_slurm_options.job_name = [volume_runno '_volume_manager'];
     %vm_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     vm_slurm_options.reservation = '';
-    volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
+    volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
     vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
-    vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path,vm_args);
-    if ~recon_options.live_run
+    vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
+    if ~options.live_run
         batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
         or_dependency = '';
         if ~isempty(running_jobs)
@@ -246,7 +206,7 @@ if (starting_point == 0) ||  (  (nechoes > 1) && (starting_point == 1)  )
     log_mode = 1;
     log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
-    if ~recon_options.live_run
+    if ~options.live_run
         quit force
     else
         return;
@@ -259,24 +219,27 @@ else
     stage_5_running_jobs='';
     stage_5e_running_jobs='';
     
-    if (~recon_options.process_headfiles_only)
+    if (~options.process_headfiles_only)
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
         if starting_point<4
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
         else
             input_fid='BOGUS_INPUT_FOR_DONE_WORK';
             local_or_streaming_or_static=3;
         end
         %% STAGE1 Scheduling
-        if (starting_point <= 1)
-            volume_fid = [work_subfolder '/' volume_runno '.fid'];
+        if (starting_point <= 1 || ~islogical(options.CS_preview_data) )
+            if ~exist('volume_fid','var')
+                error('Confusing code path error on volume_fid reset');
+                volume_fid = [work_subfolder '/' volume_runno '.fid'];
+            end
             scanner_user='';
             if (local_or_streaming_or_static == 1)
-                fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number);
+                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,volume_number);
             else
                 scanner_user='omega';
-                fid_consistency = write_or_compare_fid_tag(input_fid,fid_tag_file,volume_number,scanner,scanner_user);
+                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,volume_number,scanner,scanner_user);
             end
             if fid_consistency
                 %{
@@ -284,17 +247,24 @@ else
                 % when streaming data.
                 % This code needs to be put someplace correct! 
                 if ~exist(procpar_file,'file')
-                    datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
+                    datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
                     mode =2; % Only pull procpar file
                     puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
                 end
                 %}
                 % Getting subvolume should be the job of volume setup. 
                 % TODO: Move get vol code into setup!
+
+                % HACK to allow preview post reconstruction cleanup.
+                % work_subfolder = fileparts(volume_fid)
+                if ~exist(work_subfolder,'dir')
+                    warning('  Creating work subfolder to fetch fid, this shouldn''t happen here. This only occurs in exotic testing or recovery conditions.');
+                    mkdir(work_subfolder);
+                end
                 if (local_or_streaming_or_static == 1)
-                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes);
+                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes);
                 else
-                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,bbytes,scanner,scanner_user);
+                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes,scanner,scanner_user);
                 end
             else
                 log_mode = 1;
@@ -309,9 +279,11 @@ else
             end
         end
         %% STAGE2 Scheduling
-        if (starting_point <= 2)
+        if (starting_point <= 2 || ~islogical(options.CS_preview_data) )
             % Schedule setup
             %% Make variable file
+            %{
+            % trying to avoid this copy to reduce the confusion on startup
             if ~exist(variables_file,'file')
                 cp_cmd = sprintf('cp -p %s %s',recon_file, variables_file);
                 [s,sout]=system(cp_cmd);
@@ -319,19 +291,24 @@ else
                     warning(sout);
                 end
             end
-            mf = matfile(variables_file,'Writable',true);
-            mf.work_subfolder = work_subfolder;
-            mf.volume_number=volume_number;
+            %}
+            mf = matfile(setup_variables,'Writable',true);
             mf.recon_file = recon_file;
+            mf.volume_number=volume_number;
+            mf.volume_runno = volume_runno;
+            mf.work_subfolder = work_subfolder;
+            mf.volume_log_file = volume_log_file;
+            %{
             mf.procpar_file = procpar_file;
             mf.scale_file = scale_file;
-            mf.volume_runno = volume_runno;
-            mf.volume_log_file = volume_log_file;
-            mf.volume_fid = [work_subfolder '/' volume_runno '.fid'];
+            %}
+            mf.volume_fid = volume_fid;
+            mf.volume_workspace = volume_workspace;
             mf.workdir = workdir;
             mf.temp_file = temp_file;
             mf.images_dir =images_dir;
             mf.headfile = headfile;
+            %{
             if exist('target_machine','var')
                 mf.target_machine = target_machine;
             end
@@ -350,74 +327,55 @@ else
             if exist('Itnlim','var')
                 mf.Itnlim = Itnlim;
             end
+            %}
             %% Schedule setup via slurm and record jobid for dependency scheduling.
             vsu_slurm_options=struct;
             vsu_slurm_options.v=''; % verbose
             vsu_slurm_options.s=''; % shared; volume setup should to share resources.
             vsu_slurm_options.mem=50000; % memory requested; vsu needs a significant amount; could do this smarter, though.
-            vsu_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+            vsu_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
             vsu_slurm_options.job_name = [volume_runno '_volume_setup_for_CS_recon'];
             %vsu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
             vsu_slurm_options.reservation = ''; 
-            volume_setup_batch = [workdir 'sbatch/' volume_runno '_volume_setup_for_CS_recon.bash'];
-            vsu_args=sprintf('%s %i',variables_file, volume_number);
-            vsu_cmd = sprintf('%s %s %s', volume_setup_exec_path,matlab_path, vsu_args);
-            if ~recon_options.live_run
+            volume_setup_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
+            vsu_args=sprintf('%s %i',setup_variables, volume_number);
+            vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
+            if ~options.live_run
                 batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
             else
                 eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
             end
         end
-        if recon_options.CS_preview_data
+        if options.CS_preview_data
             return;
         end
         %% STAGE3 Scheduling
         if (starting_point <= 3)
+            %{
+            % update itnlim from main mat file to our volume file...
+            % but SERIOUSLY WHY! 
             mf = matfile(variables_file,'Writable',true);
             rf = matfile(recon_file);
-            opts2=rf.options;
-            Itnlim = opts2.Itnlim;
-            opts3=mf.options;
-            opts3.Itnlim=Itnlim;
-            mf.options=opts3;
-            volume_variable_file = [work_subfolder volume_runno '_workspace.mat'];
-            if exist(volume_variable_file,'file')
-                mf2=matfile(volume_variable_file,'Writable',true);
-                t_param=mf2.param;
-                t_param.Itnlim=Itnlim;
-                mf2.param=t_param;
-                if isfield(opts2,'verbosity')                    
-                    t_aux_param=mf2.aux_param;
-                    t_aux_param.verbosity=recon_options.verbosity;
-                    mf2.aux_param=t_aux_param;
-                end
-                
-                 if isfield(opts2,'slicewise_norm')                  
-                    t_aux_param=mf2.aux_param;
-                    t_aux_param.slicewise_norm=options.slicewise_norm;
-                    mf2.aux_param=t_aux_param;
-                end
-            end
+            rf_opts=rf.options;
+            Itnlim = rf_opts.Itnlim;
+            mf_opts=mf.options;
+            mf_opts.Itnlim=Itnlim;
+            mf.options=mf_opts;
+            %}
             % Schedule slice jobs
-            if ~exist('recon_options_file','var')
-                recon_options_file='';
-            end
-            if chunk_size > 1
-                plural = 's';
-            else
-                plural = '';
-            end
             single_threaded_recon =1;
             swr_slurm_options=struct;
             swr_slurm_options.v=''; % verbose
             if single_threaded_recon
                 swr_slurm_options.c=1; % was previously 2...also need to investigate binding
                 swr_slurm_options.hint='nomultithread';
+            %{
             else
                 swr_slurm_options.s='';
                 swr_slurm_options.hint='multithread';
+            %}
             end
             % We use mem limit to control the number of jobs per node. 
             % Want to allow 32-40 jobs per node, but use --ntasks-per-core=1 
@@ -425,8 +383,9 @@ else
             % That is why this mem number gets to be constant, we shouldnt
             % run into trouble until CS_slices are very (VERY) large. 
             swr_slurm_options.mem='5900'; 
-            swr_slurm_options.p=cs_recon_queue;
-            swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
+            swr_slurm_options.p=cs_queue.recon;
+            % swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
+            swr_slurm_options.job_name=[volume_runno '_CS_recon_NS' num2str(options.chunk_size)];
             swr_slurm_options.reservation = active_reservation;
             if exist(temp_file,'file')
                 %Find slices that need to be reconned. 
@@ -435,41 +394,42 @@ else
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
                     if isfield(options,'keep_work')
-                        if recon_options.keep_work
+                        if options.keep_work
                             %% Currently iteration limit is not a part of the recon.mat variable group...will need to add it.
-                            slices_to_process = find(tmp_header<Itnlim);
+                            slices_to_process = find(tmp_header<options.Itnlim);
                         end
                     end
                     if isempty(slices_to_process)
                         slices_to_process = 0;
                     end
                 else
-                    slices_to_process =1:1:original_dims(1);
+                    slices_to_process =1:1:recon_mat.original_dims(1,1);
                 end
             else
-                slices_to_process = 1:1:original_dims(1);
+                slices_to_process = 1:1:recon_mat.original_dims(1,1);
             end
             
             if slices_to_process
-                zero_width = ceil(log10((original_dims(1)+1)));
-                num_chunks = ceil(length(slices_to_process)/chunk_size);
+                num_chunks = ceil(length(slices_to_process)/options.chunk_size);
                 log_msg =sprintf('Volume %s: Number of chunks (independent jobs): %i.\n',volume_runno,num_chunks);
                 yet_another_logger(log_msg,log_mode,log_file);
-                new_size = num_chunks*chunk_size;
-                temp_size=length(slices_to_process);
-                log_msg =sprintf('Volume %s: Number of slices to be reconstructed: %i.\n',volume_runno,temp_size);
+                log_msg =sprintf('Volume %s: Number of slices to be reconstructed: %i.\n',volume_runno,nnz(~isnan(slices_to_process)));
                 yet_another_logger(log_msg,log_mode,log_file);
                 
-                while new_size > temp_size
-                    slices_to_process = [slices_to_process NaN];
-                    temp_size = size(slices_to_process);
+                % pad slices_to_process out to num_chunks*chunk_size if not
+                % even multiple.
+                slice_pack_padding=options.chunk_size-mod(numel(slices_to_process),options.chunk_size);
+                if slice_pack_padding~=options.chunk_size
+                    slices_to_process(end+1:end+slice_pack_padding)=NaN;
                 end
+
                 s3jobs=cell(1,num_chunks);
                 %slices to process would be better named chunks, or slabs.
-                slices_to_process = reshape(slices_to_process,[chunk_size num_chunks]);
+                slices_to_process = reshape(slices_to_process,[options.chunk_size num_chunks]);
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
+                zero_width = ceil(log10((recon_mat.dim_x+1)));
                 for ch_num=1:num_chunks
                 %parfor ch_num=1:num_chunks
                     sx=slices_to_process(:,ch_num);
@@ -487,9 +447,9 @@ else
                             slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(ss)))];
                         end
                     end
-                    slicewise_recon_batch = [workdir 'sbatch/' volume_runno '_slice' slice_string '_CS_recon.bash'];
-                    swr_args= sprintf('%s %s %s', volume_variable_file, slice_string,recon_options_file);
-                    swr_cmd = sprintf('%s %s %s', slicewise_recon_exec_path,matlab_path,swr_args);
+                    slicewise_recon_batch = fullfile(workdir, 'sbatch', [ volume_runno '_slice' slice_string '_CS_recon.bash']);
+                    swr_args= sprintf('%s %s %s', volume_workspace, slice_string,setup_variables);
+                    swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
                     if  stage_2_running_jobs
                         dep_string = stage_2_running_jobs;
                         dep_type = 'afterok-or';
@@ -498,7 +458,7 @@ else
                         dep_type = '';
                     end
                     c_running_jobs ='';
-                    if ~recon_options.live_run
+                    if ~options.live_run
                         batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
                         [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
                         s3jobs{ch_num}=c_running_jobs;
@@ -510,7 +470,7 @@ else
                         end
                     else
                         %eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
-                        slicewise_CSrecon_exec( volume_variable_file, slice_string,recon_options_file);
+                        slicewise_CSrecon_exec( volume_workspace, slice_string,setup_variables);
                         %slicewise_CSrecon_exec(swr_args)
                         %starting_point=4;
                     end
@@ -541,32 +501,25 @@ else
             '\t  \t  %s;\n'...
             '\t  fi;\n'...
             'fi'],at_success_flag, success_flag, hf_success_flag, ...
-            local_archive_tag,getenv('USER'),full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
-        mf2 = matfile(variables_file,'Writable',true);
-        mf2.handle_archive_tag_cmd=handle_archive_tag_cmd;
+            local_archive_tag,getenv('USER'),target_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+        vol_mat = matfile(setup_variables,'Writable',true);
+        vol_mat.handle_archive_tag_cmd=handle_archive_tag_cmd;
         %% STAGE4 Scheduling
         if (starting_point <= 4)
             %% Schedule via slurm and record jobid for dependency scheduling.
-            if ~exist('plural','var')
-                if chunk_size > 1
-                    plural = 's';
-                else
-                    plural = '';
-                end
-            end
             vcu_slurm_options=struct;
             vcu_slurm_options.v=''; % verbose
             vcu_slurm_options.s=''; % shared; volume setup should to share resources.
             vcu_slurm_options.mem=66000; % memory requested; vcu needs a significant amount; could do this smarter, though.
-            vcu_slurm_options.p=cs_full_volume_queue; % Really want this to be high_priority, and will usually be that.
-            vcu_slurm_options.job_name =[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
+            vcu_slurm_options.p=cs_queue.full_volume; % Really want this to be high_priority, and will usually be that.
+            vcu_slurm_options.job_name =[volume_runno '_CS_recon_NS' num2str(options.chunk_size)];
             %vcu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
             vcu_slurm_options.reservation = ''; 
-            volume_cleanup_batch = [workdir 'sbatch/' volume_runno '_volume_cleanup_for_CS_recon.bash'];
-            vcu_args=sprintf('%s',variables_file);
-            vcu_cmd = sprintf('%s %s %s', volume_cleanup_exec_path,matlab_path,vcu_args);
-            if ~recon_options.live_run
+            volume_cleanup_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_cleanup_for_CS_recon.bash']);
+            vcu_args=sprintf('%s',setup_variables);
+            vcu_cmd = sprintf('%s %s %s', cs_execs.volume_cleanup,matlab_path,vcu_args);
+            if ~options.live_run
                 batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
                 maybe_im_a_singleton='';
                 if (stage_3_running_jobs)
@@ -580,15 +533,15 @@ else
         end
         %% STAGE5 Scheduling
         if (starting_point <= 5)
-            if ~recon_options.keep_work
+            if ~options.keep_work
                 % Send to workstation and write completion flag.
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
                 mkdir_cmd = sprintf('ssh %s@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',...
-                    getenv('USER'),full_host_name,target_machine,volume_runno,volume_runno);
+                    getenv('USER'),target_host_name,target_machine,volume_runno,volume_runno);
                 scp_cmd = sprintf(['echo "Attempting to transfer data to %s.";' ...
                     'scp -pr %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
-                    target_machine,t_images_dir,getenv('USER'),full_host_name,target_machine,volume_runno);
+                    target_machine,t_images_dir,getenv('USER'),target_host_name,target_machine,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
                 local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
@@ -596,10 +549,10 @@ else
                 eval_cmd = sprintf(['success=0;\nif [[ $freespaceK -lt $gimmespaceK ]]; then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."; '...
                'else %s; fi; %s'],  images_dir,target_machine, scp_cmd,write_success_cmd);
                 %}
-                n_raw_images = original_dims(3);
+                n_raw_images = recon_mat.dim_z;
                 shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
                 shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', getenv('USER'), full_host_name,  target_machine);
+                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', getenv('USER'), target_host_name,  target_machine);
                 shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
                 shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
                 shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
@@ -609,36 +562,43 @@ else
                 shipper_slurm_options.v=''; % verbose
                 shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
                 shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
-                shipper_slurm_options.p=gatekeeper_queue; % For now, will use gatekeeper queue for volume manager as well
+                shipper_slurm_options.p=cs_queue.gatekeeper; % For now, will use gatekeeper queue for volume manager as well
                 shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
                 %shipper_slurm_options.reservation = active_reservation;
                 % using a blank reservation to force no reservation for this job.
                 shipper_slurm_options.reservation = '';
-                shipper_batch = [workdir 'sbatch/' volume_runno '_shipper.bash'];
+                shipper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_shipper.bash']);
                 %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
-                batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
-                dep_status='';
-                if ~recon_options.live_run
-                    if stage_4_running_jobs
-                        dep_status='afterok-or';
+                if ~exist(success_flag,'file')
+                    batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
+                    dep_status='';
+                    if ~options.live_run
+                        if stage_4_running_jobs
+                            dep_status='afterok-or';
+                        end
+                        stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
+                    else
+                        [ship_st,ship_out]=system(sprintf('bash %s',batch_file));
+                        if ship_st~=0
+                            error(ship_out);
+                        end
                     end
-                    stage_5_running_jobs = dispatch_slurm_jobs(batch_file,'',stage_4_running_jobs,dep_status);
                 else
-                    [ship_st,ship_out]=system(sprintf('bash %s',batch_file));
-                    if ship_st~=0
-                        error(ship_out);
-                    end
+                    ship_st=0;
+                    fprintf('Images previously sent successfully.\n');
                 end
                 %% STAGE5+ Scheduling
                 %if (starting_point >= 5)%(starting_point <= 6)
                 if (starting_point == 5)%(starting_point <= 6)
                     % This is only scheduled at stage 5 because prior to that it wont
                     % work anyway.
-                    if ~recon_options.live_run
-                        stage_5e_running_jobs = deploy_procpar_handlers(variables_file);
-                    else
+                    %if ~options.live_run
+                        stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
+                    %else
                         %% live run starting point advance handling
-                        if exist('ship_st','var')
+                        % this prevents volume manager from running
+                        % recursively forever.
+                        if options.live_run && exist('ship_st','var')
                             if ship_st==0
                                 starting_point=6;
                             end
@@ -648,7 +608,6 @@ else
             end
         end
     end
-    recon_type = 'CS_v2';
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
     % jobs? That seems like a clear mistake! We should be rescheduling so
     % long as we're not stage 6. 
@@ -660,23 +619,23 @@ else
     % data.
     % That seems okay, so lets watch for that, and not re_schedule volume
     % manager when keep_work is on and stage is 5+
-    if ( ~recon_options.keep_work && starting_point < 6 ) ...
-            || ( recon_options.keep_work &&  starting_point < 5 )
+    if ( ~options.keep_work && starting_point < 6 ) ...
+            || ( options.keep_work &&  starting_point < 5 )
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
         vm_slurm_options.mem=2048; % memory requested; vm only needs a miniscule amount.
             %--In theory only! For yz-array sizes > 2048^2, loading the
             % data of phmask, CSmask, etc can push the memory of 512 MB
-        vm_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+        vm_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
         vm_slurm_options.job_name = [volume_runno '_volume_manager'];
         %vm_slurm_options.reservation = active_reservation;
         % using a blank reservation to force no reservation for this job.
         vm_slurm_options.reservation = '';
-        volume_manager_batch = [workdir 'sbatch/' volume_runno '_volume_manager.bash'];
+        volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
         vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
-        vm_cmd = sprintf('%s %s %s', volume_manager_exec_path,matlab_path, vm_args);
-        if ~recon_options.live_run
+        vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
+        if ~options.live_run
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
             %{
             if stage_4_running_jobs

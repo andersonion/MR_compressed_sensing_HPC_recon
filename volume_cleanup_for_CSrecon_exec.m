@@ -1,4 +1,4 @@
-function misguided_status_code = volume_cleanup_for_CSrecon_exec(volume_variable_file,output_size,size_type)
+function misguided_status_code = volume_cleanup_for_CSrecon_exec(setup_variables,output_size,size_type)
 % function status=VOLUME_CLEANUP_FOR_CSRECON_EXEC(volume_variable_file,output_size,size_type)
 % Volume_cleanup for csrecon, reduces cs recon tmp files to final outputs through write_civm_image.
 % All relevant parameters are burried inside the volume_variable file(take care!)
@@ -20,62 +20,62 @@ misguided_status_code = 0;
 scale_target=2^16-1;
 
 if ~isdeployed
+    %{
     addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
     addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
-    if (~exist('volume_variable_file','var') || isempty(volume_variable_file) )
+    if (~exist('volume_variable_file','var') || isempty(setup_variables) )
       warning('using canned parameters because youdidnt specify any!');
       pause(3);
-    volume_variable_file = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
+    setup_variables = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
     %volume_scale = 1.4493;
     %variable_iterations=1;
     end
-
+%}
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
 end
 
-% TEMPORARY CODE for backwards compatibility of in-progress scans remove by
-% June 12th, 2018
-if ~exist(volume_variable_file,'file')
-    [t_workdir, t_file_name, t_ext]=fileparts(volume_variable_file);
-    old_vv_file = [t_workdir '/work/' t_file_name t_ext];
-    mv_cmd = ['mv ' old_vv_file ' ' volume_variable_file];
-    if exist(old_vv_file,'file')
-        system(mv_cmd);
-    end
-end
-load(volume_variable_file);
+% load(setup_variables);
+setup_var=matfile(setup_variables);
+wkspc_mat=matfile(setup_var.volume_workspace);
+recon_mat=matfile(setup_var.recon_file);
+options=recon_mat.options;
 %recon_dims(1)=6;
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
 
-%% resolve volume_number
+%{
+% % resolve volume_number
 if ~exist('volume_number','var')
   % In the past volume_manager didnt record the volume number to our settings file.
   % So we'd have to regenerate it using the runno as a proxy. 
-  % That has since been fixed, this code is left behind as exceptional precaution.
+  % That has since been fixed, this code is left behind as for refernce.
   warning('volume_number missing, using the guess code');
   %vnt, volume number text
-  vt=regexpi(volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
+  vt=regexpi(setup_var.volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
   if isempty(vt)
     warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
     vt={'0'};
   end
   volume_number=1+str2double(vt{:});
 end
-
+%}
 %% log details
 if ~exist('log_mode','var')
     log_mode = 1;
 end
 log_files = {};
+log_files{end+1}=setup_var.volume_log_file;
+log_files{end+1}=recon_mat.log_file;
+%{
 if exist('volume_log_file','var')
     log_files{end+1}=volume_log_file;
 end
 if exist('log_file','var')
     log_files{end+1}=log_file;
 end
+%}
 if (numel(log_files) > 0)
     log_file = strjoin(log_files,',');
 else
@@ -83,61 +83,106 @@ else
     log_mode = 3;
 end
 
-%% 
+%% pull formerly optional settings out recon_mat
+%{
 if ~exist('continue_recon_enabled','var')
     continue_recon_enabled=1;
 end
 if ~exist('variable_iterations','var')
     variable_iterations=0;
 end
+%}
+% continue_recon is referencing that we could continue the recon, not that
+% we did.
+% maybe resumable_recon would be better? or since we seem to always operate
+% this way, this really loses all meaning
+try
+    continue_recon_enabled=options.continue_recon_enabled;
+catch
+    warning('continue_recon_enabled not set');
+    continue_recon_enabled=1;
+end
+try
+    variable_iterations=options.variable_iterations;
+catch
+    warning('variable_iterations not set');
+    variable_iterations=0;
+end
 %% get scaling file or show error
+% gives us 30 x 10 second intervals to wait
+% a 300 second failure extension!
+% if things accidentally happen out of order this is garbage!
 scale_file_error =1;
-if exist('scale_file','var')
-  if (volume_number == 1)
+if setup_var.volume_number == 1 && exist(recon_mat.scale_file,'file')
     scale_file_error = 0;
-  else
+elseif setup_var.volume_number ~= 1
     num_checks = 30;
     for tt = 1:num_checks
-      %disp(['tt = ' num2str(tt)])
-      if exist(scale_file,'file')
-        scale_file_error = 0;
-        break;
-      else
-        pause(10)
-      end
-    end 
-  end
+        if exist(recon_mat.scale_file,'file')
+            scale_file_error = 0;
+            break;
+        else
+            waring('Waiting for scale file for 10 seconds');
+            pause(10)
+        end
+    end
 end
-if (~scale_file_error) && exist(scale_file,'file')
-  fid_sc = fopen(scale_file,'r');
+if ~scale_file_error
+  fid_sc = fopen(recon_mat.scale_file,'r');
   scaling = fread(fid_sc,inf,'*float');
   fclose(fid_sc);
-elseif (volume_number > 1)
+else %if (setup_var.volume_number > 1)
   error_flag = 1;
-  log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',volume_runno,scale_file);
+  log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',setup_var.volume_runno,recon_mat.scale_file);
   yet_another_logger(log_msg,log_mode,log_file,error_flag);
   status=variable_to_force_an_error;
   quit force
 end
 
 %% get options into base workspace.
+try
+    recon_dims=recon_mat.recon_dims;
+catch
+end
+try
+    original_dims=recon_mat.original_dims;
+catch
+end
+%{
+% originally allowed either or spec of recon_dims/original_dims, that is
+now disabled for simpler debuggin.
 if ~exist('recon_dims','var')
     recon_dims = original_dims;
 elseif  ~exist('original_dims','var')
     original_dims = recon_dims;
 end
+%}
+%{
 if ~exist('fermi_filter','var')
     fermi_filter = 1;
 end
-if exist('fermi_filter_w1','var')
-    w1=fermi_filter_w1;
-else
-    w1 = 0.15;
+%}
+try
+    w1=options.fermi_w1;
+catch
 end
-if exist('fermi_filter_w2','var')
-    w2=fermi_filter_w2;
-else
-    w2 = 0.75;
+%if exist('fermi_filter_w1','var')
+if ~exist('w1','var')|| ~w1
+    %w1=fermi_filter_w1;
+%else
+    warning('Fermi filter w1 not set! fermi code will use its internal default');
+%    w1 = 0.15;%    w2 = 0.75;
+end
+%if exist('fermi_filter_w2','var')
+try
+    w2=options.fermi_w2;
+catch
+end
+if ~exist('w2','var') || ~w2
+%    w2=fermi_filter_w2;
+%else
+    warning('Fermi filter w2 not set! fermi code will use its internal default');
+%    w2 = 0.75;
 end
 if ~exist('write_qsm','var')
     write_qsm=0;
@@ -146,27 +191,23 @@ if ~exist('qsm_fermi_filter','var')
     qsm_fermi_filter=0;
 end
 
-%%
-if continue_recon_enabled % This should be made default.
-    if ~exist('wavelet_dims','var')
-        if exist('waveletDims','var')
-            wavelet_dims = waveletDims;
-        else
-            wavelet_dims = [12 12];
-        end
-    end
-    if ~exist('wavelet_type','var')
-        wavelet_type = 'Daubechies';
-    end
-    XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
+if continue_recon_enabled 
+    XFM = Wavelet(options.wavelet_type,options.wavelet_dims(1),options.wavelet_dims(2));
 end
 
 %% check on temp file, try to get amount complete, or exit on fail
 temp_file_error = 1;
-if exist('temp_file','var')
+if exist(setup_var.temp_file,'file')
+    temp_file_error = 0;
+end
+%{
+% this check "should" never be necessary.
+% Maybe it was originally here for slow-disk protection? 
+% Leaving it in for reference for now.
+if exist('setup_var.temp_file','var')
     num_checks = 30;
     for tt = 1:num_checks
-        if exist(temp_file,'file')
+        if exist(setup_var.temp_file,'file')
             temp_file_error = 0;
             break;
         else
@@ -174,25 +215,26 @@ if exist('temp_file','var')
         end
     end
 end
+%}
 error_flag=0;
 if temp_file_error
     error_flag=1;
-    if ~exist('temp_file','var')
-        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',volume_runno,volume_variable_file);
+    if ~exist('setup_var.temp_file','var')
+        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',setup_var.volume_runno,setup_variables);
     else
-        log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',volume_runno,temp_file);
+        log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
     end
 else
-    [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(temp_file);
+    [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(setup_var.temp_file);
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
         unreconned_slices = length(find(tmp_header<options.Itnlim));
     end
     if  (unreconned_slices > 0)
         error_flag=1;
-        log_msg =sprintf('Volume %s: %i slices appear to be inadequately reconstructed; DYING.\n',volume_runno,unreconned_slices);
+        log_msg =sprintf('Volume %s: %i slices appear to be inadequately reconstructed; DYING.\n',setup_var.volume_runno,unreconned_slices);
     else
-        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',volume_runno,number_of_at_least_partially_reconned_slices);
+        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',setup_var.volume_runno,number_of_at_least_partially_reconned_slices);
     end
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
@@ -202,10 +244,10 @@ if error_flag==1
 end
 
 %% Read in temporary data
-log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',volume_runno,temp_file);
+log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',setup_var.volume_runno,setup_var.temp_file);
 yet_another_logger(log_msg,log_mode,log_file);
 tic
-fid=fopen(temp_file,'r');
+fid=fopen(setup_var.temp_file,'r');
 %fseek(fid,header_size*64,-1);
 header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
@@ -231,24 +273,34 @@ bytes_per_slice=2*8*recon_dims(2)*recon_dims(3);
 % its done at the end when we take the magnitude.
 % slice_quantile=zeros(1,recon_dims(1));
 
+% This histogram collection code is based on the premise that our final
+% signal values are related to our input signals by some knowable factor.
+% James is NOT convinced that is true!
 % Preparing for the switch to when scaling calc is always done at the end.
 if exist('scaling','var')   
     %sqrt(recon_dims(2)*recon_dims(3))*(2^16-1)/volume_scale;
-    scaling2 = scale_target/(volume_scale*volume_scale);
+    scaling2 = scale_target/(wkspc_mat.volume_scale*wkspc_mat.volume_scale);
 else
-    scaling2=volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+    scaling2=wkspc_mat.volume_scale/sqrt(recon_dims(2)*recon_dims(3));
 end
-
-hist_bins=0:(scaling2/256):scaling2;
-
+hist_bins=0:(scaling2/255):scaling2;
 volume_hist=histcounts(0,hist_bins); % Initialize an (almost) empty histogram
 volume_hist(1)=0;
 
 % do the full set of slices
+% rep interval minimum of 2 else it'll just stay quiet.)
+rep_interval_sec=2;
+slice_processing_start=tic;
+% a structure of report times to prevent spamming 
+t_rep=struct;
 for ss=1:recon_dims(1)
-    if ~mod(ss,10)
-        log_msg = sprintf('Processing slice %i...\n',ss);
+    % if ~mod(ss,10)
+    slice_processing_elapsed=toc(slice_processing_start);
+    st=sprintf('x_%i',floor(slice_processing_elapsed));
+    if mod(floor(slice_processing_elapsed),rep_interval_sec)&& ~isfield(t_rep,st)
+        log_msg = sprintf('Slice Processing % 6.2f%%...\n',100* ss/recon_dims(1));
         yet_another_logger(log_msg,log_mode,log_file);
+        t_rep.(st)=slice_processing_elapsed;
     end
     % James says: This data read is a bit strange,
     % why dont we just read in as double direct?
@@ -266,7 +318,7 @@ for ss=1:recon_dims(1)
     t_data_out = XFM'*t_data_out;
     
     if ~isfield(options,'slicewise_norm') || ~options.slicewise_norm % This is done in slicewise_recon when running slicewise_norm
-        t_data_out = t_data_out*volume_scale/sqrt(recon_dims(2)*recon_dims(3));
+        t_data_out = t_data_out*wkspc_mat.volume_scale/sqrt(recon_dims(2)*recon_dims(3));
     end
     %% Crop out extra k-space if non-square or non-power of 2,
     % might as well apply fermi filter in k-space, if requested (no QSM requested either)
@@ -301,33 +353,38 @@ for ss=1:recon_dims(1)
             pause(1)
         end
     %}
-    
-    
 end
+log_msg = sprintf('Slice Processing % 6.2f%%...\n',100* ss/recon_dims(1));
+yet_another_logger(log_msg,log_mode,log_file);
+% clean up slice_process temp vars to make workspace easier to navigate in
+% debugging.
+clear ss final_slice_out t_data_out XFM;
+% these are display related vars from slice process.
+clear t_rep rep_interval_sec slice_processing_start slice_processing_elapsed st;
 
-
+%% histo scale handling
 cs_hist=cumsum(volume_hist);
 thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
 [a,~]=find(cs_hist'>thresh,1);
 if (a == length(hist_bins))
     a=a-1;
 end
-
 not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;
-suggested_final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',runno));
-scale_target=2^16-1;
+suggested_final_scale_file=fullfile(fileparts(recon_mat.scale_file),...
+    sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',recon_mat.runno));
 suggested_final_scale=scale_target/not_really_data_quantile;
-
-if (volume_number == 1)
+clear hist_bins thresh volume_hist cs_hist a not_really_data_quantile;
+if (setup_var.volume_number == 1)
     fid_sc = fopen(suggested_final_scale_file,'w');
     % scale write count
     sc_wc = fwrite(fid_sc,suggested_final_scale,'float');
     fclose(fid_sc);
 end
+clear suggested_final_scale sc_wc fid_sc;
+%%
 read_time = toc;
-log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',volume_runno,read_time);
+log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,read_time);
 yet_another_logger(log_msg,log_mode,log_file);
-
 fclose(fid);
 
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
@@ -337,7 +394,7 @@ if write_qsm
     if ~exist(qsm_folder,'dir')
         system(['mkdir ' qsm_folder]);
     end
-    qsm_file = [qsm_folder volume_runno '_raw_qsm.mat'];
+    qsm_file = [qsm_folder setup_var.volume_runno '_raw_qsm.mat'];
 end
 if ~qsm_fermi_filter
     if write_qsm
@@ -353,7 +410,7 @@ if ~qsm_fermi_filter
             savefast2(qsm_file,'real_data','imag_data');
             qsm_write_time = toc;
             clear real_data imag_data
-            log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',volume_runno,qsm_file, qsm_write_time);
+            log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,qsm_file, qsm_write_time);
             yet_another_logger(log_msg,log_mode,log_file);
             %save(qsm_file,'data_out','-v7.3');
         end
@@ -361,10 +418,10 @@ if ~qsm_fermi_filter
 end
 
 %% Apply Fermi Filter, and/ or reduce sample
-if fermi_filter|| exist('output_size','var')
+if options.fermi_filter|| exist('output_size','var')
     log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
     yet_another_logger(log_msg,log_mode,log_file);
-    
+    % go back to kspace from imgspace.
     data_out = fftshift(fftn(fftshift(data_out)));
     if exist('output_size','var')
         if prod(output_size)>numel(data_out)
@@ -375,7 +432,7 @@ if fermi_filter|| exist('output_size','var')
         idx_e=round(0.5*size(data_out)+0.5*output_size);
         data_out=data_out(idx_s(1):idx_e(1),idx_s(2):idx_e(2),idx_s(3):idx_e(3));
     end
-    if fermi_filter
+    if options.fermi_filter
         if exist('w1','var')
             data_out = fermi_filter_isodim2_memfix(data_out,w1,w2);
         else
@@ -407,43 +464,52 @@ if qsm_fermi_filter
             qsm_write_time = toc;
             clear real_data imag_data
             
-            log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',volume_runno,qsm_file, qsm_write_time);
+            log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,qsm_file, qsm_write_time);
             yet_another_logger(log_msg,log_mode,log_file);
             %save(qsm_file,'data_out','-v7.3');
         end
     end
 end
+% Rename var in memory to avoid accidentally doing invalid operations on
+% dat_out
 %data_out = abs(data_out);
 mag_data = abs(data_out);
 clear data_out;
 %{
 % Move to processing after the procpar file has been processed.
-write_archive_tag_nodev(volume_runno,['/' target_machine 'space'],original_dims(3),struct1.U_code, ...
+write_archive_tag_nodev(setup_var.volume_runno,['/' target_machine 'space'],original_dims(3),struct1.U_code, ...
     ['.' struct1.U_stored_file_format],struct1.U_civmid,true,images_dir)
 
 %}
-%write_civm_image(fullfile(images_dir,[volume_runno struct1.scanner_tesla_image_code 'imx']), ...
+%write_civm_image(fullfile(images_dir,[setup_var.volume_runno struct1.scanner_tesla_image_code 'imx']), ...
 %    mag_data,struct1.U_stored_file_format,0,1)
 
 %% Pre 17 May 2018 code:
 %{
-    write_civm_image(fullfile(images_dir,[volume_runno databuffer.headfile.scanner_tesla_image_code 'imx']), ...
+    write_civm_image(fullfile(images_dir,[setup_var.volume_runno databuffer.headfile.scanner_tesla_image_code 'imx']), ...
         mag_data,'raw',0,1)
 %}
 %% Post 17 May 2018 code:
 % while we take stats of our iterations, these are not currently variable
 % and may not be the information we're after.
 % line search iterations of the minimization are variable, and we dont report those out of the fnl code.
+databuffer=large_array;
+databuffer.addprop('headfile');
+databuffer.addprop('data');
+databuffer.headfile=struct;
+t_var=recon_mat.databuffer;
+databuffer.headfile=t_var.headfile; clear t_var;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_mean = mean(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_min = min(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_max = max(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_std = std(tmp_header(:));
-databuffer.headfile.U_runno = volume_runno;
+% Have to add the volume_runno here because we are initially populated with
+% the base runno.
+databuffer.headfile.U_runno = setup_var.volume_runno;
 
-mf=matfile(recon_file);
 try
-    first_corner_voxel=mf.first_corner_voxel;
+    first_corner_voxel=recon_mat.first_corner_voxel;
     if options.roll_data
         suffix='';
     else
@@ -452,6 +518,7 @@ try
     databuffer.headfile.(['roll_corner_X' suffix ]) = first_corner_voxel(1);
     databuffer.headfile.(['roll_corner_Y' suffix ]) = first_corner_voxel(2);
     databuffer.headfile.(['roll_first_Z' suffix ])  = first_corner_voxel(3);
+    clear suffix;
 catch roll_err
     disp(roll_err.message);
 end
@@ -483,9 +550,9 @@ else
 % When we have time in the future it would be nice to have only one scale
 % operation, however these are inexpensive in cpu/memory so its not so bad
 % to do it twice.
-final_scale_file=fullfile(fileparts(scale_file),sprintf('.%s_%i_civm_raw_scale.float',runno,options.selected_scale_volume));
+final_scale_file=fullfile(fileparts(recon_mat.scale_file),sprintf('.%s_%i_civm_raw_scale.float',recon_mat.runno,options.selected_scale_volume));
 databuffer.headfile.group_max_intensity=max(mag_data(:));
-if volume_number==options.selected_scale_volume+1 && ~exist(final_scale_file,'file')
+if setup_var.volume_number==options.selected_scale_volume+1 && ~exist(final_scale_file,'file')
     % BJ says: per /cm/shared/workstation_code_dev/recon/CS_v2/testing_and_prototyping/slicewise_hist_test.m
     % It looks like slicewise implementation is 3x faster than this code
     % (e.g. 75s vs 240s for array of 2048x1024x1024)
@@ -512,13 +579,17 @@ else
     final_scale = fread(fid_sc,inf,'*float');
     fclose(fid_sc);
     log_msg=sprintf('volume_cleanup: Volume %i found scale file %s, with value %0.14f.\n' ...
-        ,volume_number,final_scale_file,final_scale);
+        ,setup_var.volume_number,final_scale_file,final_scale);
     databuffer.headfile.group_max_atpct=databuffer.headfile.group_max_intensity;
 end
 mag_data=mag_data*final_scale;
 yet_another_logger(log_msg,log_mode,log_file);
 databuffer.headfile.divisor=1/final_scale;% legacy just for confusion :D 
 fprintf('\tMax value chosen for output scale: %0.14f\n',databuffer.headfile.group_max_atpct);
+
+%% Stuff all meta to headfile here
+% rad_mat_option_
+databuffer.headfile=combine_struct(databuffer.headfile,options,'CSv2_option_');
 
 %% save civm_raw
 databuffer.data = mag_data;clear mag_data; % mag_data clear probably unnecessary, this is just in case.
@@ -527,16 +598,30 @@ if ~isfield(options,'unrecognized_fields')
 end
 unrecog_cell={'planned_ok'};
 unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
-write_civm_image(databuffer,[{['write_civm_raw=' images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
+write_civm_image(databuffer,[{['write_civm_raw=' setup_var.images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
 if options.live_run
+    warning('Live run always keeps the work :p');
     options.keep_work=1;
 end
 if ~options.keep_work && ~options.process_headfiles_only
-    if exist(headfile,'file') %Is this the right condition?
+    % Lets adjust to keeping work until our final headfile is complete.
+    % That is, its more than 20KiB big. 
+    % 20 was chosen because typical procpars are 60KiB, and incomplete
+    % headfiles are typicallyu 5-6KiB.
+    cleanup_ready=0;
+    if exist(setup_var.headfile,'file')
+        BytesPerKiB=2^10;
+        hf_minKiB=20;
+        hfinfo=dir(setup_var.headfile);
+        if hfinfo.bytes>hf_minKiB*BytesPerKiB
+            cleanup_ready=1;
+        end
+    end
+    if cleanup_ready
         if exist(work_subfolder,'dir')
             log_msg =sprintf('Images have been successfully reconstructed; removing %s now...',work_subfolder);
             yet_another_logger(log_msg,log_mode,log_file);
-            rm_cmd=sprintf('rm -rf %s',work_subfolder);
+            rm_cmd=sprintf('rm -rf %s',setup_var.work_subfolder);
             system(rm_cmd);
         else
             

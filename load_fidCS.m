@@ -1,5 +1,11 @@
-function data_buffer = load_fidCS(fidpath,max_blocks,ntraces,npoints,bitdepth,cyclenum,voldims,only_non_zeros,double_down)
-
+function data_buffer = load_fidCS(fidpath,max_blocks,ntraces,npoints, ...
+    bitdepth,cyclenum,voldims,only_non_zeros,data_type)
+%data_buffer = load_fidCS(fidpath,max_blocks,ntraces,npoints, ...
+%    bitdepth,cyclenum,voldims,only_non_zeros,data_type)
+%
+% data_type = 'single' or 'double' Need doubles a lot of the time so its
+% best.
+    
 
 %5 May 2017, BJA: Added only_non_zeros flag, which only pulls out acquired
 %data and arranges it in a 2D array, where dim1 is the fully sampled
@@ -15,10 +21,12 @@ if ~exist('only_non_zeros','var')
     only_non_zeros = 0; 
 end
 
-if ~exist('double_down','var')
+if ~exist('data_type','var')
     % Double_down is inherrently silly. This would be MUCH BETTER if it was
     % just a string, with a value of either single or double. 
-    double_down = 0; 
+    data_type = 'single' ;
+elseif isnumeric(data_type)
+    error('Please specify double or single for data type, we prefer double');
 end
 
 
@@ -39,12 +47,8 @@ end
 %preallocate complex array
 display('preallocating complex array');
  %8 May 2017, BJA
-if double_down
-    lil_dummy = zeros([1,1],'double');
-else
-    lil_dummy = zeros([1,1],'single');
-end
 
+lil_dummy = zeros([1,1],data_type);
 lil_dummy =complex(lil_dummy,lil_dummy);
 data_buffer=zeros((npoints/2)*ntraces,max_blocks,'like',lil_dummy);
    
@@ -56,12 +60,7 @@ fseek(fid,byteskip,'bof');
 display('reading blocks');
 inx=1;%index pointer
 for b = 1:max_blocks    
- 
-    if double_down
-        data = fread(fid,npoints*ntraces,[bitdepth '=>double']);
-    else
-        data = fread(fid,npoints*ntraces,[bitdepth '=>single']);
-    end
+    data = fread(fid,npoints*ntraces,[bitdepth '=>' data_type ]);
     data_buffer(:,inx)=complex(data(1:2:end),data(2:2:end));
 
     fseek(fid,28,'cof'); %skip block header

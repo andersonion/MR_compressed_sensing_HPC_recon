@@ -1,4 +1,5 @@
-function slicewise_CSrecon_exec(matlab_workspace,slice_indices,options_file)
+function slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
+% slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
  
 
 if ~isdeployed    
@@ -27,8 +28,11 @@ if  (~exist(matlab_workspace,'file'))
 else
     a = who('-file',matlab_workspace,'aux_param');
     if ~size(a)
+        %error_flag = 1;
+        %log_msg =sprintf('Matlab workspace (''%s'') exists, but parameter ''aux_param'' not found. Dying now.\n',matlab_workspace);
+    else
         error_flag = 1;
-        log_msg =sprintf('Matlab workspace (''%s'') exists, but parameter ''aux_param'' not found. Dying now.\n',matlab_workspace);
+        log_msg =sprintf('Matlab workspace (''%s'') exists, but legacy parameter ''aux_param'' found. You need to clear work folder and restart recon. Dying now.\n',matlab_workspace);
     end
 end
 if error_flag==1
@@ -39,16 +43,22 @@ if error_flag==1
 end; clear error_flag;
 
 %% Load common workspace params
-if exist('options_file','var')
-    if exist(options_file,'file')
-        load(options_file);
+if exist('setup_variables','var')
+    if exist(setup_variables,'file')
+       % load(setup_variables);
+       setup_var=matfile(setup_variables);
+       recon_mat=matfile(setup_var.recon_file);
+       options=recon_mat.options;
     end
 end
 
+if ~exist('options','var')
+    error('Trouble loading configuration data, potential data corruption OR attempted restart of previous format work folder');
+end
 tic
 mm = matfile(matlab_workspace,'Writable',false);
 %load(matlab_workspace,'aux_param');
-aux_param=mm.aux_param;
+%aux_param=mm.aux_param;
 % expected params
 %{
                mask: [2048x2048 logical]
@@ -68,7 +78,7 @@ aux_param=mm.aux_param;
           verbosity: 0
 %}
 %load(matlab_workspace,'param');
-param=mm.param;
+%param=mm.param;
 %{
 fieldnames(test_m.param)
                   FT: []
@@ -86,7 +96,7 @@ fieldnames(test_m.param)
       lineSearchBeta: 0.6000
         lineSearchT0: 1
 %}
-
+param=init;
 time_to_load_common_workspace=toc;
 if isdeployed
     log_mode = 1;
@@ -94,46 +104,51 @@ else
     % when not deployed the log printing takes significant time.
     log_mode=2;
 end;
-log_file = aux_param.volume_log_file;
+log_file = setup_var.volume_log_file;
 
 log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
 yet_another_logger(log_msg,log_mode,log_file)
 
 %% Setup common variables
 %mask_size=aux_param.maskSize;
-mask=aux_param.mask;
 %DN=aux_param.DN;
-TVWeight=aux_param.TVWeight;
-xfmWeight=aux_param.xfmWeight;
-volume_scale=aux_param.volume_scale;
-temp_file=aux_param.tempFile;
-recon_dims=aux_param.recon_dims;
-CSpdf=aux_param.CSpdf; % We can find the LESS THAN ONE elements to recreate original slice array size
-phmask=aux_param.phmask;
+% mask=aux_param.mask;
+% TVWeight=aux_param.TVWeight;
+% xfmWeight=aux_param.xfmWeight;
+% volume_scale=aux_param.volume_scale;
+% temp_file=aux_param.tempFile;
+% recon_dims=aux_param.recon_dims;
+recon_dims=recon_mat.recon_dims;
+% CSpdf=aux_param.CSpdf; % We can find the LESS THAN ONE elements to recreate original slice array size
+% phmask=aux_param.phmask;
+%{
 wavelet_dims=aux_param.waveletDims;
 if isfield(aux_param,'waveletType')
     wavelet_type=aux_param.waveletType;
 else
     wavelet_type = 'Daubechies';
 end
-OuterIt=length(TVWeight);
-if length(xfmWeight) ~= OuterIt
+%}
+
+OuterIt=length(options.TVWeight);
+if length(options.xfmWeight) ~= OuterIt
     error('Outer iterations determined by length of xfmWeight and TVWeight, Error in setting!');
 end
 
-XFM = Wavelet(wavelet_type,wavelet_dims(1),wavelet_dims(2));
+options=recon_mat.options;
+XFM = Wavelet(options.wavelet_type,options.wavelet_dims(1),options.wavelet_dims(2));
 
 param.XFM = XFM;
-param.TV=TVOP;
+param.TV=TVOP    ;
 %% set special options of the BJ fnlCg_verbose function
 recon_options=struct;
-if ~isdeployed
     %{
+if ~isdeployed
     recon_options.verbosity = 1;
     recon_options.log_file = log_file;
     recon_options.variable_iterations = 1;
-    %}
 else
+    %}
     if exist('variable_iterations','var')
         recon_options.variable_iterations = variable_iterations; end
     if exist('volume_log_file','var')
@@ -148,9 +163,10 @@ else
         recon_options.convergence_limit=convergence_limit; end
     if exist('convergence_window','var')
         recon_options.convergence_window=convergence_window; end
-end
+% end
 %%
-requested_iterations = param.Itnlim;
+% requested_iterations = param.Itnlim;
+requested_iterations = options.Itnlim;
 %im_result=zeros(dims(2),dims(3),length(slice_numbers));
 %header_size = dims(1);
 %header_size = dims(1)*64;% 8 May 2017, BJA: Change header from binary to local scaling factor
@@ -161,7 +177,7 @@ for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
     %% read temp_file header for completed work.
     % this could be done exactly once before looping foreach slice.
-    t_id=fopen(temp_file,'r+');
+    t_id=fopen(setup_var.temp_file,'r+');
     % Should be the same size as header_size 
     header_length = fread(t_id,1,'uint16'); 
     % 15 May 2017, BJA; changed header from double to uint16; will indicate number of iterations performed
@@ -205,9 +221,9 @@ for index=1:length(slice_numbers)
         if (completed_iterations == 0) 
             %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
             slice_data = complex(mm.real_data(slice_index,:),mm.imag_data(slice_index,:));
-            param.data = zeros(size(mask),'like',slice_data); % Ibid
+            param.data = zeros(size(recon_mat.mask),'like',slice_data); % Ibid
             %param.data = zeros([size(mask)],'like',slice_data);
-            param.data(mask(:))=slice_data(:); % Ibid
+            param.data(recon_mat.mask)=slice_data(:); % Ibid
             
             time_to_load_sparse_data = toc(load_start);
             log_msg =sprintf('Slice %i: Time to load sparse data:  %0.2f seconds.\n',slice_index,time_to_load_sparse_data);
@@ -223,9 +239,9 @@ for index=1:length(slice_numbers)
             % use the CS Mask to get the actual density instead of the 
             % the theoretical. We have sdc3_mat, we've used before.
             % https://github.com/ISMRM/mri_unbound
-            im_zfwdc = ifft2c(param.data./CSpdf)/volume_scale;
-            ph = exp(1i*angle((ifft2c(param.data.*phmask))));
-            param.FT = p2DFT(mask, recon_dims(2:3), ph, 2);
+            im_zfwdc = ifft2c(param.data./recon_mat.CSpdf)/mm.volume_scale;
+            ph = exp(1i*angle((ifft2c(param.data.*recon_mat.phmask))));
+            param.FT = p2DFT(recon_mat.mask, recon_dims(2:3), ph, 2);
             res=XFM*im_zfwdc;
             clear im_zfwdc ph slice_data; 
         else
@@ -237,7 +253,7 @@ for index=1:length(slice_numbers)
             % questionable anyways (at least how implemented by me).
             recon_options.convergence_window = 3;
             
-            res=CS_tmp_load(temp_file,recon_dims,slice_index);
+            res=CS_tmp_load(setup_var.temp_file,recon_dims,slice_index);
   
         end
          
@@ -253,8 +269,9 @@ for index=1:length(slice_numbers)
                 yet_another_logger(...
                     sprintf('\t %i iter block # %i\n',param.Itnlim,n),log_mode,log_file);
             end
-            param.TVWeight  = TVWeight(n);   % TV penalty
-            param.xfmWeight = xfmWeight(n);  % L1 wavelet penalty
+            % gotta be sure these are 1xN
+            param.TVWeight  = options.TVWeight(n);   % TV penalty
+            param.xfmWeight = options.xfmWeight(n);  % L1 wavelet penalty
             [res, inner_its, lin_search_time] = fnlCg_verbose(res, param,recon_options);
             time_to_recon=time_to_recon+lin_search_time;
             iterations_performed=iterations_performed+inner_its;
@@ -270,7 +287,7 @@ for index=1:length(slice_numbers)
             scaling = fread(fid_sc,inf,'*float');
             fclose(fid_sc);
             im_res = XFM'*res;
-            im_res = im_res*volume_scale/sqrt(recon_dims(2)*recon_dims(3)); % --->> check this, sqrt of 2D plane elements required for proper scaling
+            im_res = im_res*mm.volume_scale/sqrt(recon_dims(2)*recon_dims(3)); % --->> check this, sqrt of 2D plane elements required for proper scaling
             %% Crop out extra k-space if non-square or non-power of 2
             %if sum(original_dims == recon_dims) ~= 3
             %    im_res = fftshift(fftn(fftshift(im_res)));
@@ -315,7 +332,7 @@ for index=1:length(slice_numbers)
         
         tic
         
-        t_id=fopen(temp_file,'r+');
+        t_id=fopen(setup_var.temp_file,'r+');
         header_length = fread(t_id,1,'uint16'); % Should be the same size as header_size
         work_done = fread(t_id,header_length,'uint16');
         %% Write data
@@ -328,7 +345,7 @@ for index=1:length(slice_numbers)
             % image_to_write = [real(res(:))' imag(res(:))'];
             % fwrite(t_id,image_to_write,'double'); %'n'
             fwrite(t_id,[real(res(:))' imag(res(:))'],'double');
-            log_msg =sprintf('Slice %i: Successfully reconstructed and written to %s.\n',slice_index,temp_file);
+            log_msg =sprintf('Slice %i: Successfully reconstructed and written to %s.\n',slice_index,setup_var.temp_file);
             if log_mode==2
                 yet_another_logger(log_msg,1,log_file);
             else
@@ -352,13 +369,13 @@ for index=1:length(slice_numbers)
             end
             if (num_written ~= 1) 
                 log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',...
-                    slice_index,header_info,temp_file,tt);
+                    slice_index,header_info,setup_var.temp_file,tt);
                 yet_another_logger(log_msg,log_mode,log_file,1);
                 variable_that_throws_an_error_so_slurm_knows_we_failed;
                 error('would slurm see this slice error?');
             else
                 log_msg =sprintf('Slice %i: Reconstruction flag ("%i") written to header of %s, after %i tries.\n',...
-                    slice_index,header_info,temp_file,tt);
+                    slice_index,header_info,setup_var.temp_file,tt);
             end
             yet_another_logger(log_msg,log_mode,log_file);
             
@@ -377,7 +394,7 @@ end
 %  slices in this job will appear to be reconned then; if any have failed,
 %  will explicitly fail in hopes of triggering backup jobs instead of
 %  another complete cycle of volume_manager, etc.
-[~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
+[~,~,tmp_header] = read_header_of_CStmp_file(setup_var.temp_file);
 apparent_iterations = tmp_header(slice_numbers);
 apparent_failures = slice_numbers(apparent_iterations<requested_iterations);
 num_af=length(apparent_failures);

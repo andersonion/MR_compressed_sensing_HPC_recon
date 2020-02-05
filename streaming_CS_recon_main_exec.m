@@ -1,4 +1,5 @@
-function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, varargin )
+function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series, varargin )
+% streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series, options_cell_array )
 %  Initially created on 14 September 2017, BJ Anderson, CIVM
 % SUMMARY
 %  Main code for compressed sensing reconstruction on a computing cluster
@@ -15,7 +16,8 @@ function streaming_CS_recon_main_exec(scanner,runno,study,agilent_series, vararg
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
-  
+
+recon_type = 'CS_v2.1';
 if ~isdeployed
     %% Get all necessary code for reconstruction
     % run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -40,6 +42,7 @@ end
 for pc=1:min(2,length(varargin))
     if isempty(regexpi(varargin{pc},'=')) % there is no equals sign
         if ~isempty(regexpi(varargin{pc},'^[0-9]+$'))
+            warning('Specifing iteration limit loosely is not recommended, use Itnlim=%i instead.',varargin{pc});
             if numel(strfind(strjoin(varargin),'Itnlim'))==0
                 varargin{pc}=sprintf('Itnlim=%s',varargin{pc});
             else
@@ -47,6 +50,7 @@ for pc=1:min(2,length(varargin))
                 % pause(3);
             end
         elseif ~isempty(regexpi(varargin{pc},'^CS[0-9]+_[0-9]+x_.*$'))
+            warning('Specifing CS table loosly on commandline is not recommended, use CS_table=%s instead.',varargin{pc});
             % example CS_table 'CS256_8x_pa18_pb54' In theory, this regular expression allows
             % out to infinity size and compression
             if numel(strfind(strjoin(varargin),'CS_table'))==0
@@ -59,7 +63,7 @@ for pc=1:min(2,length(varargin))
     else
         break; % as soon as we find = signs, we're in the auto opt portion.
     end
-end
+end; clear pc;
 %% run the option digester
 types.standard_options={...
     'target_machine',       'which regular engine should we send data to for archival.' 
@@ -84,7 +88,8 @@ types.beta_options={...
 types.planned_options={...
     'selected_scale_volume',' default 0, which volume set''s the scale '
     'wavelet_dims',         ''
-    'wavelet_type',         ''
+    'wavelet_type',         ['One of -> ' strjoin({'Haar', 'Beylkin', 'Coiflet', 'Daubechies',...
+    'Symmlet', 'Vaidyanathan','Battle'},':')]
     'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
     'fermi_w1',             ''
     'fermi_w2',             ''
@@ -95,8 +100,9 @@ types.planned_options={...
     'scanner_user',         ' what user do we use to pull from scanner.'
     'live_run',             ' run the code live in matlab, igored when deployed.'
     'CS_preview_data',      ' save a pre recon orthocenter of kspace and imgspace'
+    'skip_target_machine_check', 'dont bother checking if target_machine is alive.' 
     };
-options=mat_pipe_option_handler(varargin,types);
+options=mat_pipe_option_handler(varargin,types); clear varargin types;
 % A reminder, mat_pipe_option handler exists to do two things. 
 % 1. provide half decent help for your function. 
 % 2. clean up options to a known state to make option use easier, 
@@ -128,9 +134,12 @@ elseif ~isdeployed && ~options.live_run
     warning('Running in matlab, but live run is off, we''ll be scheduling slurm jobs. Are you sure thats what you wanted?');
     pause(3);
 end
-% james normally attaches this to the "debug_val" option, 
+% james normally attaches this to the "debug_mode" option, 
 % with increasing values of debugging generating more and more outtput.
 options.verbose=1;
+if options.debug_mode<10
+    options.verbose=0;
+end
 log_mode = 2; % Log only to log file.
 if options.verbose
     log_mode = 1; % Log to file and standard out/error.
@@ -140,6 +149,12 @@ if ~options.target_machine
 end
 % since options are defacto off, this should set inverse.
 options.fermi_filter=~options.skip_fermi_filter; 
+if ~options.fermi_w1
+    options.fermi_w1 = 0.15;
+end
+if ~options.fermi_w2
+    options.fermi_w2 = 0.75;
+end
 if ~options.chunk_size
     % 25 November 2016, temporarily (?) changed to 6
     % 2018 07 05 set to 30 like our wrapping shell script to reduce cluster
@@ -210,6 +225,7 @@ else
     options.re_init_count=str2double(options.iteration_strategy(2))-1;
     options.Itnlim=ic*(options.re_init_count+1);
     options.iteration_strategy=strjoin(options.iteration_strategy,'x');
+    clear ic;
 end
 if numel(options.xfmWeight) == 1
     options.xfmWeight= ones(1,options.re_init_count+1)*options.xfmWeight;
@@ -221,6 +237,14 @@ if numel(options.xfmWeight) ~=  numel(options.TVWeight) ...
     || numel(options.xfmWeight) ~= options.re_init_count+1
     error('mis-match for our re_initalizations and required params, TVWeight and xfmWeight');
 end
+if ~ischar(options.wavelet_type)
+    %     'Haar', 'Beylkin', 'Coiflet', 'Daubechies',
+    %           'Symmlet', 'Vaidyanathan','Battle'
+    options.wavelet_type='Daubechies';
+end
+if numel(options.wavelet_dims)~=2
+    options.wavelet_dims=[12,12];
+end
 %% user configurable scanner user.
 % only partially implemented :D 
 if ~options.scanner_user
@@ -228,58 +252,26 @@ if ~options.scanner_user
 else
     scanner_user=options.scanner_user;
 end
-%% Reservation support
+matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+%% Reservation/ENV support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
+cs_queue=CS_env_queue();
 %% Determine where the matlab executables live
-%  May change this to look to environment variables, or a seperate
-%  head/textfile, which will give us dynamic flexibility if our goal is
-%  have end-to-end deployability.
-% the CS_CODE_DEV setting cant be entirely in options as main is one of the
-% "versioned" pieces of code.
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
-% Gatekeeper support
-gatekeeper_path = getenv('CS_GATEKEEPER_EXEC');
-% set an env var to get latest dev code, or will defacto run stable.
-CS_CODE_DEV=getenv('CS_CODE_DEV');
-if isempty(CS_CODE_DEV)
-    CS_CODE_DEV='stable';
-end
-if isempty(gatekeeper_path)
-    gatekeeper_path = [ '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/' CS_CODE_DEV '/run_gatekeeper_exec.sh'] ;
-    setenv('CS_GATEKEEPER_EXEC',gatekeeper_path);
-end
-gatekeeper_queue = getenv('CS_GATEKEEPER_QUEUE');
-if isempty(gatekeeper_queue)
-    gatekeeper_queue =  'slow_master';%'high_priority';
-    setenv('CS_GATEKEEPER_QUEUE',gatekeeper_queue)
-end
-cs_full_volume_queue = getenv('CS_FULL_VOLUME_QUEUE');
-if isempty(cs_full_volume_queue)
-    cs_full_volume_queue = 'high_priority';
-end
-fid_splitter_path = getenv('CS_FID_SPLITTER_EXEC');
-if isempty(fid_splitter_path)
-    fid_splitter_path = [ '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/' CS_CODE_DEV '/run_fid_splitter_exec.sh' ];
-    setenv('CS_FID_SPLITTER_EXEC',fid_splitter_path);
-end
-volume_manager_path = getenv('CS_VOLUME_MANAGER_EXEC');
-if isempty(volume_manager_path)
-    volume_manager_path = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' CS_CODE_DEV '/run_volume_manager_exec.sh'];
-    setenv('CS_VOLUME_MANAGER_EXEC',volume_manager_path);
-end
+[cs_execs,cs_exec_set]=CS_env_execs();
 %% Get workdir
 scratch_drive = getenv('BIGGUS_DISKUS');
 workdir =  fullfile(scratch_drive,[runno '.work']);
-log_file = fullfile(workdir,[ runno '.recon_log']);
-local_fid= fullfile(workdir,[runno '.fid']);
-study_flag=fullfile(workdir,['.' runno '.recon_completed']);
+log_file = fullfile(workdir,[ runno '_recon.log']);
+% local_fid= fullfile(workdir,[runno '.fid']);
+local_fid= fullfile(workdir,'fid');
+agilent_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 %% do main work and schedule remainder
-if ~exist(study_flag,'file')
+if ~exist(agilent_study_flag,'file')
     % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
-    recon_file = fullfile(workdir,[runno 'recon.mat']);
+    recon_file = fullfile(workdir,[runno '_recon.mat']);
     % t_vars will be cleared after this section to maintain the original
     % code flow and var bloat. Need to revisit this when we have time.
     if ~exist(recon_file,'file')
@@ -338,11 +330,14 @@ if ~exist(study_flag,'file')
     %being a snot and leaving this pause even after the user says yes, 
     % in case they're extra hasty :P 
     forced_wait=3;
+    if options.debug_mode>=50 
+        forced_wait=0.1;
+    end
     fprintf('Continuing in %i seconds ...\n',forced_wait);
     pause(forced_wait); 
     %% Write initialization info to log file.
     if ~exist(workdir,'dir');
-        mkdir_cmd = sprintf('mkdir -m 775 %s',workdir);
+        mkdir_cmd = sprintf('mkdir %s',workdir);
         system(mkdir_cmd);
     end
     if ~exist(log_file,'file')
@@ -355,21 +350,22 @@ if ~exist(study_flag,'file')
     start_date=sprintf('%02i %s %04i',ts(3),month_string{1},ts(1));
     start_time=sprintf('%02i:%02i',ts(4:5));
     user = getenv('USER');
-    log_msg =sprintf('\n');
+    log_msg=sprintf('\n');
     log_msg=sprintf('%s----------\n',log_msg);
     log_msg=sprintf('%sCompressed sensing reconstruction initialized on: %s at %s.\n',log_msg,start_date, start_time);
     log_msg=sprintf('%s----------\n',log_msg);
-    log_msg=sprintf('%sScanner study: %s\n',log_msg, study);
+    log_msg=sprintf('%sScanner study: %s\n',log_msg, agilent_study);
     log_msg=sprintf('%sScanner series: %s\n',log_msg, agilent_series);
     log_msg=sprintf('%sUser: %s\n',log_msg,user);
-    log_msg=sprintf('%sExec Set: %s\n',log_msg,CS_CODE_DEV);
+    log_msg=sprintf('%sExec Set: %s\n',log_msg,cs_exec_set);
     yet_another_logger(log_msg,log_mode,log_file);
     
     if ~exist(recon_file,'file')
+        % This should be an impossible condition!
         m = specid_to_recon_file(t_db,t_opt,recon_file);
         clear t_db t_opt;
     end
-    
+    m.recon_type = recon_type;
     %% Test ssh connectivity using our perl program which has robust ssh handling.
     %{ 
     % but the scanner is probably fine and not where we'll have trouble
@@ -380,7 +376,11 @@ if ~exist(study_flag,'file')
     %}
     puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
         getenv('USER'),options.target_machine,options.target_machine,getenv('USER'));
-    [s,sout]=system(puller_test,'-echo');
+    fprintf('Test target_machine (%s) connection...\n',options.target_machine);
+    if options.skip_target_machine_check
+        puller_test='echo "Skipping ssh check";';
+    end
+    [s,sout]=system(puller_test);
     if s~=0
         error('Problem on testing of connection to %s\n%s\n',...
             options.target_machine,sout);
@@ -391,7 +391,7 @@ if ~exist(study_flag,'file')
     %% Second First things first: determine number of volumes to be reconned
     local_hdr = fullfile(workdir,[runno '_hdr.fid']);
     try
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
     catch merr
         if options.debug_mode<50
             error(merr.message)
@@ -419,7 +419,11 @@ if ~exist(study_flag,'file')
         [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr_details(local_hdr);
         m.dim_x = round(m.npoints/2);
     end
-    procpar_file = fullfile(workdir,[runno '.procpar']);
+    procpar_file = fullfile(workdir,'procpar');
+    if ~exist(procpar_file,'file')
+        warning('Legacy procpar file name detected!');
+        procpar_file = fullfile(workdir,[runno '.procpar']);
+    end
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
         if (local_or_streaming_or_static == 2) 
@@ -448,13 +452,14 @@ if ~exist(study_flag,'file')
             yet_another_logger(log_msg,log_mode,log_file);
         else
             %% local or static mode
-            %datapath='/home/mrraw/' study '/' agilent_series '.fid'];
-            datapath=fullfile('/home/mrraw',study,[agilent_series '.fid']);
+            %datapath='/home/mrraw/' agilent_study '/' agilent_series '.fid'];
+            datapath=fullfile('/home/mrraw',agilent_study,[agilent_series '.fid']);
             mode =2; % Only pull procpar file
             puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
         end
     end
-    %% Might as well process skiptable/mask while we're here
+    %% process skiptable/mask set up common part of headfile output
+    % add sktiptable/mask stuff to our recon.mat
     % we can check if we've done this before using the whos command
     varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
@@ -472,7 +477,7 @@ if ~exist(study_flag,'file')
         
         % Please enhance later to not be so clumsy (include these variables
         % in the missing variable list elsewhere in this function.
-
+        
         bh=struct;
         original_dims=m.original_dims;
         bh.dim_X=original_dims(1);
@@ -481,12 +486,21 @@ if ~exist(study_flag,'file')
         bh.A_dti_vols=m.n_volumes;
         bh.A_channels = 1;
         bh.A_echoes = m.nechoes;
+        
+        bh.CS_working_array=recon_dims;
+        bh.CS_sampling_fraction = m.sampling_fraction;
+        bh.CS_acceleration = 1/m.sampling_fraction;
+        bh.B_recon_type=m.recon_type;
+        
         %bh.U_runno = volume_runno;
         temp=m.databuffer;
         gui_info = read_headfile(fullfile(temp.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
-        faux_struct1 = combine_struct(bh,gui_info,'U_');
-        temp.headfile = combine_struct(temp.headfile,faux_struct1);
+        gui_info=rmfield(gui_info,'comment');
+        temp.headfile = combine_struct(temp.headfile,bh);
+        temp.headfile = combine_struct(temp.headfile,gui_info,'U_');
+        temp.headfile=rmfield(temp.headfile,'comment');
         m.databuffer=temp;
+        clear temp gui_info bh
     end; 
     %% Check all n_volumes for incomplete reconstruction
     %WARNING: this code relies on each entry in recon status being
@@ -508,16 +522,13 @@ if ~exist(study_flag,'file')
     unreconned_volumes_strings=vol_strings(find(~recon_status));
     num_unreconned = length(unreconned_volumes); % For reporting purposes
     % num_reconned = length(reconned_volumes); % For reporting purposes
+    clear volume_flag vol_string vol_strings vn;
     %% Let the user know the status of thesave recon.
-    s_string = 's';
-    if (m.n_volumes == 1)
-        s_string = '';
-    end
-    log_msg =sprintf('%i of %i volume%s have fully reconstructed.\n',m.n_volumes-num_unreconned,m.n_volumes,s_string);
+    log_msg =sprintf('%i of %i volume(s) have fully reconstructed.\n',m.n_volumes-num_unreconned,m.n_volumes);
     yet_another_logger(log_msg,log_mode,log_file);
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
-        m.study_workdir = workdir;
+        m.agilent_study_workdir = workdir;
         m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
         m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
         %% tangled web of support scanner name ~= host name.
@@ -546,11 +557,15 @@ if ~exist(study_flag,'file')
         m.scanner = scanner;
         %% continue stuffing vars to matfile.
         m.runno = runno;
-        m.study = study;
+        m.agilent_study = agilent_study;
         m.agilent_series = agilent_series;
         m.procpar_file = procpar_file;
         m.log_file = log_file;
-        m.options = options; % The following shall soon be cannibalized by options!
+        m.options = options;
+        
+        %{
+        % option transcription disabled!
+        % Replicating things is confusing and bad :p
         transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','fermi_filter','verbosity'};
         for on=1:numel(transcribed_opts)
             m.(transcribed_opts{on})=options.(transcribed_opts{on});
@@ -558,34 +573,53 @@ if ~exist(study_flag,'file')
         if ~islogical(options.email_addresses)
             m.email_addresses = options.email_addresses;
         end
+        %}
         % For single-block fids, wait for completion and then slice as
         % necessary.
+        % This code should migrate into the volume manager proper, 
+        % WHERE IT BELONGS !
+        %
+        % In the future, we could try to scrape pieces out to get the 
+        % 1-D fft done ahead, and to avoid the wait for copy, that is
+        % assuming the scanner saves data as it goes...
         running_jobs = '';
         if (m.nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
             if ~exist('local_or_streaming_or_static','var')
-                warning('Weird code here, should never run, debug later - james');
-                [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+                error('Weird code here, should never run, debug later - james');
+                [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
             end
             if (local_or_streaming_or_static == 2) 
                 %% if we're streaming a MGRE or single block
                 log_msg =sprintf('WARNING: Unable to stream recon for this type of scan (single-block fid); will wait for scan to complete.\n');
                 yet_another_logger(log_msg,log_mode,log_file);
-                input_fid = ['/home/mrraw/' study '/' agilent_series '.fid/fid'];
+                input_fid = ['/home/mrraw/' agilent_study '/' agilent_series '.fid/fid'];
             end
-            if ~exist(local_fid,'file') % If local_fid exists, then it will also be input_fid.
+            if ~exist(local_fid,'file') 
+                % If local_fid exists, then it will also be input_fid.
+                warning('Multi-echo code is clumsy and could stand refactoring!');
+                pause(3);
                 missing_fids = 0;
                 for vs = 1:length(unreconned_volumes_strings)
                     volumn_runno = [runno '_m' unreconned_volumes_strings{vs}];
                     subvolume_workspace_file = [workdir '/' volumn_runno '/' volumn_runno '_workspace.mat'];
+                    varinfo=whos('-file',subvolume_workspace_file);
+                    %{
                     try
                         dummy_mf = matfile(subvolume_workspace_file,'Writable',false);
                         tmp_param = dummy_mf.param;
                     catch
+                    %}
+                    if ~ismember('imag_data',{varinfo.name}) ...
+                            || ~ismember('real_data',{varinfo.name})
                         c_fid = [workdir '/' volumn_runno '.fid'];
                         if ~exist(c_fid,'file')
                             missing_fids = missing_fids+1;
                         end
                     end
+                    %{
+                    % end for catch, just for reference
+                    end
+                    %}
                 end
                 if missing_fids
                     block_number=1;
@@ -593,7 +627,7 @@ if ~exist(study_flag,'file')
                 end
                 if ready
                     if ~exist('datapath','var')
-                        datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
+                        datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
                     end
                     puller_glusterspaceCS_2(runno,datapath,scanner,workdir,3);
                     if ~exist(local_fid,'file') % It is assumed that the target of puller is the local_fid
@@ -608,15 +642,15 @@ if ~exist(study_flag,'file')
                     gk_slurm_options.v=''; % verbose
                     gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
                     gk_slurm_options.mem=512; % memory requested; gatekeeper only needs a miniscule amount.
-                    gk_slurm_options.p=gatekeeper_queue;
+                    gk_slurm_options.p=cs_queue.gatekeeper;
                     gk_slurm_options.job_name = [runno '_gatekeeper'];
                     %gk_slurm_options.reservation = active_reservation;
                     % using a blank reservation to force no reservation for this job.
                     gk_slurm_options.reservation = '';
-                    study_gatekeeper_batch = [workdir '/sbatch/' runno '_gatekeeper.bash'];
+                    agilent_study_gatekeeper_batch = [workdir '/sbatch/' runno '_gatekeeper.bash'];
                     gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', ...
-                        gatekeeper_path, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
-                    batch_file = create_slurm_batch_files(study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options)
+                        cs_execs.gatekeeper, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
+                    batch_file = create_slurm_batch_files(agilent_study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
                     running_jobs = dispatch_slurm_jobs( batch_file,slurm_options);
                 end
             end
@@ -625,7 +659,7 @@ if ~exist(study_flag,'file')
             fs_slurm_options.v=''; % verbose
             fs_slurm_options.s=''; % shared; volume setup should to share resources.
             fs_slurm_options.mem=50000; % memory requested; fs needs a significant amount; could do this smarter, though.
-            fs_slurm_options.p=cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+            fs_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
             fs_slurm_options.job_name = [runno '_fid_splitter_recon'];
             fs_slurm_options.reservation = active_reservation;
             or_dependency = '';
@@ -633,7 +667,7 @@ if ~exist(study_flag,'file')
                 or_dependency='afterok-or';
             end
             fs_args= sprintf('%s %s', local_fid,recon_file);
-            fs_cmd = sprintf('%s %s %s', fid_splitter_path,matlab_path,fs_args);
+            fs_cmd = sprintf('%s %s %s', cs_execs.fid_splitter_path,matlab_path,fs_args);
             if ~options.live_run
                 fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
                 batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
@@ -648,9 +682,9 @@ if ~exist(study_flag,'file')
             %%% first_volume, last_volume handling, by just skiping loop.
             vn=str2num(unreconned_volumes_strings{vs})+1;
             if isnumeric(options.first_volume) && options.first_volume
-                    if vn~=1 && vn<options.first_volume
-                        continue;
-                    end
+                if vn~=1 && vn<options.first_volume
+                    continue;
+                end
             end
             if isnumeric(options.last_volume) && options.last_volume
                 if vn~=1 && vn>options.last_volume
@@ -666,10 +700,10 @@ if ~exist(study_flag,'file')
             if ~exist(images_dir,'dir')
                 %%% mkdir commands pulled into here from check status,
                 fprintf('Making voldir,sbatch,work,images,directories\n');    
-                mkdir_s(1)=system(['mkdir -m 775 ' volume_dir]);
-                mkdir_s(2)=system(['mkdir -m 775 ' vol_sbatch_dir]);
-                mkdir_s(3)=system(['mkdir -m 775 ' work_subfolder]);
-                mkdir_s(4)=system(['mkdir -m 775 ' images_dir]);
+                mkdir_s(1)=system(['mkdir ' volume_dir]);
+                mkdir_s(2)=system(['mkdir ' vol_sbatch_dir]);
+                mkdir_s(3)=system(['mkdir ' work_subfolder]);
+                mkdir_s(4)=system(['mkdir ' images_dir]);
                 % becuase mgre fid splitter makes directories, we dont do this
                 % check for mgre
                 if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
@@ -686,14 +720,14 @@ if ~exist(study_flag,'file')
             %--In theory only! For yz-array sizes > 2048^2, loading the
             % data of phmask, CSmask, etc can push the memory of 512 MB
             vm_slurm_options.mem=2048;
-            vm_slurm_options.p=gatekeeper_queue;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
+            vm_slurm_options.p=cs_queue.gatekeeper;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vm_slurm_options.job_name = [volume_runno '_volume_manager'];
             %vm_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
             vm_slurm_options.reservation = ''; 
             volume_manager_batch = fullfile(volume_dir,'sbatch',[ volume_runno '_volume_manager.bash']);
             vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,workdir);
-            vm_cmd = sprintf('%s %s %s ', volume_manager_path, ...
+            vm_cmd = sprintf('%s %s %s ', cs_execs.volume_manager, ...
                 matlab_path, vm_args);
             %%% James's happy delay patch
             if ~options.process_headfiles_only
@@ -715,10 +749,10 @@ if ~exist(study_flag,'file')
         end
     end
     %% Pull fid and procpar, load reconstruction parameter data
-    % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,study,series,recon_path);
-    %    reconfile = agilent2glusterspaceCS(scanner,runno,study,series,recon_path);
+    % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,agilent_study,series,recon_path);
+    %    reconfile = agilent2glusterspaceCS(scanner,runno,agilent_study,series,recon_path);
     %    load(reconfile)
-end % This 'end' belongs to the study_flag check
+end % This 'end' belongs to the agilent_study_flag check
 if options.fid_archive && local_or_streaming_or_static==3
     % puller overwrite option
     poc='';
@@ -729,7 +763,7 @@ if options.fid_archive && local_or_streaming_or_static==3
         foc='-o';
     end
     pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s', ...
-        poc,scanner,study,agilent_series,runno,foc,user,runno);
+        poc,scanner,agilent_study,agilent_series,runno,foc,user,runno);
     ssh_and_run=sprintf('ssh %s@%s "%s"',getenv('USER'),options.target_machine,pull_cmd);
     log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
     log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);
@@ -752,11 +786,14 @@ function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
     % databuffer=large_array;
     databuffer.engine_constants = load_engine_dependency();
     databuffer.scanner_constants = load_scanner_dependency(scanner);
+    % Wanted to Intentionally omit U_runno because it'll only be right for single
+    % volumes. 
+    % Unfortunately it's part of sanity checking in gui_info_collect'
     databuffer.headfile.U_runno = runno;
     databuffer.headfile.U_scanner = scanner;
     databuffer.input_headfile = struct; % Load procpar here.
-    databuffer.headfile = combine_struct(databuffer.headfile,databuffer.engine_constants);
     databuffer.headfile = combine_struct(databuffer.headfile,databuffer.scanner_constants);
+    databuffer.headfile = combine_struct(databuffer.headfile,databuffer.engine_constants);
     optstruct.testmode = false;
     optstruct.debug_mode = 0;
     optstruct.warning_pause = 0;
@@ -765,6 +802,7 @@ function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
 end
 
 function m = specid_to_recon_file(scanner,runno,recon_file)
+warning('THIS FUNCTION IS VERY BAD');
 % holly horrors this function is bad form!
 % it combines several disjointed programming styles.
 % the name is also terrible!

@@ -38,7 +38,8 @@ if ~numel(test)
     img_format=[ '.' img_format ];
 end
 
-%% sort runnumbers and insert a comment between any blocks, this should clear up any lingering issuses with channel mode tags. 
+%% sort runnumbers and insert a comment between any blocks, 
+% this should clear up any lingering issuses with channel mode tags. 
 
 runbase='';
 strptr=1;
@@ -95,7 +96,7 @@ for i=1:length(runno)
     end
 end
 tag_cells{end+1, 1}=['# recon_person=' civmid];
-tag_cells{end+1, 1}=['# tag_file_creator=' 'James_matlab'];
+tag_cells{end+1, 1}=['# tag_file_creator=' 'CSv2_matlab'];
 % tag_file{end+1, 1}=['# Filtering_method= ' Filtering_method];
 tagfile_name=['READY_' runno{1}];
 dlmcell(['/' out_dir '/' tagfile_name], tag_cells);

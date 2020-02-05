@@ -52,7 +52,8 @@ else
     bytes_per_point = 2;
 end
 
-
+% What is this 32 doing here? What does that represent?
+% Is that 4bytes * 2 complex? *2 something else? *? 
 complete_file_size=32+nblocks*bytes_per_block;
 
 fclose(fid);

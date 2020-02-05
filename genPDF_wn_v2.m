@@ -32,7 +32,11 @@ if length(imSize)==1
 end
 %}
 sx = imSize(1);
-sy = imSize(2);
+try
+    sy = imSize(2);
+catch
+    sy=imSize(1);
+end
 try
     sz = imSize(3);
 catch

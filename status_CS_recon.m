@@ -23,6 +23,10 @@ if nargin>1
         elseif strcmp(varargin{ai},'test')
             test_mode=true;
             vu(ai)=0;
+        elseif strcmp(varargin{ai},'range')
+            range=eval(varargin{ai+1});
+            vu(ai)=0;
+vu(ai+1)=0;
         end
     end
     if sum(vu)>0
@@ -41,7 +45,13 @@ if s==0 % unix status check
     % out slices, it will become a 2 part cell with the written image path
     rundata = C(index);clear C index;
     progress=0;
-    for ri=1:numel(rundata)
+    range_start=1;
+    range_end=numel(rundata)
+    if exist('range','var')
+      range_start=range(1);
+      range_end=range(2);
+    end
+    for ri=range_start:range_end
         if isempty(rundata{ri})
            continue;
         end
