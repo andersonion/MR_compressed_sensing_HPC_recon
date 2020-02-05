@@ -420,10 +420,11 @@ if ~exist(agilent_study_flag,'file')
         m.dim_x = round(m.npoints/2);
     end
     procpar_file = fullfile(workdir,'procpar');
-    if ~exist(procpar_file,'file')
+    procpar_file_legacy = fullfile(workdir,[runno '.procpar']);
+    if exist(procpar_file_legacy,'file')
         warning('Legacy procpar file name detected!');
-        procpar_file = fullfile(workdir,[runno '.procpar']);
-    end
+        procpar_file=procpar_file_legacy;
+    end;clear procpar_file_legacy;
     procpar_or_CStable= procpar_file;
     if ~exist(procpar_file,'file')
         if (local_or_streaming_or_static == 2) 
@@ -487,7 +488,7 @@ if ~exist(agilent_study_flag,'file')
         bh.A_channels = 1;
         bh.A_echoes = m.nechoes;
         
-        bh.CS_working_array=recon_dims;
+        bh.CS_working_array=m.recon_dims;
         bh.CS_sampling_fraction = m.sampling_fraction;
         bh.CS_acceleration = 1/m.sampling_fraction;
         bh.B_recon_type=m.recon_type;
