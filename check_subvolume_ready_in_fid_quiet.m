@@ -46,16 +46,16 @@ block_header=28; %agilent block headers are 28 bytes big.
 % header_grab = [ 'tail -q -c +' num2str(byte_position) ' ' input_fid ...
 %     ' | head -c 1 | xxd -b - | tail -c +17 | head -c 1' ];
 % HERE's AN IDEA, JUST GET ALL THE HEADER BYTES, THEN READ THE ONE BYTE :-P
-temp_fidpath=sprintf('/tmp/%s_blk%i_%i.fhd',datestr(now,30),volume_number,ceil(rand(1)*10000));
+temp_fhdpath=sprintf('/tmp/%s_blk%i_%i.fhd',datestr(now,30),volume_number,ceil(rand(1)*10000));
 lin_dd_status=' status=noxfer';
-lin_of=[' of=' temp_fidpath];
+lin_of=[' of=' temp_fhdpath];
 lin_append=' oflag=append';
 mac_of='';
 if ismac && local_operation_only
     lin_dd_status='';
     lin_of='';
     lin_append='';
-    mac_of=['>> ' temp_fidpath];
+    mac_of=['>> ' temp_fhdpath];
 end
 header_grab = ['( dd bs='  num2str(header_size)  lin_dd_status ' count=1' lin_of mac_of ...
     ' && dd ' lin_dd_status ' bs=' num2str(bbytes)  ' skip=' num2str(volume_number-1) ' count=0'...
@@ -98,29 +98,37 @@ else
     [s, dd_out]=ssh_call(ssh_grab); %run remotely
     
     % fetches the fid file  to same location locally. 
-    scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,temp_fidpath,temp_fidpath);
+    scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,temp_fhdpath,temp_fhdpath);
     [s, scp_out  ] = system(scp_fid); % fetch fid
 end
 
-file_meta=dir(temp_fidpath);%gets metadata, especially file bytes.
+file_meta=dir(temp_fhdpath);%gets metadata, especially file bytes.
 if file_meta.bytes ~= header_size+block_header
-    warning('Problem with the copy/transfer! temporary file is %s',temp_fidpath);
+    warning('Problem with the copy/transfer! temporary file is %s',temp_fhdpath);
     ready=0;
     bhdr=struct;
     return
 else
     if ~local_operation_only
         % removes temp fid remotly.
-        ssh_rm_cmd=sprintf('ssh %s@%s rm %s',user,scanner,temp_fidpath);
+        ssh_rm_cmd=sprintf('ssh %s@%s rm %s',user,scanner,temp_fhdpath);
         [s, tmp_rm_out] = system(ssh_rm_cmd);
     end
     % read block header
-    bhdr=load_blk_hdr(temp_fidpath,header_size);
+    try
+        [np,nb,nt,bitd,bbytesk,tbytes,bhdr]=load_fid_hdr(temp_fhdpath);
+    catch
+        warning('untested code path failed, falling back to older simple code');
+        bhdr=load_blk_hdr(temp_fhdpath,header_size);
+    end
     % get the status bit for completion, from BJ's research it is the just
     % one bit for completion.
     ready=bitget(bhdr.status,1);
     % remove local header.
-    rm_cmd=sprintf('rm %s',temp_fidpath);
+    rm_cmd=sprintf('rm %s',temp_fhdpath);
     [s, tmp_rm_out] = system(rm_cmd); % run remove
+    if s~=0
+        warning('error removing tmp fhd %s. %s',temp_fhdpath,tmp_rm_out);
+    end
 end
 

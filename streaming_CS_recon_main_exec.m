@@ -18,6 +18,8 @@ function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series
 %
 
 recon_type = 'CS_v2.1';
+typical_pa=18;
+typical_pb=54;
 if ~isdeployed
     %% Get all necessary code for reconstruction
     % run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -416,7 +418,7 @@ if ~exist(agilent_study_flag,'file')
     varlist='npoints,nblocks,ntraces,bitdepth,bbytes,dim_x';
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
-        [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr_details(local_hdr);
+        [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(local_hdr);
         m.dim_x = round(m.npoints/2);
     end
     procpar_file = fullfile(workdir,'procpar');
@@ -435,13 +437,29 @@ if ~exist(agilent_study_flag,'file')
                     %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
                     list_cs_tables_cmd = [ 'ssh ' scanner_user '@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
                     [~,available_tables]=ssh_call(list_cs_tables_cmd);
-                    log_msg = sprintf('Please rerun this code and specify the CS_table to run in streaming mode\n');
-                    log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
-                    log_msg=sprintf('%sAvailable tables:\n%s\n',log_msg,available_tables);
-                    %procpar_or_CStable=[workdir options.CS_table];
-                    yet_another_logger(log_msg,log_mode,log_file,1);
-                    if isdeployed
-                        quit force;
+                    valid_tables=select_valid_tables(available_tables,m.ntraces,typical_pa,typical_pb);
+                    if numel(valid_tables)>1
+                        log_msg=sprintf('CS_table ambiguous, If a table matches our default params,\n');
+                        log_msg=sprintf('%sit will be listed last.\n',log_msg); 
+                        log_msg=sprintf('%sFor best clarity please specify when in streaming mode.\n',log_msg);
+                        log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
+                        log_msg=sprintf('Vaild tables for this data:\n\t%s\n%s',strjoin(valid_tables,'\n\t'),log_msg);
+                        yet_another_logger(log_msg,log_mode,log_file,1);
+                        fprintf('  (Ctrl+C to abort)\n');
+                        options.CS_table='';
+                        while isempty( ...
+                                regexpi(options.CS_table,sprintf('^%s$',strjoin(valid_tables,'|'),'once') ) ...
+                                )
+                            options.CS_table=input( ...
+                                sprintf('Type in a name to continue\n'),'s');
+                        end
+                    elseif numel(valid_tables)==1
+                        options.CS_table=valid_tables{1};
+                        warning('Only one possible CS_table found. If this is incorrect Ctrl+c now.\n%s',options.CS_table);
+                        pause(5);
+                    else
+                        % no valid tables
+                        error('Table listing: %s\nCS_table not specified and couldn''t find valid CS table,\n\tMaybe this isn''t a CS acq?',available_tables);
                     end
                 end
                 log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
