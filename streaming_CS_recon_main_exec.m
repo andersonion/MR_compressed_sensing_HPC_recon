@@ -67,40 +67,40 @@ end; clear pc;
 %% run the option digester
 types.standard_options={...
     'target_machine',       'which regular engine should we send data to for archival.' 
+    'CS_reservation',       ' specify reservation to run on' 
     'CS_table',             ' the CS table on the scanner to use. Must be specified in streaming mode.' 
     'first_volume',         ' start reconstructing at volume N, The first volume will also be processed!'
-    'last_volume',          ' stop reconstructing at volume N.'
+    'last_volume',          ' stop reconstructing after volume N.'
+    'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
+    'CS_preview_data',      ' save a pre recon of kspace and imgspace. Defaults to orthocenter, can specify =volume for whole volume. WILL NOT DO RECON'
     'roll_data',            ' pre-roll the data before reconstruction'
-    'skip_fermi_filter',    'do not do fermi_filtering of kspace before fft' 
     'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
-    'Itnlim',               'number of iterations, would like to rename ot max_iterations. Probably have to chase this down in the code.'
     're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
+    'Itnlim',               'number of iterations, would like to rename to max_iterations. Probably have to chase this down in the code.'
     'TVWeight',             ''
     'xfmWeight',            ''
     'hamming_window',       ' used in the creation of phmask'
-    'slicewise_norm',       ' normalize the initial image by slice max instead of volume max'
-    'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
-    };
-types.beta_options={...
-    'CS_reservation',       ' specify reservation to run on' 
+    'skip_fermi_filter',    'do not do fermi_filtering of kspace before fft' 
+    'fermi_w1',             ''
+    'fermi_w2',             ''
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
-types.planned_options={...
-    'selected_scale_volume',' default 0, which volume set''s the scale '
+types.beta_options={...
     'wavelet_dims',         ''
     'wavelet_type',         ['One of -> ' strjoin({'Haar', 'Beylkin', 'Coiflet', 'Daubechies',...
     'Symmlet', 'Vaidyanathan','Battle'},':')]
-    'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
-    'fermi_w1',             ''
-    'fermi_w2',             ''
+    'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
+    'skip_target_machine_check', 'dont bother checking if target_machine is alive.' 
+    };
+types.planned_options={...
+    'selected_scale_volume',' default 0, which volume set''s the scale '
+    'slicewise_norm',       ' normalize the initial image by slice max instead of volume max'
     'convergence_threshold',''
     'keep_work',           ''
     'email_addresses',      ''
     'verbosity',             ''
     'scanner_user',         ' what user do we use to pull from scanner.'
     'live_run',             ' run the code live in matlab, igored when deployed.'
-    'CS_preview_data',      ' save a pre recon orthocenter of kspace and imgspace'
-    'skip_target_machine_check', 'dont bother checking if target_machine is alive.' 
     };
 options=mat_pipe_option_handler(varargin,types); clear varargin types;
 % A reminder, mat_pipe_option handler exists to do two things. 
