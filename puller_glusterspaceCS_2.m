@@ -21,17 +21,17 @@ if exist(workpath,'dir') && overwrite==1
 elseif ~exist(workpath,'dir')
     mkdir(workpath);
 end
-fid_pull_cmd=['scp -p omega@' scanner ':' datapath '/fid ' workpath '/' runno '.fid'];
-procpar_pull_cmd=['scp -p omega@' scanner ':' datapath '/procpar ' workpath '/' runno '.procpar'];
+fid_pull_cmd=['scp -p omega@' scanner ':' datapath '/fid ' workpath '/' 'fid'];
+procpar_pull_cmd=['scp -p omega@' scanner ':' datapath '/procpar ' workpath '/' 'procpar'];
 %pull the fid file and the procpar to the work directory if they dont exist
 %if they do exist check filesize
 if (mode == 1) || (mode == 3)
-    if ~exist([workpath '/' runno '.fid'],'file')
+    if ~exist([workpath '/fid'],'file')
         ssh_call(fid_pull_cmd);
     end
 end
 if (mode == 2) || (mode == 3)
-    if ~exist([workpath '/' runno '.procpar'],'file')
+    if ~exist([workpath '/procpar'],'file')
         ssh_call(procpar_pull_cmd);
     end
 end
