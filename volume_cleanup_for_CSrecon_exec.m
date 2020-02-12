@@ -493,10 +493,13 @@ write_archive_tag_nodev(setup_var.volume_runno,['/' target_machine 'space'],orig
 % while we take stats of our iterations, these are not currently variable
 % and may not be the information we're after.
 % line search iterations of the minimization are variable, and we dont report those out of the fnl code.
+%{
+% this was a nice idea, but its causing trouble. Disabled for now.
 databuffer=large_array;
 databuffer.addprop('headfile');
 databuffer.addprop('data');
 databuffer.headfile=struct;
+%}
 t_var=recon_mat.databuffer;
 databuffer.headfile=t_var.headfile; clear t_var;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
