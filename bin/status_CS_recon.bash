@@ -1,8 +1,10 @@
 #!/bin/bash
-# run workstation command with "rad_mat" which really just sets pipeline startup
-#
-# if you want to email output see email example below
-if [ -z $1 ];then
+# run status_CS_recon matlab code with all the script args 
+# effectively a wrapper for that matlab function.
+# 
+# Very nearly a generalized run matlab code named like script. 
+runno="$1";
+if [ -z "${runno}" ];then
     echo "please specify runno!";
     exit;
 fi;
@@ -17,24 +19,74 @@ done
 
 cd ${WKS_SHARED}/pipeline_utilities;
 #echo /usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit";exit;
-lck_file=$HOME/CS_recon_${1}.lck
-if [ ! -f $lck_file ]; then 
-    touch $lck_file
-    s_file=$HOME/CS_recon_${1}.status;
-    /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 |sed 's/[^[:print:]]//g' > $s_file
+s_file_raw=$HOME/".CS_recon_${runno}.rstatus";
+s_file=$HOME/"CS_recon_${runno}.status";
 
-    rm $lck_file; 
-else 
-    touch -t $(date -d "1 day ago" +%Y%m%d%H%M.%S) ${HOME}/.queue_anchor_lck_tst
-    if [ $lck_file -ot ${HOME}/.queue_anchor_lck_tst ];then
-	rm $lck_file;
+# use a lock file to prevent double running in case that happens accidentially. 
+# but, that adds complication of potentially stuck locks.
+lck_file=$HOME/".CS_recon_${runno}_status.lck";
+lck_stuck_t=${HOME}/".CS_recon_${runno}_status.t_anchor"
+
+#TIME_STRING="1 day ago";
+TIME_STRING="5 minutes ago";
+TIME_STRING="1 minute ago";
+touch -t $(date -d "$TIME_STRING" +%Y%m%d%H%M.%S) "$lck_stuck_t";
+if [ -f "$lck_file" ]; then 
+    if [ "$lck_file" -ot "$lck_stuck_t" ];then
+	rm "$lck_file";
     fi;
     echo "lock file $lck_file still exists from previous run, maybe we're calling too often? OR we crashed...";
-    if [ ! -f $lck_file ]; then
-	echo "lock file was older than a day so we just trashed it";
+    if [ ! -f "$lck_file" ]; then
+	echo "lock file was older than $TIME_STRING so we just trashed it";
     fi;
-    rm ${HOME}/.queue_anchor_lck_tst
 fi;
+
+if [ ! -f "$lck_file" ]; then 
+    # 
+    # touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && sed 's/[^[:print:]]//g' "$s_file_raw" > "$s_file" && rm "$lck_file";
+    s_last="NO_LAST";
+    if [ -f "$s_file" ];then
+	echo -n '';  
+	# old file existts... lets stash it
+	s_last="$(basename ${s_file})";
+	s_last="$(dirname ${s_file})/${s_last%.*}.last";
+	mv -f "$s_file" "$s_last";
+    fi;
+    run_error=0;
+    touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nojvm -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && grep  -iE '([0-9]+[.][0-9]+%|stage|total)' "$s_file_raw" > "$s_file" || run_error=1;
+    if diff -s "$s_file" "$s_last" > /dev/null; then 
+	# identicle
+	# preserve timestamp by squashing current f.
+	mv -f "$s_last" "$s_file"; 
+    else
+	# different, keep updated remove last
+	rm "$s_last";
+    fi;
+    #ls -lt $lck_stuck_t $s_file;
+    if [ "$s_file" -ot "$lck_stuck_t" ];then 
+	hchk=$(cluster_status_CS_recon);
+	if [ "$hchk" == "Healthy" ];then 
+	    echo "Not to worry, cluster is healthy"; 
+	else
+	    echo "WARNING: Cluster unhealthy!" >&2; 
+	fi;
+	echo -n "no progress since $TIME_STRING $s_file:"
+    else
+	echo -n "$s_file:";
+    fi;
+    grep -i total "$s_file"
+    
+    if [ $run_error -eq 0 ];then 
+	rm "$lck_file" && rm "$s_file_raw";
+    fi;
+    if [ -e "$s_file_raw" ];then
+	cat "$s_file_raw";
+	echo "ERROR collecting status" >&2;
+	exit 1;
+    fi;
+    #touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 | sed -r s'/^[^0-9T]*([0-9]+[.]|[Tt][Oo][Tt][Aa][Ll])(.+$)/\1\2/' > "$s_file" && rm "$lck_file";
+fi; 
+rm "$lck_stuck_t";
 
 # example cron job to send mail to some user.
 #min     hour          day     month weekday

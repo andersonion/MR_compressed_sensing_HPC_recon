@@ -25,3 +25,11 @@ do if [ ! -z "$at" ];
     then echo "See attached $at" | mail -s "status_CS_recon $t_run $(basename ${at%.*})" -a $at $args ;
     fi;
 done
+
+exit 0;
+# Could convert to use mail_dir to send one series of mail. 
+# Only really important if we've got more than one attachment. 
+# Someting like, mkdir good subjname; foreach attacmnent ln -s $attachment 
+# Decided aginst it because we'd rather get these one at a time with their volumename.
+
+
