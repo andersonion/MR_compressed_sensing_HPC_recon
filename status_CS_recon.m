@@ -70,7 +70,7 @@ if s==0 % unix status check
             % the scp to final costs.
             % Dont dump it now, just keep track of which ones, we'll parfor
             % the dumps becuase they could be slow. 
-            out_orth=fullfile(data_directory,[base_runno '.work'],[vr '_ortho.png']);
+            out_orth=fullfile(getenv('BIGGUS_DISKUS'),[base_runno '.work'],[vr '_ortho.png']);
             if ~exist(out_orth,'file') || test_mode
                 rundata{ri}={rundata{ri},out_orth};
             end
