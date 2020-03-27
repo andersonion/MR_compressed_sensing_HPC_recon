@@ -14,4 +14,7 @@ stat_queue=$("slurm_queue_snapshot" $the_user);
 # any entry on that line looking like a simple runo. 
 # This is unnecessarily specific, we dont have to limit ourselves to col3 in the case we adjust the order.
 #awk '{print $3}' $stat_queue |tail -n +2 |sed -E 's/.*([A-Z][0-9]+).*/\1/g'|sort -u
-tail -n +2 $stat_queue | sed -nE 's/.*([A-Z][0-9]+).*/\1/gp'|sort -u
+
+# cant tune the sed line to only print first match, figured out the perlism for this
+#tail -n +2 $stat_queue | sed -nE 's/^(.*)([A-Z][0-9]+)(.*)$/\2/p'|sort -u
+tail -n +2 $stat_queue | perl -ne 'print "$1\n" if /([A-Z][0-9]+)/'|sort -u

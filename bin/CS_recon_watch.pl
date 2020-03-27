@@ -58,7 +58,9 @@ $opts->{"u_crond=s"}=\$u_crond;
 #${$opts->{"user=s"}}=${\$USER};
 # slipping options direct to scalar is slightly different syntax, watchout.
 $opts->{"user=s"}=\$USER;
+
 $opts=auto_opt($opts,\@ARGV);
+
 
 #$Data::Dump::dump($opts);die;
 #die $USER;
@@ -75,19 +77,23 @@ if($watch_mode !~ /enable|disable|cleanup/) {
     die "$watch_mode not valid enable/disable";
 }
 
-
 # Get extra users to email.
-my $conf_path=File::Spec->catfile($CSRECON_DIR,"CS_recon_watch_config.headfile");
-my $conf = new Headfile ('ro', $conf_path) or die;
-$conf->check() or print "conf check error $conf_path\n";
-$conf->read_headfile();
-
-($v_ok,my $coder)=$conf->get_value_check("coder");
-$coder="" if !$v_ok;
-($v_ok, my $sysadmin)=$conf->get_value_check("sysadmin");
-$sysadmin="" if !$v_ok;
-($v_ok, my $director)=$conf->get_value_check("director");
-$director="" if !$v_ok;
+my $coder='';
+my $sysadmin='';
+my $director='';
+if ($debug_val<50){
+    my $conf_path=File::Spec->catfile($CSRECON_DIR,"CS_recon_watch_config.headfile");
+    my $conf = new Headfile ('ro', $conf_path) or die;
+    $conf->check() or print "conf check error $conf_path\n";
+    $conf->read_headfile();
+    
+    ($v_ok,$coder)=$conf->get_value_check("coder");
+    $coder="" if !$v_ok;
+    ($v_ok, $sysadmin)=$conf->get_value_check("sysadmin");
+    $sysadmin="" if !$v_ok;
+    ($v_ok, $director)=$conf->get_value_check("director");
+    $director="" if !$v_ok;
+}
 #these are email strings, so comma separated.
 # Also, need to lead with comma.
 # That requrement comes from how they're used in the template, and could stand revision. 
@@ -110,7 +116,7 @@ if ( ! -e $u_crond ) {
 # shelly code helpers from cs recon used to get the currently operational recons. 
 my $cron_template=File::Spec->catfile($CSRECON_DIR,'utility','template_CS_recon_watch_status.cron');
 if ( ! -e $cron_template )  {
-    die "Missing template $cron_template" unless $mode =~/cleanup/;
+    die "Missing template $cron_template" unless $watch_mode =~/cleanup/;
 }
 my $cron_cleanup_template=File::Spec->catfile($CSRECON_DIR,'utility','template_CS_recon_watch_cleanup.cron');
 if ( ! -e $cron_cleanup_template )  {
