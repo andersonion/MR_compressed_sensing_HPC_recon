@@ -108,9 +108,13 @@ if ( ! -e $u_crond ) {
 
 # options enable, disable cleanup.
 # shelly code helpers from cs recon used to get the currently operational recons. 
-my $cron_template=File::Spec->catfile($CSRECON_DIR,'utility','template_auto_insert.cron');
+my $cron_template=File::Spec->catfile($CSRECON_DIR,'utility','template_CS_recon_watch_status.cron');
 if ( ! -e $cron_template )  {
-    die "Missing template $cron_template";
+    die "Missing template $cron_template" unless $mode =~/cleanup/;
+}
+my $cron_cleanup_template=File::Spec->catfile($CSRECON_DIR,'utility','template_CS_recon_watch_cleanup.cron');
+if ( ! -e $cron_cleanup_template )  {
+    die "Missing template $cron_cleanup_template";
 }
 ##template_auto_insert.cron
 #t_run="runno"
@@ -221,6 +225,7 @@ for (@runnos) {
     if( ! defined $block) {
 	my $cron_stub = new Config::Crontab( -file => $cron_file);
 	$cron_stub->read or die $cron_stub->error;
+	# env line
 	my ($e_l)=$cron_stub->select( -type => 'env', 
 				      -name_re => 't_run');
 	$e_l->value($_);
@@ -233,14 +238,11 @@ for (@runnos) {
 	$e_l->value($IMG_USERS) if $IMG_USERS ne "";
 	$cron_stub->write($r_cron_path);
     }
-    #print "---\n";
-    #print $block->dump;
-    #print "---\n";
     printd(25,"CS_recon_watch adding:$_\n");
     $ct->last($block);
     $update++;
-    #my $r_cron = new Config::Crontab( -file => $r_cron_path);
 }
+
 # get all blocks, if their t_run value is not an active runno remove them
 if(${$opts->{"check"}}) {
     my @e_ls=$ct->select( -type =>  'env' , 
@@ -253,6 +255,31 @@ if(${$opts->{"check"}}) {
 	$ct->remove($block);
 	$update++;
     }
+}
+
+# cleanup lines
+my ($c_l)=$ct->select( -command_re => 'CS_recon_watch.*cleanup');
+# active lines indicating we have more cs_recon status calls to work on.
+# chose this instead of command becuase this more likly template lines
+my @a_ls=$ct->select( -type =>  'env' , 
+		      -name_re => 't_run' );
+# active lines
+#my @a_ls=$ct->select(-command_re => 'status_CS_recon' );
+if(scalar(@a_ls)>=1 && ! defined $c_l) {
+# some commands found so, we need a cleanup call but we dont have one. 
+    my $cron_file=$cron_cleanup_template;
+    my $cron_stub = new Config::Crontab( -file => $cron_file);
+    $cron_stub->read or die $cron_stub->error;
+    my ($e_l)=$cron_stub->select( -command_re => 'CS_recon_watch.*cleanup');
+    $e_l->value($_);
+    my $block=$cron_stub->block($e_l);
+    $ct->last($block);
+    $update++;
+} elsif(scalar(@a_ls)==0 && defined $c_l) {
+    # no commands found, and we have a cleanup call, so lets get rid ofit. 
+    my $block=$ct->block($c_l);
+    $ct->remove($block);
+    $update++;
 }
 #for
 if($update) {
