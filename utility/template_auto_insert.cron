@@ -1,0 +1,17 @@
+
+###
+# BEGIN AUTO INSERT
+SHELL=/bin/bash
+# Defcto mail to owner
+MAILTO=$USER@duke.edu
+# Bonus users, *dev*
+EXTRA_USERS=
+# IMG Only users, *director*
+IMG_USERS=
+##### THIS IS THE MOST FAVORED SETUP, replicate these two lines, and edit the t_run line.
+# Schedule: at 15 past, every 4 hours starting at 6am until 10:15
+# Command: status collection including orthocenter, and send result.
+t_run="RUNNO"
+15	6,10,14,18,22	*	*	*	source $HOME/.bashrc; s_file=$HOME/CS_recon_${t_run}.status; status_CS_recon $t_run Write 2>&1 ; cat $s_file| mail -s "status_CS_recon $t_run"  $USER@duke.edu$EXTRA_USERS; status_CS_recon_mail $t_run $USER@duke.edu$EXTRA_USERS$IMG_USERS;
+# END AUTO INSERT
+###
