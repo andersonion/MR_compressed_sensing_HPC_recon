@@ -53,7 +53,11 @@ if [ ! -f "$lck_file" ]; then
 	mv -f "$s_file" "$s_last";
     fi;
     run_error=0;
-    touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nojvm -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && grep  -iE '([0-9]+[.][0-9]+%|stage|total)' "$s_file_raw" > "$s_file" || run_error=1;
+    # | sed 's/[^[:print:]]//g'
+    # | perl -pi -e 's/[^[:ascii:]]//g' 
+    # | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' 
+    touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nojvm -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && grep  -iE '([0-9]+[.][0-9]+%|stage|total)' "$s_file_raw"  | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' > "$s_file" || run_error=1;
+
     if diff -s "$s_file" "$s_last" > /dev/null; then 
 	# identicle
 	# preserve timestamp by squashing current f.
