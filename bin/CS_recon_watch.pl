@@ -51,7 +51,17 @@ my $USER=$ENV{"USER"};
 
 my $opts={};
 #${$opts->{"delete"}}="";
+#${$opts->{"nodecnt|nodecount|nodes|node|n:i"}}=1;
+${$opts->{"check!"}}=1;
+$opts->{"u_crond=s"}=\$u_crond;
+#${$opts->{"user=s"}}=\$USER;
+#${$opts->{"user=s"}}=${\$USER};
+# slipping options direct to scalar is slightly different syntax, watchout.
+$opts->{"user=s"}=\$USER;
 $opts=auto_opt($opts,\@ARGV);
+
+#$Data::Dump::dump($opts);die;
+#die $USER;
 
 
 # Process input, er set mode? enable(default), disable, check only, add 1 runno
@@ -61,7 +71,7 @@ $watch_mode='enable' if ! defined $watch_mode;
 #$watch_mode="disable";
 #$debug_val=25;
 
-if($watch_mode !~ /enable|disable|check/) {
+if($watch_mode !~ /enable|disable|cleanup/) {
     die "$watch_mode not valid enable/disable";
 }
 
@@ -170,32 +180,30 @@ print $set_line->dump ."\n";
 printd(5,"Getting active runnos ...\n");
 my @runnos=run_and_watch("show_running_cs_runnos $USER");
 chomp(@runnos);
+if(!scalar(@runnos)) {
+    printd(5,"No active runnos found to enable, will still check for old ones\n");
+}
 #Data::Dump::dump(@runnos);
 
 
 # the user cron
 my $ct = new Config::Crontab;
 $ct->read;
-# blocks([\@blocks])
 
-=item
-## find and remove the block in which '/bin/baz' is executed
-my $event = $ct->select( -type       => 'event',
-			  -command_re => '/bin/baz');
-$block = $ct->block($event);
-$ct->remove($block);
-=cut
+# a count of our update operations, if > 0 we write our updated crontab
 my $update=0;
 for (@runnos) {
+    # cleanup will neither add nor remove.
+    next if $watch_mode =~ /cleanup/x;
     my $r_cron_path =File::Spec->catfile($u_crond,$cron_file_prefix."$_.cron");
     # check if block is already in ct
-    #$ct->select
     my ($r_run)=$ct->select( -type => 'env', 
+			     -name_re => 't_run',
 			     -value_re => "^$_\$");
     my $block;
     if(defined $r_run) {
 	$block=$ct->block($r_run);
-	if($watch_mode =~ /enable|check/x ) {
+	if($watch_mode =~ /enable/x ) {
 	    printd(25,"CS_recon_watch previously enabled:$_\n");
 	} elsif($watch_mode =~ /disable/x ) {
 	    printd(25,"CS_recon_watch disable:$_\n");
@@ -234,21 +242,27 @@ for (@runnos) {
     #my $r_cron = new Config::Crontab( -file => $r_cron_path);
 }
 # get all blocks, if their t_run value is not an active runno remove them
-my @e_ls=$ct->select( -type =>  'env' , 
-		      -name_re => 't_run', 
-		      -value_nre => '^'.join('|',@runnos).'$' );
-printd(5,"Cleaning up complete work\n") if scalar(@e_ls);
-foreach (@e_ls) {
-    my $block=$ct->block($_);
-    printd(25,"Removing cron job non-running".$_->value."\n");
-    $ct->remove($block);
-    $update++;
+if(${$opts->{"check"}}) {
+    my @e_ls=$ct->select( -type =>  'env' , 
+			  -name_re => 't_run', 
+			  -value_nre => '^'.join('|',@runnos).'$' );
+    printd(5,"Cleaning up complete work\n") if scalar(@e_ls);
+    foreach (@e_ls) {
+	my $block=$ct->block($_);
+	printd(25,"Removing cron job non-running".$_->value."\n");
+	$ct->remove($block);
+	$update++;
+    }
 }
 #for
 if($update) {
     $ct->write;
 }
 
+exit 0;
+
+
+#### brainstorming mess below
 #Data::Dump::dump($ct);
 
 #ex add new entriy ending in _BLOCK_
