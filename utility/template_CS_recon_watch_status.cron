@@ -1,9 +1,16 @@
 
 ###
 # BEGIN AUTO INSERT
+# Take care when setting up varaibles, cron var expansion is very limited.
+# Broadly, vars cannot be made of other vars. 
+# so, the following would not work.
+# tmp=a
+# tmpaa=$tmp$tmp  
+# 
 SHELL=/bin/bash
 # Defacto mail to owner
-MAILTO=$USER@duke.edu
+# set at runtime by script
+MAILTO=
 # Bonus users, *dev*, *sysadmin*
 # Additionaly users auto inserted by CS_recon_watch.
 # Any entry specified in template would be overwritten. 

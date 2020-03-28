@@ -81,11 +81,14 @@ if($watch_mode !~ /enable|disable|cleanup/) {
 my $coder='';
 my $sysadmin='';
 my $director='';
+my $conf_path=File::Spec->catfile($CSRECON_DIR,"CS_recon_watch_config.headfile");
+my $conf = new Headfile ('ro', $conf_path) or die;
+$conf->check() or print "conf check error $conf_path\n";
+$conf->read_headfile();
+# email_domain is a little funny in that it has the @ in the string.
+($v_ok,my $email_domain)=$conf->get_value_check('email_domain');
+$email_domain="" if !$v_ok;
 if ($debug_val<50){
-    my $conf_path=File::Spec->catfile($CSRECON_DIR,"CS_recon_watch_config.headfile");
-    my $conf = new Headfile ('ro', $conf_path) or die;
-    $conf->check() or print "conf check error $conf_path\n";
-    $conf->read_headfile();
     
     ($v_ok,$coder)=$conf->get_value_check("coder");
     $coder="" if !$v_ok;
@@ -236,6 +239,11 @@ for (@runnos) {
 				      -name_re => 't_run');
 	$e_l->value($_);
 	$block=$cron_stub->block($e_l);
+	# This whole mail setup needs a lttle re-architecting 
+	# to let errors go to sysdmin+dev and output go to users/img users as desired
+	($e_l)=$cron_stub->select( -type => 'env', 
+				   -name_re => 'MAILTO');
+	$e_l->value($ENV{'USER'}.$email_domain);
 	($e_l)=$cron_stub->select( -type => 'env', 
 			       -name_re => 'EXTRA_USERS');
 	$e_l->value($EXTRA_USERS) if $EXTRA_USERS ne "";
