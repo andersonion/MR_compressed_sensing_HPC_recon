@@ -277,7 +277,10 @@ if(scalar(@a_ls)>=1 && ! defined $c_l) {
     my $cron_stub = new Config::Crontab( -file => $cron_file);
     $cron_stub->read or die $cron_stub->error;
     my ($e_l)=$cron_stub->select( -command_re => 'CS_recon_watch.*cleanup');
-    $e_l->value($_);
+    ($e_l)=$cron_stub->select( -type => 'env', 
+			       -name_re => 'MAILTO');
+    $e_l->value("$coder,$sysadmin") if $coder ne "";
+    #$e_l->value($_);
     my $block=$cron_stub->block($e_l);
     $ct->last($block);
     $update++;
