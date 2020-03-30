@@ -171,7 +171,7 @@ if (starting_point == 0) ||  (  (recon_mat.nechoes > 1) && (starting_point == 1)
     agilent_study_gatekeeper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
     [input_fid,~] =find_input_fidCS(scanner,runno,agilent_study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
-        volume_fid, input_fid, scanner, log_file, volume_number, bbytes);
+        volume_fid, input_fid, scanner, log_file, volume_number, recon_mat.bbytes);
     gatekeeper_cmd = sprintf('%s %s %s ', cs_execs.gatekeeper, matlab_path,...
         gatekeeper_args);
     if ~options.live_run
