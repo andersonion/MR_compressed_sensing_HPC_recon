@@ -1,0 +1,9 @@
+
+###
+# BEGIN AUTO INSERT
+SHELL=/bin/bash
+# Defacto mail is set to dev+sysadmin in script
+MAILTO=
+30	6-21	*	*	*	source $HOME/.bashrc; CS_recon_watch cleanup -D0 --user=all 2>&1 >/dev/null
+# END AUTO INSERT
+###
