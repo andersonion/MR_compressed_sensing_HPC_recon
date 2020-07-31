@@ -71,9 +71,12 @@ if acq_st.int32==1
 elseif acq_st.float==1
     bitdepth='float32';
     bytes_per_point = 4;
-else
+elseif ~isempty(acq_status)
     bitdepth='int16';
     bytes_per_point = 2;
+else
+    bitdepth=[];
+    bytes_per_point=[];
 end
 % bytes_per_point should agree with bytes per element
 if bytes_per_element ~= bytes_per_point
