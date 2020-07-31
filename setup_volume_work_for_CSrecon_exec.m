@@ -129,7 +129,7 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         warning('Preview data wont do any recon at current.');
         preview_stamp=fullfile(setup_var.workdir,'.preview.time');
         system(sprintf('touch %s',preview_stamp));
-        preview_imgs=CS_preview_data(original_mask,data,fullfile(setup_var.workdir,volume_runno),options.CS_preview_data);
+        preview_imgs=CS_preview_data(recon_mat.original_mask,data,fullfile(setup_var.workdir,volume_runno),options.CS_preview_data);
         for pn=1:numel(preview_imgs)
             scp_to_engine=sprintf('scp -p %s %s@%s.dhe.duke.edu:/%sspace/',...
                 preview_imgs{pn},getenv('USER'),options.target_machine,options.target_machine);
