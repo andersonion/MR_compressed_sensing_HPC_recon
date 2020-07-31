@@ -25,17 +25,17 @@ else
     log_files = strsplit(log_file,',');
 end
 
-if (mode ~= 1) && (mode ~= 2) && (mode ~= 3)
+if ~sum(1:3==mode)
     mode  = 3;
 end
 
 
-std_out = 1;
+file_descriptor = 1;
 if exist('error_flag','var') && error_flag
     if ~strcmp(log_msg(1:5),'ERROR')
         log_msg = ['ERROR: ' log_msg];
     end
-    std_out = 2; % 2 send message to standard error instead of standard out.
+    file_descriptor = 2; % 2 send message to standard error instead of standard out.
 end
 
 for ff = 1:numel(log_files)
@@ -47,8 +47,8 @@ for ff = 1:numel(log_files)
     end
 end
 
-if (mode == 1) || (mode == 3)
-    fprintf(std_out,'%s',log_msg);
+if mode ~=2
+    fprintf(file_descriptor,'%s',log_msg);
 end
 end
 
