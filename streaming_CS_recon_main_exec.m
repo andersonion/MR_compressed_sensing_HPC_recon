@@ -550,11 +550,11 @@ if ~exist(agilent_study_flag,'file')
         end
     end
     %reconned_volumes=find(recon_status);
-    unreconned_volumes=find(~recon_status);
     %reconned_volumes_strings=vol_strings(find(recon_status));
+    %num_reconned = length(reconned_volumes); % For reporting purposes
+    unreconned_volumes=find(~recon_status);
     unreconned_volumes_strings=vol_strings(find(~recon_status));
     num_unreconned = length(unreconned_volumes); % For reporting purposes
-    % num_reconned = length(reconned_volumes); % For reporting purposes
     clear volume_flag vol_string vol_strings vn;
     %% Let the user know the status of thesave recon.
     log_msg =sprintf('%i of %i volume(s) have fully reconstructed.\n',m.n_volumes-num_unreconned,m.n_volumes);
@@ -563,8 +563,6 @@ if ~exist(agilent_study_flag,'file')
     if (num_unreconned > 0)
         %% tangled web of support scanner name ~= host name.
         if ~exist('scanner_host_name','var')
-            % What madness is this! Reloading data, Never!...
-            %aa=load_scanner_dependency(scanner);
             try 
                 aa=m.scanner_constants;
             catch
@@ -592,125 +590,9 @@ if ~exist(agilent_study_flag,'file')
         m.procpar_file = procpar_file;
         m.log_file = log_file;
         m.options = options;
-        
-        %{
-        % option transcription disabled!
-        % Replicating things is confusing and bad :p
-        transcribed_opts={'target_machine','chunk_size','TVWeight','xfmWeight','Itnlim','fermi_filter','verbosity'};
-        for on=1:numel(transcribed_opts)
-            m.(transcribed_opts{on})=options.(transcribed_opts{on});
-        end
-        if ~islogical(options.email_addresses)
-            m.email_addresses = options.email_addresses;
-        end
-        %}
-        % For single-block fids, wait for completion and then slice as
-        % necessary.
-        % This code should migrate into the volume manager proper, 
-        % WHERE IT BELONGS !
-        %
-        % In the future, we could try to scrape pieces out to get the 
-        % 1-D fft done ahead, and to avoid the wait for copy, that is
-        % assuming the scanner saves data as it goes...
+
         running_jobs = '';
-        
-        %% Freshly removed MGRE special  handling, dispsersed into vol manager. 
-        %{
-        if (m.nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
-            %% single volume section
-            if ~exist('local_or_streaming_or_static','var')
-                error('Weird code here, should never run, debug later - james');
-                [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
-            end
-            if (local_or_streaming_or_static == 2) 
-                %% if we're streaming a MGRE or single block
-                log_msg =sprintf('WARNING: Unable to stream recon for this type of scan (single-block fid); will wait for scan to complete.\n');
-                yet_another_logger(log_msg,log_mode,log_file);
-                input_fid = ['/home/mrraw/' agilent_study '/' agilent_series '.fid/fid'];
-            end
-            if ~exist(local_fid,'file') 
-                % If local_fid exists, then it will also be input_fid.
-                warning('Multi-echo code is clumsy and could stand refactoring!');
-                pause(3);
-                missing_fids = 0;
-                for vs = 1:length(unreconned_volumes_strings)
-                    volumn_runno = [runno '_m' unreconned_volumes_strings{vs}];
-                    %{
-                    subvolume_workspace_file = [workdir '/' volumn_runno '/' volumn_runno '_workspace.mat'];
-                    varinfo=whos('-file',subvolume_workspace_file);
-                    try
-                        dummy_mf = matfile(subvolume_workspace_file,'Writable',false);
-                        tmp_param = dummy_mf.param;
-                    catch
-                    if ~ismember('imag_data',{varinfo.name}) ...
-                            || ~ismember('real_data',{varinfo.name})
-                    %}
-                        c_fid = [workdir '/' volumn_runno '.fid'];
-                        if ~exist(c_fid,'file')
-                            missing_fids = missing_fids+1;
-                        end
-                    %{
-                    end
-                    % end for catch, just for reference
-                    end
-                    %}
-                end
-                if missing_fids
-                    block_number=1;
-                    ready=check_subvolume_ready_in_fid_quiet(input_fid,block_number,m.bbytes,scanner,scanner_user);
-                end
-                if ready
-                    if ~exist('datapath','var')
-                        datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
-                    end
-                    puller_glusterspaceCS_2(runno,datapath,scanner,workdir,3);
-                    if ~exist(local_fid,'file') % It is assumed that the target of puller is the local_fid
-                        error_flag = 1;
-                        log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
-                            scanner,[datapath '/fid']);
-                        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                        quit force
-                    end
-                else % Setup watcher/gatekeeper
-                    gk_slurm_options=struct;
-                    gk_slurm_options.v=''; % verbose
-                    gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
-                    gk_slurm_options.mem=512; % memory requested; gatekeeper only needs a miniscule amount.
-                    gk_slurm_options.p=cs_queue.gatekeeper;
-                    gk_slurm_options.job_name = [runno '_gatekeeper'];
-                    %gk_slurm_options.reservation = active_reservation;
-                    % using a blank reservation to force no reservation for this job.
-                    gk_slurm_options.reservation = '';
-                    agilent_study_gatekeeper_batch = [workdir '/sbatch/' runno '_gatekeeper.bash'];
-                    gatekeeper_cmd = sprintf('%s %s %s %s %s %s %i %i', ...
-                        cs_execs.gatekeeper, matlab_path,local_fid,input_fid,scanner,log_file,1,m.bbytes);
-                    batch_file = create_slurm_batch_files(agilent_study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
-                    running_jobs = dispatch_slurm_jobs( batch_file,slurm_options);
-                end
-            end
-            % Run splitter, using job_dependencies if necessary
-            fs_slurm_options=struct;
-            fs_slurm_options.v=''; % verbose
-            fs_slurm_options.s=''; % shared; volume setup should to share resources.
-            fs_slurm_options.mem=50000; % memory requested; fs needs a significant amount; could do this smarter, though.
-            fs_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
-            fs_slurm_options.job_name = [runno '_fid_splitter_recon'];
-            fs_slurm_options.reservation = active_reservation;
-            or_dependency = '';
-            if ~isempty(running_jobs)
-                or_dependency='afterok-or';
-            end
-            fs_args= sprintf('%s %s', local_fid,recon_file);
-            fs_cmd = sprintf('%s %s %s', cs_execs.fid_splitter_path,matlab_path,fs_args);
-            if ~options.live_run
-                fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
-                batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
-                fid_splitter_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
-            else
-                eval(sprintf('fid_splitter_exec %s',fs_args));
-            end
-        end % End of single volume and MGRE preprocessing.
-        %}
+
         % Setup individual volumes to be reconned, with the assumption that
         % its own .fid file exists
         for vs = 1:length(unreconned_volumes_strings)
@@ -787,11 +669,8 @@ if ~exist(agilent_study_flag,'file')
             end
         end
     end
-    %% Pull fid and procpar, load reconstruction parameter data
-    % CSreconfile = agilent2glusterspaceCS_wn(scanner,runno,agilent_study,series,recon_path);
-    %    reconfile = agilent2glusterspaceCS(scanner,runno,agilent_study,series,recon_path);
-    %    load(reconfile)
 end % This 'end' belongs to the agilent_study_flag check
+
 if options.fid_archive && local_or_streaming_or_static==3
     % puller overwrite option
     poc='';

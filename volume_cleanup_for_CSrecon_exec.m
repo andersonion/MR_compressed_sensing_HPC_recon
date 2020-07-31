@@ -615,6 +615,10 @@ if ~options.keep_work && ~options.process_headfiles_only
     % That is, its more than 20KiB big. 
     % 20 was chosen because typical procpars are 60KiB, and incomplete
     % headfiles are typicallyu 5-6KiB.
+    %
+    % The problem with this setup is that the cleanup will never be run!
+    % When streaming procpar's are completed independent of this function,
+    % and much later, so we're blind to them. 
     cleanup_ready=0;
     if exist(setup_var.headfile,'file')
         BytesPerKiB=2^10;
@@ -631,7 +635,6 @@ if ~options.keep_work && ~options.process_headfiles_only
             rm_cmd=sprintf('rm -rf %s',setup_var.work_subfolder);
             system(rm_cmd);
         else
-            
             log_msg =sprintf('Work folder %s already appears to have been removed. No action will be taken.\n',work_subfolder);
             yet_another_logger(log_msg,log_mode,log_file);
         end
@@ -640,8 +643,5 @@ if ~options.keep_work && ~options.process_headfiles_only
         yet_another_logger(log_msg,log_mode,log_file);
     end
 end
-%% LEAKY PROCPAR HANDLERS FOR SOME REASON!
-% its not clear why yet, but this deploy procpar handlers command leaks 
-% deploy_procpar_handlers(volume_variable_file); 
 
 end

@@ -313,7 +313,7 @@ else
                     fs_args= sprintf('%s %s', local_fid,recon_file);
                     fs_cmd = sprintf('%s %s %s', cs_execs.fid_splitter,matlab_path,fs_args);
                     if ~options.live_run
-                        fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
+                        fid_splitter_batch = [workdir '/sbatch/' recon_mat.runno '_fid_splitter_CS_recon.bash'];
                         batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
                         %fid_splitter_running_jobs
                         stage_1_running_jobs = dispatch_slurm_jobs(batch_file,'');
