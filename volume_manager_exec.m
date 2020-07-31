@@ -10,14 +10,8 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 
 % for all execs run this little bit of code which prints start and stop time using magic.
 C___=exec_startup();
- 
-% Need to figure out how to pass reconfile, scale_file --> just use recon_file!
-%%load(recon_file);
+
 recon_mat=matfile(recon_file);
-scanner=recon_mat.scanner;
-agilent_study=recon_mat.agilent_study;
-agilent_series=recon_mat.agilent_series;
-runno=recon_mat.runno;
 options=recon_mat.options;
 log_mode=2;
 if options.debug_mode>=10
@@ -73,7 +67,6 @@ end
 % Looks like we have a logic glitch where we dont re-run manager unless
 % volume cleanup still has yet to run. SO, lets change that(its at the
 % end!).
-
 
 [starting_point, log_msg] = check_status_of_CSrecon(workdir,...
     volume_runno, ...
@@ -155,7 +148,7 @@ if ~exist(local_archive_tag,'file')
     clear databuffer;
 end
 
-if (starting_point == 0) ||  (  (recon_mat.nechoes > 1) && (starting_point == 1)  )
+if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && volume_number ~=1  )
     %% starting point 0/1
     % FID not ready yet, schedule gatekeeper for us.
     gk_slurm_options=struct;
@@ -164,14 +157,14 @@ if (starting_point == 0) ||  (  (recon_mat.nechoes > 1) && (starting_point == 1)
     gk_slurm_options.mem=512; % memory requested; gatekeeper only needs a miniscule amount.
     gk_slurm_options.p=cs_queue.gatekeeper;
     %gk_slurm_options.job_name = [volume_runno '_gatekeeper'];
-    gk_slurm_options.job_name = [runno '_gatekeeper']; %Trying out singleton behavior
+    gk_slurm_options.job_name = [recon_mat.runno '_gatekeeper']; %Trying out singleton behavior
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
     agilent_study_gatekeeper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
-    [input_fid,~] =find_input_fidCS(scanner,runno,agilent_study,agilent_series);% hint: ~ ==> local_or_streaming_or_static
+    [input_fid,~] =find_input_fidCS(recon_mat.scanner,recon_mat.runno,recon_mat.agilent_study,recon_mat.agilent_series);% hint: ~ ==> local_or_streaming_or_static
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
-        volume_fid, input_fid, scanner, log_file, volume_number, recon_mat.bbytes);
+        volume_fid, input_fid, recon_mat.scanner, log_file, volume_number, recon_mat.bbytes);
     gatekeeper_cmd = sprintf('%s %s %s ', cs_execs.gatekeeper, matlab_path,...
         gatekeeper_args);
     if ~options.live_run
@@ -194,12 +187,14 @@ if (starting_point == 0) ||  (  (recon_mat.nechoes > 1) && (starting_point == 1)
     vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
     if ~options.live_run
-        batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
+        batch_file = create_slurm_batch_files(volume_manager_batch, ...
+            vm_cmd,vm_slurm_options);
         or_dependency = '';
         if ~isempty(running_jobs)
             or_dependency='afterok-or';
         end
-        c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
+        c_running_jobs = dispatch_slurm_jobs(batch_file,'',...
+            running_jobs,or_dependency);
     else
         eval(sprintf('volume_manager_exec %s',vm_args));
     end
@@ -223,7 +218,9 @@ else
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
         if starting_point<4
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
+            [input_fid, local_or_streaming_or_static]=find_input_fidCS( ...
+                recon_mat.scanner, recon_mat.runno, ...
+                recon_mat.agilent_study, recon_mat.agilent_series);
         else
             input_fid='BOGUS_INPUT_FOR_DONE_WORK';
             local_or_streaming_or_static=3;
@@ -232,66 +229,120 @@ else
         if (starting_point <= 1 || ~islogical(options.CS_preview_data) )
             if ~exist('volume_fid','var')
                 error('Confusing code path error on volume_fid reset');
-                volume_fid = [work_subfolder '/' volume_runno '.fid'];
+                % volume_fid = [work_subfolder '/' volume_runno '.fid'];
             end
-            scanner_user='';
+            % when checking consistency, we only check volume 1
+            % That is becuase we're making sure the fid is what we expect,
+            % and that is a reasonable fingerprint.
+            % Checking other volumes would require getting their data bits
+            % first, and that is not likely to fail independently.
             if (local_or_streaming_or_static == 1)
-                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,volume_number);
+                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,1);
             else
                 scanner_user='omega';
-                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,volume_number,scanner,scanner_user);
+                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,1,recon_mat.scanner,scanner_user);
             end
             if fid_consistency
                 %{
                 % James commented this out because it was killing streaming CS,
                 % when streaming data.
-                % This code needs to be put someplace correct! 
+                % This code needs to be put someplace correct!
                 if ~exist(procpar_file,'file')
                     datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
                     mode =2; % Only pull procpar file
                     puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
                 end
                 %}
-                % Getting subvolume should be the job of volume setup. 
+                % Getting subvolume should be the job of volume setup.
                 % TODO: Move get vol code into setup!
-
+                
                 % HACK to allow preview post reconstruction cleanup.
                 % work_subfolder = fileparts(volume_fid)
                 if ~exist(work_subfolder,'dir')
                     warning('  Creating work subfolder to fetch fid, this shouldn''t happen here. This only occurs in exotic testing or recovery conditions.');
                     mkdir(work_subfolder);
                 end
-                if (local_or_streaming_or_static == 1)
-                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes);
+                if recon_mat.nechoes == 1
+                    % for multi-block fids(diffusion)
+                    if (local_or_streaming_or_static == 1)
+                        get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes);
+                    else
+                        get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes,recon_mat.scanner,scanner_user);
+                    end
+                elseif recon_mat.nechoes > 1 && volume_number == 1
+                    % for 1 block fids, mgre, and single vol, in theory we
+                    % can only operate when static, further we should only
+                    % enter this code block if already static.
+                    %
+                    % This is coded to only trigger for multi-echo,
+                    % Hopefully single vol will be handled correctly in necho 1 block above.
+                    %
+                    % schedule local gatekeeper on volume fid
+                    % for volume 1 fetch fetch data, run the fid
+                    % splitter.
+                    
+                    % due to how ugly puller_glusterpsaceCS_2 is we have to define yet another temply var.
+                    % hopefully we can swap the proper terminal puller code
+                    if ~exist('datapath','var')
+                        datapath=['/home/mrraw/' recon_mat.agilent_study '/' recon_mat.agilent_series '.fid'];
+                    end
+                    local_fid= fullfile(base_workdir,'fid');
+                    if ~exist(local_fid,'file')
+                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner,base_workdir,3);
+                    end
+                    if ~exist(local_fid,'file') 
+                        % It is assumed that the target of puller is the local_fid
+                        error_flag = 1;
+                        log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
+                            scanner,[datapath '/fid']);
+                        yet_another_logger(log_msg,log_mode,log_file,error_flag);
+                        if isdeployed
+                            quit force;
+                        else
+                            error(log_msg);
+                        end
+                    end
+                    % Run splitter
+                    fs_slurm_options=struct;
+                    fs_slurm_options.v=''; % verbose
+                    fs_slurm_options.s=''; % shared; volume setup should to share resources.
+                    fs_slurm_options.mem=50000; % memory requested; fs needs a significant amount; could do this smarter, though.
+                    fs_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
+                    fs_slurm_options.job_name = [recon_mat.runno '_fid_splitter_recon'];
+                    fs_slurm_options.reservation = active_reservation;
+                    fs_args= sprintf('%s %s', local_fid,recon_file);
+                    fs_cmd = sprintf('%s %s %s', cs_execs.fid_splitter,matlab_path,fs_args);
+                    if ~options.live_run
+                        fid_splitter_batch = [workdir '/sbatch/' runno '_fid_splitter_CS_recon.bash'];
+                        batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
+                        %fid_splitter_running_jobs
+                        stage_1_running_jobs = dispatch_slurm_jobs(batch_file,'');
+                    else
+                        eval(sprintf('fid_splitter_exec %s',fs_args));
+                    end
                 else
-                    get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes,scanner,scanner_user);
+                    error('Trouble with nechoes detect switch tell dev they''re sloppy');
                 end
             else
                 log_mode = 1;
                 error_flag = 1;
                 log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid);
-                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',log_msg,input_fid,fid_tag_file,volume_number,scanner,scanner_user);
+                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',...
+                    log_msg,input_fid,fid_tag_file,volume_number,recon_mat.scanner,scanner_user);
                 log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
                 
                 yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                status=variable_to_force_an_error;
-                quit force
+                if isdeployed
+                    quit force;
+                else
+                    error(log_msg);
+                end
             end
         end
         %% STAGE2 Scheduling
         if (starting_point <= 2 || ~islogical(options.CS_preview_data) )
             % Schedule setup
             %% Make variable file
-            %{
-            % trying to avoid this copy to reduce the confusion on startup
-            if ~exist(variables_file,'file')
-                cp_cmd = sprintf('cp -p %s %s',recon_file, variables_file);
-                [s,sout]=system(cp_cmd);
-                if s~=0
-                    warning(sout);
-                end
-            end
-            %}
             mf = matfile(setup_variables,'Writable',true);
             mf.recon_file = recon_file;
             mf.volume_number=volume_number;
@@ -337,13 +388,20 @@ else
             vsu_slurm_options.job_name = [volume_runno '_volume_setup_for_CS_recon'];
             %vsu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
-            vsu_slurm_options.reservation = ''; 
+            vsu_slurm_options.reservation = '';
             volume_setup_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
             vsu_args=sprintf('%s %i',setup_variables, volume_number);
             vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
+            if  stage_1_running_jobs
+                dep_string = stage_1_running_jobs;
+                dep_type = 'afterok-or';
+            else
+                dep_string = '';
+                dep_type = '';
+            end
             if ~options.live_run
                 batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
-                stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'');
+                stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
             else
                 eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
             end
@@ -355,7 +413,7 @@ else
         if (starting_point <= 3)
             %{
             % update itnlim from main mat file to our volume file...
-            % but SERIOUSLY WHY! 
+            % but SERIOUSLY WHY!
             mf = matfile(variables_file,'Writable',true);
             rf = matfile(recon_file);
             rf_opts=rf.options;
@@ -371,25 +429,25 @@ else
             if single_threaded_recon
                 swr_slurm_options.c=1; % was previously 2...also need to investigate binding
                 swr_slurm_options.hint='nomultithread';
-            %{
+                %{
             else
                 swr_slurm_options.s='';
                 swr_slurm_options.hint='multithread';
-            %}
+                %}
             end
-            % We use mem limit to control the number of jobs per node. 
-            % Want to allow 32-40 jobs per node, but use --ntasks-per-core=1 
+            % We use mem limit to control the number of jobs per node.
+            % Want to allow 32-40 jobs per node, but use --ntasks-per-core=1
             % to make sure that every core has exactly one job on them.
             % That is why this mem number gets to be constant, we shouldnt
-            % run into trouble until CS_slices are very (VERY) large. 
-            swr_slurm_options.mem='5900'; 
+            % run into trouble until CS_slices are very (VERY) large.
+            swr_slurm_options.mem='5900';
             swr_slurm_options.p=cs_queue.recon;
             % swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
             swr_slurm_options.job_name=[volume_runno '_CS_recon_NS' num2str(options.chunk_size)];
             swr_slurm_options.reservation = active_reservation;
             if exist(temp_file,'file')
-                %Find slices that need to be reconned. 
-                % the temp file only exists if setup has run. 
+                %Find slices that need to be reconned.
+                % the temp file only exists if setup has run.
                 [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
@@ -422,7 +480,7 @@ else
                 if slice_pack_padding~=options.chunk_size
                     slices_to_process(end+1:end+slice_pack_padding)=NaN;
                 end
-
+                
                 s3jobs=cell(1,num_chunks);
                 %slices to process would be better named chunks, or slabs.
                 slices_to_process = reshape(slices_to_process,[options.chunk_size num_chunks]);
@@ -431,7 +489,7 @@ else
                 % we could parfor this when we're in live_mode.
                 zero_width = ceil(log10((recon_mat.dim_x+1)));
                 for ch_num=1:num_chunks
-                %parfor ch_num=1:num_chunks
+                    %parfor ch_num=1:num_chunks
                     sx=slices_to_process(:,ch_num);
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
                     sx(isnan(sx))=[];
@@ -481,7 +539,7 @@ else
                 end
             end
         end
-        %% craft archive tag commands for later. 
+        %% craft archive tag commands for later.
         write_archive_tag_success_cmd = ...
             sprintf(['if [[ -f %s ]]; then\n'...
             '\t  rm %s;\n'...
@@ -603,7 +661,7 @@ else
                                 starting_point=6;
                             end
                         end
-                    end
+                    %end
                 end
             end
         end
