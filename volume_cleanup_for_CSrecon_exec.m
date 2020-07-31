@@ -20,17 +20,7 @@ misguided_status_code = 0;
 scale_target=2^16-1;
 
 if ~isdeployed
-    %{
-    addpath('/cm/shared/workstation_code_dev/recon/CS_v2/CS_utilities/');
-    addpath('/cm/shared/workstation_code_dev/recon/WavelabMex/');
-    if (~exist('volume_variable_file','var') || isempty(setup_variables) )
-      warning('using canned parameters because youdidnt specify any!');
-      pause(3);
-    setup_variables = '/nas4/bj/S67950_02.work/S67950_02_m1/work/S67950_02_m1_setup_variables.mat';
-    %volume_scale = 1.4493;
-    %variable_iterations=1;
-    end
-%}
+
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
@@ -112,18 +102,21 @@ end
 % gives us 30 x 10 second intervals to wait
 % a 300 second failure extension!
 % if things accidentally happen out of order this is garbage!
+wait_interval=10;
+num_checks = 30;
 scale_file_error =1;
 if setup_var.volume_number == 1 && exist(recon_mat.scale_file,'file')
     scale_file_error = 0;
 elseif setup_var.volume_number ~= 1
-    num_checks = 30;
     for tt = 1:num_checks
         if exist(recon_mat.scale_file,'file')
             scale_file_error = 0;
             break;
         else
-            waring('Waiting for scale file for 10 seconds');
-            pause(10)
+            warning(['Waiting %i seconds for scale file, THIS IS UNFORTUNATE.\n ' ...
+                '\twaited %i/%i(MAX WAIT), '],wait_interval, ...
+                tt*wait_interval, wait_interval*num_checks);
+            pause(wait_interval)
         end
     end
 end
@@ -135,8 +128,11 @@ else %if (setup_var.volume_number > 1)
   error_flag = 1;
   log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',setup_var.volume_runno,recon_mat.scale_file);
   yet_another_logger(log_msg,log_mode,log_file,error_flag);
-  status=variable_to_force_an_error;
-  quit force
+  if isdeployed
+      quit force
+  else
+      error(log_msg);
+  end
 end
 
 %% get options into base workspace.
@@ -239,8 +235,11 @@ else
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
 if error_flag==1
-    status=variable_to_force_an_error;
-    quit force
+    if isdeployed
+        quit force;
+    else
+        error(log_msg);
+    end
 end
 
 %% Read in temporary data
@@ -253,8 +252,11 @@ header_size = fread(fid,1,'uint16');
 fseek(fid,2*header_size,0);
 %data_in=fread(fid,inf,'*uint8');
 
-
-BRIGHT_NOISE_THRESHOLD=0.9995; % our magic number threshold to remove bright noise.
+% our magic number threshold to remove bright noise.
+% This is the percentage of data we scale to, instead of a simple scale to
+% max, we scale such that the max value preserves 99.95% of our data,
+% said otherwise, we overrange 0.05%.
+BRIGHT_NOISE_THRESHOLD=0.9995; 
 
 %% min memory mode, we only load 1 full CS slice at a time,
 % each is reduced to the proscribed acq dim
@@ -419,7 +421,7 @@ end
 
 %% Apply Fermi Filter, and/ or reduce sample
 if options.fermi_filter|| exist('output_size','var')
-    log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n');
+    log_msg =sprintf('Volume %s: Fermi filter is being applied to k-space!\n',setup_var.volume_number);
     yet_another_logger(log_msg,log_mode,log_file);
     % go back to kspace from imgspace.
     data_out = fftshift(fftn(fftshift(data_out)));
@@ -441,13 +443,15 @@ if options.fermi_filter|| exist('output_size','var')
     end
     data_out =fftshift(ifftn(fftshift(data_out)));
 end
-if ~isdeployed && strcmp(getenv('USER'),'rja20')
-    figure(12)
+%{
+% show the code dev a central slice.
+if ~isdeployed && strcmp(getenv('USER'),'THECODEDEV')
+    figure(666)
     %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
     imagesc(abs(squeeze(data_out(:,:,round(original_dims(3)/2)))))
     colormap gray
 end
-
+%}
 %% Save data
 if qsm_fermi_filter
     if write_qsm
@@ -632,7 +636,7 @@ if ~options.keep_work && ~options.process_headfiles_only
             yet_another_logger(log_msg,log_mode,log_file);
         end
     else
-        log_msg =sprintf('Images have not been successfully transferred yet; work folder will not be removed at this time.\n')
+        log_msg =sprintf('Images have not been successfully transferred yet; work folder will not be removed at this time.\n');
         yet_another_logger(log_msg,log_mode,log_file);
     end
 end

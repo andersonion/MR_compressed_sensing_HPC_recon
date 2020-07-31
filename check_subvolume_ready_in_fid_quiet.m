@@ -77,8 +77,12 @@ else
     fileID = fopen(scr_f,'w');
     if fileID == -1
         log_msg=sprintf('Failure to open /tmp script %s for writing',scr_f);
-        disp(log_msg)
-        error_due_to_network_issues
+        % error_due_to_network_issues
+        if isdeployed
+            quit force;
+        else
+            error(log_msg);
+        end
     end
     fprintf(fileID, '#!/bin/bash\n');
     fprintf(fileID, '%s\n',header_grab);

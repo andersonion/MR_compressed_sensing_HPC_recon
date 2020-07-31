@@ -23,6 +23,7 @@ if status&&fail_on_error
     %yet_another_logger(log_msg,log_mode,log_file,error_flag);
     disp(log_msg)
     % throw as caller here? Becuase that is far less yucky?
+    error(log_msg);
     error_due_to_network_issues
     %quit force
 end

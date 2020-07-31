@@ -11,6 +11,7 @@ for i_t=numel(cell_of_tables):-1:1
         [~,y,z,pa,pb,ds_lvl]=extract_info_from_CStable(cell_of_tables{i_t},1);
         if y*z/ds_lvl~=ntraces
             cell_of_tables(i_t)=[];
+            continue;
         end
         if pa==def_pa && pb==def_pb
             defacto_table=cell_of_tables{i_t};

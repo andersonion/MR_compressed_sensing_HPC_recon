@@ -371,8 +371,11 @@ for index=1:length(slice_numbers)
                 log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',...
                     slice_index,header_info,setup_var.temp_file,tt);
                 yet_another_logger(log_msg,log_mode,log_file,1);
-                variable_that_throws_an_error_so_slurm_knows_we_failed;
-                error('would slurm see this slice error?');
+                if isdeployed
+                    quit force;
+                else
+                    error(log_msg);
+                end                
             else
                 log_msg =sprintf('Slice %i: Reconstruction flag ("%i") written to header of %s, after %i tries.\n',...
                     slice_index,header_info,setup_var.temp_file,tt);
@@ -406,9 +409,11 @@ if  (num_af > 0)
         log_msg =sprintf('Slice %i: attempted reconstruction appears to have failed; THROWING FAILURE FLAG.\n',apparent_failures(ff));
         yet_another_logger(log_msg,log_mode,log_file);
     end
-    
-    status=variable_to_force_an_error;
-    
+    if isdeployed
+        quit force
+    else
+        error(log_msg);
+    end
 end
 %%
 return

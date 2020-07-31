@@ -1,4 +1,4 @@
-function out_code = local_file_gatekeeper_exec( local_file,log_file,interval,time_limit)
+function out_code = local_file_gatekeeper_exec( local_file, log_file, interval, time_limit)
 % Mainly for checking to see if the needed data has been written to the
 % fid, but can be used for procpars and other remote files.
 % 
@@ -13,22 +13,16 @@ function out_code = local_file_gatekeeper_exec( local_file,log_file,interval,tim
 % waiting.  This should help catch cancelled jobs.
 
 if ~isdeployed;
-local_file = '/glusterspace/S67665_70.work/S67665_70_m04.fid';
-remote_file= '/home/vnmr1/vnmrsys/exp2/acqfil/fid'; 
-
-log_file='/glusterspace/S67665_70.work/S67665_70.recon_log'
-
-interval='5';
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
 end
 
+%% set defaults
 out_code = 1; % Default is failure.
-
-
 if ~exist('interval','var')
-    interval = 120; % Default interval of 2 minutes
+    % Default interval of 2 minutes
+    interval = 120;
 else
     if ischar(interval)
         interval=str2double(interval);
@@ -36,7 +30,8 @@ else
 end
                                                                                                                                                                                                                                                                                                                                                                                         
 if ~exist('time_limit','var')
-    time_limit=2592000; % Default time_limit of 30 days
+    % Default time_limit of 30 days
+    time_limit=2592000;
 else
     if ischar(time_limit)
         time_limit=str2double(time_limit);
@@ -69,8 +64,6 @@ for tt = 1:max_checks
         pause(interval);
     end
 end
-
-
 wait_time = floor(toc/60);
 
 if ready
@@ -81,7 +74,11 @@ else
     error_flag=1;
     log_msg=sprintf('\nWaiting for the input data for the file ''%s'' was NOT ready after %i minutes of waiting.\n',local_file,wait_time);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
-    status=this_undefined_variable_will_return_a_goddamn_error_code;
+    if isdeployed
+        quit force;
+    else
+        error(log_msg);
+    end
 end
 
 end

@@ -35,7 +35,11 @@ if (header_size == 0)
         % Why not just use the "error" function instead of a fprintf and a
         % broken status?
         fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
-        status=this_undefined_variable_will_return_a_goddamn_error_code;
+        if isdeployed
+            quit force;
+        else
+            error();
+        end
     end
 end
 work_done=fread(fid,header_size,'uint16')';
