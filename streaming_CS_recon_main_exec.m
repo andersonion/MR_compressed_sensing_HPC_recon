@@ -18,8 +18,8 @@ function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series
 %
 
 recon_type = 'CS_v2.1';
-typical_pa=18;
-typical_pb=54;
+typical_pa=1.8;
+typical_pb=5.4;
 if ~isdeployed
     %% Get all necessary code for reconstruction
     % run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
@@ -79,8 +79,8 @@ types.standard_options={...
     'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
     're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
     'Itnlim',               'number of iterations, would like to rename to max_iterations. Probably have to chase this down in the code.'
-    'TVWeight',             ''
-    'xfmWeight',            ''
+    'TVWeight',             ' total variation? '
+    'xfmWeight',            ' wavelet transform weight? '
     'hamming_window',       ' used in the creation of phmask'
     'skip_fermi_filter',    'do not do fermi_filtering of kspace before fft' 
     'fermi_w1',             ''
@@ -88,7 +88,7 @@ types.standard_options={...
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
     };
 types.beta_options={...
-    'wavelet_dims',         ''
+    'wavelet_dims',         '[filter_size,wave_scale] filter_size can be from 4 to 20, in steps of 2. wave_scale is the final wavelet scale. 4 is generally a good value, it can be increased for larger volumes, but it wont really change your image quality( up or down). We do need to take care that 2^wave_scale <= log2(dim_y/2^scale_count). We think 4 is a good wave scale count. '
     'wavelet_type',         ['One of -> ' strjoin({'Haar', 'Beylkin', 'Coiflet', 'Daubechies',...
     'Symmlet', 'Vaidyanathan','Battle'},':')]
     'process_headfiles_only',    ' skip image reconstruction and only process headfile(s)'
@@ -368,6 +368,9 @@ if ~exist(agilent_study_flag,'file')
         clear t_db t_opt;
     end
     m.recon_type = recon_type;
+    m.agilent_study_workdir = workdir;
+    m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
+    m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
     %% Test ssh connectivity using our perl program which has robust ssh handling.
     %{ 
     % but the scanner is probably fine and not where we'll have trouble
@@ -391,7 +394,7 @@ if ~exist(agilent_study_flag,'file')
     end
     
     %% Second First things first: determine number of volumes to be reconned
-    local_hdr = fullfile(workdir,[runno '_hdr.fid']);
+    % local_hdr = fullfile(workdir,[runno '_hdr.fid']);
     try
         [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
     catch merr
@@ -403,22 +406,33 @@ if ~exist(agilent_study_flag,'file')
             warning('Trouble finding fid, gonna hope a more interesting error stops us later');
         end
     end
-    if ~exist(local_hdr,'file');
-        if (local_or_streaming_or_static == 1)
-            get_hdr_from_fid(input_fid,local_hdr);
+    %if ~exist(local_hdr,'file');
+    % get_hdr_from_fid(input_fid,local_hdr);
+    % get_hdr_from_fid(input_fid,local_hdr,scanner);
+    %end
+    if (local_or_streaming_or_static == 1)
+        fid_consistency = write_or_compare_fid_tag(input_fid,m.fid_tag_file,1);
+    else
+        if (local_or_streaming_or_static == 2)
+            log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
+            yet_another_logger(log_msg,log_mode,log_file);
+        end
+        fid_consistency = write_or_compare_fid_tag(input_fid,m.fid_tag_file,1,scanner,scanner_user);
+    end
+    if ~fid_consistency
+        log_msg=sprintf('FID consistency check failed!\n');
+        yet_another_logger(log_msg,3,log_file,1);
+        if isdeployed
+            quit force;
         else
-            if (local_or_streaming_or_static == 2)
-                log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
-                yet_another_logger(log_msg,log_mode,log_file);
-            end
-            get_hdr_from_fid(input_fid,local_hdr,scanner);
+            error(log_msg);
         end
     end
     
     varlist='npoints,nblocks,ntraces,bitdepth,bbytes,dim_x';
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
-        [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(local_hdr);
+        [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(m.fid_tag_file);
         m.dim_x = round(m.npoints/2);
     end
     procpar_file = fullfile(workdir,'procpar');
@@ -443,8 +457,8 @@ if ~exist(agilent_study_flag,'file')
                         log_msg=sprintf('%sit will be listed last.\n',log_msg); 
                         log_msg=sprintf('%sFor best clarity please specify when in streaming mode.\n',log_msg);
                         log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
-                        log_msg=sprintf('Vaild tables for this data:\n\t%s\n%s',strjoin(valid_tables,'\n\t'),log_msg);
-                        yet_another_logger(log_msg,log_mode,log_file,1);
+                        log_msg=sprintf('Vaild tables for pa %0.2f and pb %0.2f this data:\n\t%s\n%s',typical_pa,typical_pb,strjoin(valid_tables,'\n\t'),log_msg);
+                        yet_another_logger(log_msg,3,log_file,0);
                         fprintf('  (Ctrl+C to abort)\n');
                         options.CS_table='';
                         while isempty( ...
@@ -547,9 +561,6 @@ if ~exist(agilent_study_flag,'file')
     yet_another_logger(log_msg,log_mode,log_file);
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
-        m.agilent_study_workdir = workdir;
-        m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
-        m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
         %% tangled web of support scanner name ~= host name.
         if ~exist('scanner_host_name','var')
             % What madness is this! Reloading data, Never!...
@@ -602,7 +613,11 @@ if ~exist(agilent_study_flag,'file')
         % 1-D fft done ahead, and to avoid the wait for copy, that is
         % assuming the scanner saves data as it goes...
         running_jobs = '';
+        
+        %% Freshly removed MGRE special  handling, dispsersed into vol manager. 
+        %{
         if (m.nechoes >  1) %nblocks == 1 --> we can let single echo GRE fall through the same path as DTI
+            %% single volume section
             if ~exist('local_or_streaming_or_static','var')
                 error('Weird code here, should never run, debug later - james');
                 [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
@@ -620,22 +635,22 @@ if ~exist(agilent_study_flag,'file')
                 missing_fids = 0;
                 for vs = 1:length(unreconned_volumes_strings)
                     volumn_runno = [runno '_m' unreconned_volumes_strings{vs}];
+                    %{
                     subvolume_workspace_file = [workdir '/' volumn_runno '/' volumn_runno '_workspace.mat'];
                     varinfo=whos('-file',subvolume_workspace_file);
-                    %{
                     try
                         dummy_mf = matfile(subvolume_workspace_file,'Writable',false);
                         tmp_param = dummy_mf.param;
                     catch
-                    %}
                     if ~ismember('imag_data',{varinfo.name}) ...
                             || ~ismember('real_data',{varinfo.name})
+                    %}
                         c_fid = [workdir '/' volumn_runno '.fid'];
                         if ~exist(c_fid,'file')
                             missing_fids = missing_fids+1;
                         end
-                    end
                     %{
+                    end
                     % end for catch, just for reference
                     end
                     %}
@@ -695,6 +710,7 @@ if ~exist(agilent_study_flag,'file')
                 eval(sprintf('fid_splitter_exec %s',fs_args));
             end
         end % End of single volume and MGRE preprocessing.
+        %}
         % Setup individual volumes to be reconned, with the assumption that
         % its own .fid file exists
         for vs = 1:length(unreconned_volumes_strings)
@@ -728,7 +744,11 @@ if ~exist(agilent_study_flag,'file')
                 if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
                     log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ',volume_runno,volume_dir);
                     yet_another_logger(log_msg,log_mode,log_file,1);
-                    quit force
+                    if isdeployed
+                        quit force
+                    else
+                        error(log_msg);
+                    end
                 end
             end
             vm_slurm_options=struct;
@@ -737,7 +757,7 @@ if ~exist(agilent_study_flag,'file')
             
             % memory requested; volume manager only needs a miniscule amount.
             %--In theory only! For yz-array sizes > 2048^2, loading the
-            % data of phmask, CSmask, etc can push the memory of 512 MB
+            % data of phmask, CSmask, etc can push the memory past the former 512MB
             vm_slurm_options.mem=2048;
             vm_slurm_options.p=cs_queue.gatekeeper;% cs_full_volume_queue; % For now, will use gatekeeper queue for volume manager as well
             vm_slurm_options.job_name = [volume_runno '_volume_manager'];
@@ -863,6 +883,7 @@ recon_dims = [original_dims(1) size(mask)];%size(data);
 phmask = zpad(hamming(options.hamming_window)*hamming(options.hamming_window)',recon_dims(2),recon_dims(3)); %mask to grab center frequency
 phmask = phmask/max(phmask(:));			 %for low-order phase estimation and correction
 end
+
 function missing=matfile_missing_vars(mat_file,varlist)
 % function missing_count=matfile_missing_vars(mat_file,varlist)
 % checks mat file for list of  vars,
