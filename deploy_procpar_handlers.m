@@ -121,7 +121,7 @@ if ~exist(recon_mat.procpar_file,'file') ...
     mode =2; % Only pull procpar file
     datapath=fullfile('/home/mrraw',recon_mat.agilent_study,[recon_mat.agilent_series '.fid']);
     puller_glusterspaceCS_2(recon_mat.runno,  datapath,  recon_mat.scanner,...
-        study_workdir,  mode);
+        recon_mat.agilent_study_workdir,  mode);
 end
 
 %% set up procpar gatekeeper
@@ -133,19 +133,20 @@ if (~exist(recon_mat.procpar_file,'file') || ~exist(setup_var.headfile,'file'))
     gk_slurm_options.mem=512; % memory requested; gatekeeper only needs a miniscule amount--or so I thought!.
     gk_slurm_options.p=cs_queue.gatekeeper;
     %gk_slurm_options.job_name = [volume_runno '_procpar_gatekeeper'];
-    gk_slurm_options.job_name = [runno '_procpar_gatekeeper_and_processor'];
+    gk_slurm_options.job_name = [setup_var.volume_runno '_procpar_gatekeeper_and_processor'];
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
-    procpar_gatekeeper_batch = [workdir '/sbatch/' volume_runno '_procpar_gatekeeper.bash'];
-    procpar_gatekeeper_args= sprintf('%s %s',[procpar_file ':' headfile],log_file);
+    procpar_gatekeeper_batch = fullfile(setup_var.workdir, 'sbatch', [ setup_var.volume_runno '_procpar_gatekeeper.bash' ]);
+    procpar_gatekeeper_args= sprintf('%s %s',[recon_mat.procpar_file ':' setup_var.headfile],setup_var.volume_log_file);
     procpar_gatekeeper_cmd = sprintf('%s %s %s', cs_execs.procpar_gatekeeper, matlab_path,procpar_gatekeeper_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
         pp_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
         log_mode = 1;
-        log_msg =sprintf('Procpar data and/or headfile for volume %s will be processed as soon as it is available; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,pp_running_jobs);
-        yet_another_logger(log_msg,log_mode,log_file);
+        log_msg =sprintf(['Procpar data and/or headfile for volume %s will be processed as soon as it is available;'...
+            ' initializing gatekeeper (SLURM jobid(s): %s).\n'],setup_var.volume_runno,pp_running_jobs);
+        yet_another_logger(log_msg,log_mode,recon_mat.log_file);
     else
         eval(sprintf('local_file_gatekeeper_exec %s',procpar_gatekeeper_args));
     end

@@ -18,7 +18,12 @@ if options.debug_mode>=10
     log_mode=1;
 end
 log_file=recon_mat.log_file;
-workdir=fullfile(base_workdir,volume_runno);
+try
+    workdir=fullfile(base_workdir,volume_runno);
+catch merr
+    workdir=fullfile(recon_mat.agilent_study_workdir,volume_runno);
+end
+    
 target_machine=options.target_machine;
 target_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stupid way to fix the unneccessary 'fix' James introduced
 %full_host_name=databuffer.scanner_constants.scanner_host_name; % Just kidding. We can thank James for this red herring.
@@ -184,7 +189,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     % using a blank reservation to force no reservation for this job.
     vm_slurm_options.reservation = '';
     volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
-    vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
+    vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(volume_manager_batch, ...
@@ -250,7 +255,7 @@ else
                 if ~exist(procpar_file,'file')
                     datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
                     mode =2; % Only pull procpar file
-                    puller_glusterspaceCS_2(runno,datapath,scanner,base_workdir,mode);
+                    puller_glusterspaceCS_2(runno,datapath,scanner,recon_mat.agilent_study_workdir,mode);
                 end
                 %}
                 % Getting subvolume should be the job of volume setup.
@@ -286,9 +291,9 @@ else
                     if ~exist('datapath','var')
                         datapath=['/home/mrraw/' recon_mat.agilent_study '/' recon_mat.agilent_series '.fid'];
                     end
-                    local_fid= fullfile(base_workdir,'fid');
+                    local_fid= fullfile(recon_mat.agilent_study_workdir,'fid');
                     if ~exist(local_fid,'file')
-                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner,base_workdir,3);
+                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner,recon_mat.agilent_study_workdir,3);
                     end
                     if ~exist(local_fid,'file') 
                         % It is assumed that the target of puller is the local_fid
@@ -677,8 +682,12 @@ else
     % data.
     % That seems okay, so lets watch for that, and not re_schedule volume
     % manager when keep_work is on and stage is 5+
+    %{
     if ( ~options.keep_work && starting_point < 6 ) ...
             || ( options.keep_work &&  starting_point < 5 )
+    %}
+    % clever simplificaion of conditional.
+    if starting_point < ( 6 - options.keep_work)
         vm_slurm_options=struct;
         vm_slurm_options.v=''; % verbose
         vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -691,7 +700,7 @@ else
         % using a blank reservation to force no reservation for this job.
         vm_slurm_options.reservation = '';
         volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
-        vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,base_workdir);
+        vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
         vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
         if ~options.live_run
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
@@ -705,25 +714,32 @@ else
             % when we schecdule end stage jobs, tell ourselves to run one
             % more time once they're terminated, note not after failure, or
             % after success.
+            dep_type='singleton';
+            dep_jobs='';
             if ~isempty(stage_4_running_jobs) || ~isempty(stage_5_running_jobs) || ~isempty(stage_5e_running_jobs)
-                dep_jobs='';
+                dep_type='afterany';
                 %%% these can be combined with strjoin. 
+                job_glob=cell(0);
                 if stage_5e_running_jobs
-                    dep_jobs=stage_5e_running_jobs;
+                    job_glob=[job_glob,stage_5e_running_jobs];
+                    %dep_jobs=stage_5e_running_jobs;
                 end
                 if stage_5_running_jobs
-                    dep_jobs=sprintf('%s:%s',dep_jobs,stage_5_running_jobs);
+                    job_glob=[job_glob,stage_5_running_jobs];
+                    %dep_jobs=sprintf('%s:%s',dep_jobs,stage_5_running_jobs);
                 end
                 if stage_4_running_jobs
-                    dep_jobs=sprintf('%s:%s',dep_jobs,stage_4_running_jobs);
+                    job_glob=[job_glob,stage_4_running_jobs];
+                    %dep_jobs=sprintf('%s:%s',dep_jobs,stage_4_running_jobs);
                 end
+                %{
                 if strcmp(dep_jobs(1),':')
                     dep_jobs(1)=[];
                 end
-                c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,'afterany');
-            else
-                c_running_jobs = dispatch_slurm_jobs(batch_file,'','singleton');
+                %}
+                dep_jobs=strjoin(job_glob,':');
             end
+            c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,dep_type);
             log_mode = 1;
             log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
@@ -734,6 +750,9 @@ else
             eval(sprintf('volume_manager_exec %s',vm_args));
             pause(1);
         end
+    end
+    if starting_point == 6
+        volume_clean(setup_variables);
     end
 end
 

@@ -45,10 +45,22 @@ send_archive_tag = fullfile(volume_dir,sprintf('%simages',volume_runno), ...
 
 send_archive_tag=wildcard_tag_finder(send_archive_tag);
 
+headfile_complete=0;
+headfile=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
+    sprintf('%s.headfile',volume_runno));
+if exist(headfile,'file')
+    BytesPerKiB=2^10;
+    hf_minKiB=20;
+    hfinfo=dir(headfile);
+    if hfinfo.bytes>hf_minKiB*BytesPerKiB
+        headfile_complete=1;
+    end
+end
+
 vol_status=100;% starting at complete, keep working it down. 
 % vol status is what % from 0-100 are we. 
 % have to assign each stage some % it takes. lets pretend that only slices matter, and they take 90% of the work.
-if ~exist(send_archive_tag,'file')
+if ~exist(send_archive_tag,'file') || ~headfile_complete
     % this 2 pct represents processing the procpar, and images and headfile
     % to dest engine. We could break this down further, but its probably
     % not worth it. eg, 1.8% is send data, 0.1% is proces procpar, 0.1% is
