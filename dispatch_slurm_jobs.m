@@ -119,6 +119,11 @@ else
 end
 
 sbatch_cmd = sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);%['sbatch --requeue --mem=' mem ' -s -p ' queue ' ' slurm_options ' ' setup_dependency ' --job-name=' job_name ' --out=' batch_folder 'slurm-%j.out ' batch_file];
+% SLOPADASHERY insert sbatch_cmd to our sbatch file :D
+fid = fopen(batch_file, 'a+');
+fprintf(fid, '\n# %s\n', sbatch_cmd);
+fclose(fid);
+
 [sbatch_status,msg]=system(sbatch_cmd);
 if sbatch_status~=0 
     warning('PROBLEM Scheduling with command %s output:%s ',sbatch_cmd,msg);

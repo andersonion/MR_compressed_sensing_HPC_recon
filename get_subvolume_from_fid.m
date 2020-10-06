@@ -41,13 +41,19 @@ if ismac && local_operation_only
     lin_append='';
     mac_of=['>> ' dd_dest_path];
 end
+% dd1 duplicate the file header onto outputfile
+% dd2 skip some N volumes, but its confusing how that can work... 
+% dd3 duplicate 1 block
 dd_cmd = ['( dd bs='  num2str(header_size) lin_dd_status ' count=1' lin_of mac_of ...
     ' && dd ' lin_dd_status ' bs=' num2str(bbytes)  ' skip=' num2str(volume_number-1) ' count=0'...
     ' && dd ' lin_dd_status ' bs=' num2str(bbytes)  ' count=1' lin_of ' conv=notrunc' lin_append  ' ) < ' input_fid mac_of];
 
 if local_operation_only 
     % runs dd command locally
-    [~,~] = system(dd_cmd);
+    [s,sout] = system(dd_cmd);
+    if s~=0
+        error(sout);
+    end
 else
     % runs dd command remotely.
     % first cleans old files we may have left on system

@@ -650,27 +650,32 @@ else
                     ship_st=0;
                     fprintf('Images previously sent successfully.\n');
                 end
-                %% STAGE5+ Scheduling
-                %if (starting_point >= 5)%(starting_point <= 6)
-                if (starting_point == 5)%(starting_point <= 6)
-                    % This is only scheduled at stage 5 because prior to that it wont
-                    % work anyway.
-                    %if ~options.live_run
-                        stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
-                    %else
-                        %% live run starting point advance handling
-                        % this prevents volume manager from running
-                        % recursively forever.
-                        if options.live_run && exist('ship_st','var')
-                            if ship_st==0
-                                starting_point=6;
-                            end
-                        end
-                    %end
-                end
             end
         end
     end
+    
+    %% STAGE5+ Scheduling
+    %if (starting_point >= 5)%(starting_point <= 6)
+    if (starting_point == 5)%(starting_point <= 6)
+        % This is only scheduled at stage 5 because prior to that it wont
+        % work anyway.
+        % originally it was embedded in stage 5 scheduling, however somehow
+        % it kept leeking jobs... Adjusted to timeout after 3 minutes
+        % now(internal to the handlers function) 
+        %if ~options.live_run
+        stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
+        %else
+        %% live run starting point advance handling
+        % this prevents volume manager from running
+        % recursively forever.
+        if options.live_run && exist('ship_st','var')
+            if ship_st==0
+                starting_point=6;
+            end
+        end
+        %end
+    end
+    
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
     % jobs? That seems like a clear mistake! We should be rescheduling so
     % long as we're not stage 6. 
@@ -740,8 +745,12 @@ else
                 dep_jobs=strjoin(job_glob,':');
             end
             c_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_jobs,dep_type);
+            dep_feedback=dep_type;
+            if ~isempty(dep_jobs)
+                dep_feedback=sprintf('%s:%s',dep_feedback,dep_jobs);
+            end
             log_mode = 1;
-            log_msg =sprintf('If original cleanup jobs for volume %s fail, volume_manager will be re-initialized (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
+            log_msg =sprintf('volume %s volume_manager re-initialize after dependency %s satisfied until complete. Next SLURM jobid(s): %s.\n',volume_runno,dep_feedback,c_running_jobs);
             yet_another_logger(log_msg,log_mode,log_file);
         else
             % could add dbstack check to prevent infinite recursion and

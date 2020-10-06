@@ -138,7 +138,8 @@ if (~exist(recon_mat.procpar_file,'file') || ~exist(setup_var.headfile,'file'))
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
     procpar_gatekeeper_batch = fullfile(setup_var.workdir, 'sbatch', [ setup_var.volume_runno '_procpar_gatekeeper.bash' ]);
-    procpar_gatekeeper_args= sprintf('%s %s',[recon_mat.procpar_file ':' setup_var.headfile],setup_var.volume_log_file);
+    % setting 60 second interval and 3 minutes time limit.
+    procpar_gatekeeper_args= sprintf('%s %s 60 180',[recon_mat.procpar_file ':' setup_var.headfile],setup_var.volume_log_file);
     procpar_gatekeeper_cmd = sprintf('%s %s %s', cs_execs.procpar_gatekeeper, matlab_path,procpar_gatekeeper_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
