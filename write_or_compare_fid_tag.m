@@ -47,7 +47,8 @@ if ~write_mode
         fhd.bbytes, fhd.complete_file_size, ...
         bhd] = load_fid_hdr(fid_tag_path);
     % blk_hdr.status 
-    ready=bitget(bhd.status,1);
+    %ready=bitget(bhd.status,1);
+    ready=bhd.status.hasData;
     if ~ready
         error('You started recon so fast the inital block wasn''t done.');
         write_mode=1;
@@ -123,7 +124,8 @@ else
         tfhd.bbytes, tfhd.complete_file_size, ...
         tbhd] = load_fid_hdr(tmp_fid_tag);
     % blk_hdr.status
-    tready=bitget(tbhd.status,1);
+    %tready=bitget(tbhd.status,1);
+    tready=tbhd.status.hasData;
     if ~tready
         return;
     end

@@ -127,7 +127,8 @@ else
     end
     % get the status bit for completion, from BJ's research it is the just
     % one bit for completion.
-    ready=bitget(bhdr.status,1);
+    % ready=bitget(bhdr.status,1);
+    ready=bhdr.status.hasData;
     % remove local header.
     rm_cmd=sprintf('rm %s',temp_fhdpath);
     [s, tmp_rm_out] = system(rm_cmd); % run remove

@@ -433,7 +433,7 @@ if ~exist(agilent_study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(m.fid_tag_file);
-        m.dim_x = round(m.npoints/2);
+        m.dim_x = round(double(m.npoints)/2);
     end
     procpar_file = fullfile(workdir,'procpar');
     procpar_file_legacy = fullfile(workdir,[runno '.procpar']);
@@ -744,7 +744,7 @@ fprintf('process_CS_mask ... this can take a minute.\n');
 [mask, dim_y, dim_z, pa, pb ] = extract_info_from_CStable(procpar_or_CStable);
 n_sampled_lines=sum(mask(:));
 sampling_fraction = n_sampled_lines/length(mask(:));
-original_dims = [dim_x dim_y dim_z];
+original_dims = double([dim_x dim_y dim_z]);
 % Generate sampling PDF (this is not the sampling mask)
 [CSpdf,~] = genPDF_wn_v2(original_dims(2:3),pa,sampling_fraction,pb,false);
 original_mask = mask;
