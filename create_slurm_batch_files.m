@@ -1,4 +1,5 @@
-function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slurm_option_struct )
+function [ file_name ] = create_slurm_batch_files(...
+    file_name,cell_of_commands,slurm_option_struct )
 % Formats, in a consistent manner, batch files to be called from sbatch
 %   
   
@@ -42,7 +43,8 @@ function [ file_name ] = create_slurm_batch_files(file_name,cell_of_commands,slu
     % should be handled by setting our res struct to inclue them for
     % uniformity. Not bothering for now. 
     if isfield(slurm_option_struct,'p') ...
-            && ( isfield(slurm_option_struct,'reservation') && ~isempty(slurm_option_struct.reservation) )
+            && ( isfield(slurm_option_struct,'reservation') ...
+            && ~isempty(slurm_option_struct.reservation) )
         [s,o]=system(sprintf('scontrol show reservation %s',slurm_option_struct.reservation));
         resinfo=struct;
         %PartitionName=matlab
