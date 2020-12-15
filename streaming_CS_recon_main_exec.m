@@ -433,7 +433,25 @@ if ~exist(agilent_study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(m.fid_tag_file);
-        m.dim_x = round(double(m.npoints)/2);
+        % formerly protected dim_x by rounding BUT THAT IS BAD!
+        % If it is EVER fractional we want to throw errors!
+        dx = m.npoints/2;
+        if floor(dx) ~= dx
+            log_msg=sprintf('ERROR pulling dim_x from fid hdr field npoints!\n');
+            yet_another_logger(log_msg,3,log_file,1);
+            if isdeployed
+                quit force;
+            else
+                error(log_msg);
+            end
+        end
+        m.dim_x=dx;
+        vs=strsplit(varlist,',');
+        for vn=1:numel(vs)
+            if isnumeric(m.(vs{vn})) % && ~ischar(m.(vs{vn}))
+                m.(vs{vn})=double(m.(vs{vn}));
+            end
+        end; clear vs vn
     end
     procpar_file = fullfile(workdir,'procpar');
     procpar_file_legacy = fullfile(workdir,[runno '.procpar']);
@@ -507,7 +525,12 @@ if ~exist(agilent_study_flag,'file')
         else
             m.n_volumes = m.nblocks;
         end
-        
+        %{ 
+        vs=strsplit(varlist,',');
+        for vn=1:numel(vs)
+            m.(vs{vn})=double(m.vs{vn});
+        end; clear vs vn
+        %}
         % Please enhance later to not be so clumsy (include these variables
         % in the missing variable list elsewhere in this function.
         
@@ -545,7 +568,8 @@ if ~exist(agilent_study_flag,'file')
         volume_runno = sprintf('%s_m%s',runno,vol_string);
         volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
         vol_strings{vn}=vol_string;
-        if exist(volume_flag,'file')
+        [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
+        if exist(volume_flag,'file') && pc >= 100
             recon_status(vn)=1;
         end
     end
