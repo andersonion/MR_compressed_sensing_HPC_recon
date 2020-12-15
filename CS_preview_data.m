@@ -30,9 +30,12 @@ lil_dummy = zeros([1,1],'single');
 lil_dummy = complex(lil_dummy,lil_dummy);
 temp_data=zeros(original_dims,'like',lil_dummy);
 % populate full array with all the data.
-for n = 1:original_dims(1)
-    temp_data(n,original_mask(:))=data(n,:);
-end
+% for n = 1:original_dims(1)
+%    temp_data(n,original_mask(:))=data(n,:);
+% end
+temp_data(:,original_mask(:))=data(:,:);
+
+
 % save basic kspace preview
 if ~isempty(regexpi(mode,'volume'))
     save_nii(make_nii(real(temp_data)),img{1});
