@@ -325,15 +325,15 @@ else
                     else
                         eval(sprintf('fid_splitter_exec %s',fs_args));
                     end
-                else
-                    error('Trouble with nechoes detect switch tell dev they''re sloppy');
+                % else
+                    % error('Trouble with nechoes detect switch tell dev they''re sloppy');
                 end
             else
                 log_mode = 1;
                 error_flag = 1;
                 log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid);
                 log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',...
-                    log_msg,input_fid,fid_tag_file,volume_number,recon_mat.scanner,scanner_user);
+                    log_msg,input_fid,recon_mat.fid_tag_file,volume_number,recon_mat.scanner,scanner_user);
                 log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
                 
                 yet_another_logger(log_msg,log_mode,log_file,error_flag);
