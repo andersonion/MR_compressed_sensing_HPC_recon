@@ -52,7 +52,12 @@ if local_operation_only
     % runs dd command locally
     [s,sout] = system(dd_cmd);
     if s~=0
-        error(sout);
+        if isdeployed
+            warning(sout);
+            quit force;
+        else
+            error(sout);
+        end
     end
 else
     % runs dd command remotely.
@@ -65,7 +70,6 @@ else
     % have a return status, and we have one when find doesnt get any
     % result. Its not clear if ssh_call should be enhanced, or a "real"
     % solution found. 
-    
     ssh_dd=sprintf('ssh %s@%s "%s"',user,scanner,dd_cmd);
     % fetches the fid file
     scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,remote_temp_fidpath,local_fidpath);
@@ -73,19 +77,33 @@ else
     [~,~] = ssh_call(scp_fid);
 end
 
+if ~local_operation_only
+    % removes temp fid remotly.
+    ssh_rm_cmd=sprintf('ssh %s@%s rm %s',user,scanner,remote_temp_fidpath);
+    disp(ssh_rm_cmd)
+    [~,~] = system(ssh_rm_cmd);
+end
+    
 file_meta=dir(local_fidpath);%gets metadata, especially file bytes.
 if file_meta.bytes ~= bbytes+header_size
-    error('Problem with the copy/transfer! temporary file is %s',remote_temp_fidpath);
-else
-    % file permissions forced to friendly, u+g=rw, o=r
-    chmod_cmd=sprintf('chmod 664 %s',local_fidpath);
-    [~,~] = system(chmod_cmd); % set perms
-    if ~local_operation_only
-        % removes temp fid remotly.
-        ssh_rm_cmd=sprintf('ssh %s@%s rm %s',user,scanner,remote_temp_fidpath);
-        disp(ssh_rm_cmd)
-        [~,~] = system(ssh_rm_cmd);
+    errN=1;
+    err_fid=sprintf('%s.err%i',local_fidpath,errN);
+    while exist(err_fid,'file') && errN<=100
+        errN=errN+1;
+        err_fid=sprintf('%s.err%i',local_fidpath,errN);
     end
+    rename(local_fidpath,err_fid);
+    msg=sprintf('Problem with the copy/transfer! Failed %i times.\nLast err fid: %s.\nremote temp was: %s.', err_fid, remote_temp_fidpath);
+    if isdeployed
+        warning(msg);
+        quit force;
+    else
+        error(msg);
+    end
+else
+    % file permissions forced to friendly secure, u+g=rw, o=-
+    chmod_cmd=sprintf('chmod 660 %s',local_fidpath);
+    [~,~] = system(chmod_cmd); % set perms
 end
 
 end
