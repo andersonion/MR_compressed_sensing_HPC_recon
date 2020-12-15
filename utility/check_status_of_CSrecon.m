@@ -172,7 +172,8 @@ if ~exist(send_archive_tag,'file') || ~headfile_complete
                 starting_point = 2;
                 % Check to see if the volume fid is ready.
                 volume_fid=fullfile(work_subfolder,[volume_runno,'.fid']);
-                if ~exist(volume_fid,'file')
+                fid_info=dir(volume_fid);
+                if ~exist(volume_fid,'file') || ~isempty(fid_info) && fid_info.bytes<=60
                     starting_point = 1;
                     vol_status=vol_status-4;
                     % Need to remember to  handle differently for single

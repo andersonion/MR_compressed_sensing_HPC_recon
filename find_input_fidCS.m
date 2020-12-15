@@ -14,7 +14,8 @@ workdir = fullfile(scratch_drive,[runno '.work/']);
 
 % Simplistic fid name.
 local_fid = [workdir 'fid'];
-if ~exist(local_fid,'file')
+fid_info=dir(local_fid);
+if ~exist(local_fid,'file') || ~isempty(fid_info) && fid_info.bytes<=60
     % Specific fid name 
     local_fid = [workdir runno '.fid'];
 end
