@@ -11,7 +11,7 @@ C___=exec_startup();
 recon_mat=matfile(variables_file);
 log_mode=1;
 % Check for output fids
-work_to_do = ones(length(recon_mat.nechoes));
+%work_to_do = ones(length(recon_mat.nechoes));
 work_to_do = ones(1,recon_mat.nechoes);
 for nn = 1:recon_mat.nechoes
     vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.nechoes-1))) 'i' ],nn-1);
@@ -35,14 +35,27 @@ if sum(work_to_do)
     end
     %}
     tic
+    
     try
         fid = fopen(local_fid,'r','ieee-be');
     catch ME
         disp(ME)
     end
+    %% failed on fopen, maybe symbolic link schenanigans.
+    if exist('ME','var') || fid<0 
+      [s,sout]=system(sprintf('readlink %s',local_fid));
+      if s==0
+          sout=strtrim(sout);
+          if exist(sout,'file')
+              fid = fopen(sout,'r','ieee-be');
+          end
+      end
+    end
+    %%
     if exist('ME','var') || fid<0 
         close all;
-        error('Trouble with opening fid:%s',local_fid)
+        fprintf('Trouble with opening fid:%s\n',local_fid)
+        quit force
     end
     
     if strcmp(recon_mat.bitdepth,'int16');
@@ -53,17 +66,47 @@ if sum(work_to_do)
         bytes_per_point = 4;
     end
     
-    % read full file trying to be 100% data agnostic because all we want to
-    % do is transcribe the bytes from the input file into the output.
+    hdr_60byte = fread(fid,30,'uint16');
+    %% read full file trying to be 100% data agnostic 
+    % because all we want to do is transcribe the bytes from the input file into the output.
     % Suspect the trouble here is data blocks are not updated in size when
     % it comes time to read them... 
-    hdr_60byte = fread(fid,30,'int16');
-    data= fread(fid,bytes_per_point*recon_mat.npoints*recon_mat.ntraces,...
-        '*uint8');
+    % Fomer simple line which failed, this was not reverted becuase the new
+    % lines should be just as efficient, and they'll be resilient to slow
+    % disk problems.
+    % [data,count]= fread(fid,read_bytes,'*uint8');
+    count=0;
+    % forcing doubles becuase our header vars may not be, if they're not
+    % doubles we get stupid bit errors. 
+    read_bytes=double(bytes_per_point) ...
+        * double(recon_mat.npoints) ...
+        * double(recon_mat.ntraces);
+    data=zeros([read_bytes,1],'uint8');
+    try_lim=10;
+    while count<read_bytes && try_lim>0
+        [buff,ncount]= fread(fid,read_bytes-count,'*uint8');
+        if ncount==read_bytes
+            data=buff;
+        else
+            data(count+1:count+ncount)=buff;
+        end
+        count=count+ncount;
+        try_lim=try_lim-1;
+    end; 
     fclose(fid);
+    if(try_lim<9)
+        warning('Took %i tries to read full data',10-try_lim);
+    end
+    % get rid of temp vars cluttering the workspace.
+    clear count ncount buff read_bytes try_count;
     
     %data = reshape(data,[npoints recon_mat.nechoes ntraces/recon_mat.nechoes]);
-    data = reshape(data,[recon_mat.npoints*bytes_per_point recon_mat.nechoes recon_mat.ntraces/recon_mat.nechoes]);
+    ldims=[double(bytes_per_point)*double(recon_mat.npoints) double(recon_mat.nechoes) double(recon_mat.ntraces)/double(recon_mat.nechoes)];
+    if numel(data)/prod(ldims) ~=1
+        error('LOADING DIMENSION ERROR!');
+    end
+    
+    data = reshape(data,ldims);
     data = permute(data,[1 3 2]);
     fid_load_time = toc;
     
@@ -82,8 +125,8 @@ if sum(work_to_do)
         c_hdr = hdr_60byte;
         c_hdr(19) = nn;
         c_fid = sprintf('%s%s.fid',c_work_dir,volume_runno);
-        fid =fopen(c_fid,'w');
-        fwrite(fid,c_hdr,'int16');
+        fid =fopen(c_fid,'w','ieee-be');
+        fwrite(fid,c_hdr,'uint16');
         c_data = data(:,:,nn);
 
         fwrite(fid,c_data(:),'uint8');
