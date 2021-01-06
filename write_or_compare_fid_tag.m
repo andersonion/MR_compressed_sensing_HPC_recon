@@ -3,6 +3,8 @@ function [ consistency_status, fhd, bhd ] = write_or_compare_fid_tag( ...
 % busy function handling fid_er_print operations. 
 % would be good to refactor into a get_fid_tag, and a compare_fid_tag.
 %
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 % This can run locally just as well, though it is designed for remote deployment.
 % (when scanner is specified).

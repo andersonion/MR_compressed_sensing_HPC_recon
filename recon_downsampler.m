@@ -20,7 +20,8 @@ function recon_downsampler(cs_runno,runno_downsample,vol_lim)
 % runno_downsample.N40008=8;   % example 1/8
 % recon_downsampler(cs_runno,runno_downsample);
 %
-%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~exist('vol_lim','var')
     vol_lim=inf;
 end

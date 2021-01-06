@@ -2,6 +2,10 @@ function [slices_complete, slices_remaining, full_header ] = read_header_of_CStm
 %UNTITLED2 Summary of this function goes here
 %   Detailed explanation goes here
 %header_size = dims(1); %*64; %the 64 is implied when we read in as double
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 if ~exist('header_size','var')
     header_size = dims(1); 
 end

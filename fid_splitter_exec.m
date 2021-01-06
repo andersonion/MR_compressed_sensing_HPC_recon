@@ -4,6 +4,8 @@ function fid_splitter_exec(local_fid,variables_file )
 %
 % Written by BJ Anderson, CIVM
 % 19 September 2017 (but really, 26 October 2017)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 % for all execs run this little bit of code which prints start and stop time using magic.
 C___=exec_startup();

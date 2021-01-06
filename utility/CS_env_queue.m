@@ -2,6 +2,10 @@ function cs_queue=CS_env_queue()
 % get cs env vars or set defaults for
 %  CS_GATEKEEPER_QUEUE:slow_master
 %  CS_FULL_VOLUME_QUEUE:high_priority
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 %% queue support
 cs_queue.gatekeeper = getenv('CS_GATEKEEPER_QUEUE');
 if isempty(cs_queue.gatekeeper)

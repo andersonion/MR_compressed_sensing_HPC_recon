@@ -11,7 +11,9 @@ function out_code = local_file_gatekeeper_exec( local_file, log_file, interval, 
 %
 % If a new scan appears and does not match this scan, then it will stop
 % waiting.  This should help catch cancelled jobs.
-
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~isdeployed;
 else
     % for all execs run this little bit of code which prints start and stop time using magic.

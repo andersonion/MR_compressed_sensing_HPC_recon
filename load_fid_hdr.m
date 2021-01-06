@@ -8,6 +8,10 @@ function [npoints,nblocks,ntraces,bitdepth,bytes_per_block,complete_file_size, .
 % page 264
 % header_struct tries to be the elements in order, such that if written
 % back to file it would re-create the structure correctly.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 try
     fid = fopen(fidpath,'r','ieee-be');
 catch ME

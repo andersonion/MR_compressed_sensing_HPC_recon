@@ -14,6 +14,9 @@ function yet_another_logger(log_msg,mode,log_file,error_flag)
 %
 % error_flag will append 'ERROR:' to message if not already present, and
 % send to standard error instead of standard output for modes 1 & 3
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 if ~exist('mode','var')
     mode = 1;

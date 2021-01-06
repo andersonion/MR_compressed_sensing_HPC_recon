@@ -1,5 +1,8 @@
 function b = load_blk_hdr(hdrpath,skip)
 % Useful Ref: https://www.agilent.com/cs/library/usermanuals/Public/0199937900a.pdf
+% ... note, unclear if original work
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 try
     fid = fopen(hdrpath,'r','ieee-be');
 catch ME

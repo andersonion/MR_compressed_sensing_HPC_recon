@@ -1,4 +1,7 @@
 function cell_of_tables=select_valid_tables(cell_of_tables,ntraces,def_pa,def_pb)
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~iscell(cell_of_tables)
     warning('A cell of tables is preferred to just a big string');
     cell_of_tables=strsplit(strtrim(cell_of_tables));

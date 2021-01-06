@@ -5,6 +5,9 @@ function puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
 %       3 -> pull both.
 % This function name is terrible, and only marginally connects to its
 % purpose. -James 20171204
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 %check arguments
 if nargin<5
     error('not enough input arguments');

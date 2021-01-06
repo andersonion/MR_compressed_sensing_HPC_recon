@@ -3,6 +3,9 @@ function [slices_remaining, slices_completed, full_header ] = read_header_of_CSt
 %   Written 14 September 2017, BJ Anderson, CIVM
 %   slice_remaining is returned first, thus acting by itself as an exit
 %   code of 0->'success;
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 %if ~exist('header_size','var')
 %    header_size = dims(1);

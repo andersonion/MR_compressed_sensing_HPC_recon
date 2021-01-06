@@ -4,6 +4,9 @@ function bytes_written=save_fid_hdr(the_file,hdr)
 % path.
 % hdr_struct has fields in order of proper type, so this function can
 % blindly write
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 if ischar(the_file) && exist(fileparts(the_file),'dir')
     if ~exist(the_file,'file')

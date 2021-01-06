@@ -1,7 +1,8 @@
 function [ jobids,msg1,msg2 ] = dispatch_slurm_jobs( batch_file,slurm_options_string,optional_dependencies,optional_dependency_type )
 % Custom handling of using the sbatch command
 %
-
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 jobids=0;
 dependencies='';

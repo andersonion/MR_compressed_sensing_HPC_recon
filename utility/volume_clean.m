@@ -2,6 +2,9 @@ function volume_clean(setup_variables)
 % function volume_clean(volume_variable_file)
 % Volume_clean for csrecon, removes tmp files if all work is done.
 % All relevant parameters are burried inside the volume_variable file(take care!)
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 if ~isdeployed
 

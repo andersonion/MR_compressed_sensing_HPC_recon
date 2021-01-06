@@ -7,6 +7,8 @@ function extract_imagespace_from_CS_tmp(mat_file)
 % 
 % initally prototyped as prepare_qsm
 % 
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 mat=matfile(mat_file,'Writable',true);
 if ~mat.keep_work
   error('keep_work needed to be on for this to work, sorry, you''ll probably need to recon_again.');

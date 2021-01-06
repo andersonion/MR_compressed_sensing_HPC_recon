@@ -1,7 +1,9 @@
 function [ c_running_jobs ] = deploy_procpar_handlers(setup_variables)
 % Handles waiting for the procpar file to exist,
 % then processing it into a complete headfile.
- 
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 %% OPAQUE LOAD OF A BUNCH OF THINGS
 % load(setup_variables)
 setup_var=matfile(setup_variables);

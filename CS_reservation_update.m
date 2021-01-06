@@ -1,4 +1,6 @@
 function CS_reservation_update(runno,new_reservation)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 cd(getenv('BIGGUS_DISKUS'));
 [s,p]=system(sprintf('ls -d %s.work',runno));
 if s~=0

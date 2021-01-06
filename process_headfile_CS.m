@@ -1,6 +1,8 @@
 function process_headfile_CS(recon_file,image_dir_hf,procpar_path,recon_type )
 % read image_dir hf and add procpar to our headfiles.
 % image_dir_hf vars take prescedence
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~exist('recon_type','var')
     recon_type = 'matlab_CS';
     warning('Default recon type: %s',recon_type);

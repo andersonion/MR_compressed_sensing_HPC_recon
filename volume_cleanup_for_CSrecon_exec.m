@@ -16,6 +16,9 @@ function misguided_status_code = volume_cleanup_for_CSrecon_exec(setup_variables
 % we do want the fermi_filtered data instead of the unfiltered data. It is
 % assumed that the QSM requires unfiltered data.  Bake it in now will not
 % require recompilation later if we need this option.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 misguided_status_code = 0;
 scale_target=2^16-1;
 

@@ -13,6 +13,9 @@ function [cs_execs,exec_set]=CS_env_execs(set_var)
 %   slice_recon
 %   procpar_gatekeeper
 %   procpar_cleanup
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 
 %  May change this to look to environment variables, or a seperate

@@ -1,6 +1,9 @@
 function gui_info_collect(data_buffer,opt_struct)
 %% collect gui info (or set testmode)
 %check civm runno convention
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 % add loop while gui has not run successfully,
 if isempty(regexp(data_buffer.headfile.U_runno,'^[A-Z][0-9]{5,6}.*', 'once'))
     %~strcmp(runno(1),'S') && ~strcmp(runno(1),'N') || length(runno(2:end))~=5 || isnan(str2double(runno(2:end)))

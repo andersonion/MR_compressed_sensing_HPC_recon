@@ -1,4 +1,7 @@
 function res=CS_tmp_load(temp_file,recon_dims,slice_index)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 % could in the future make temp_file a file ident or a file. not sure if
 % thats a good thing or not.
 header_size = 1+recon_dims(1);

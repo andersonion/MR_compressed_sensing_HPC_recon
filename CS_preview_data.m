@@ -1,4 +1,7 @@
 function img=CS_preview_data(original_mask,data,out_base,mode)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 % mode, slice or volume
 mtxt='';
 if isempty(regexpi(mode,'volume','ONCE'))

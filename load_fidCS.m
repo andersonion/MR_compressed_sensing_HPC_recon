@@ -5,7 +5,8 @@ function data_buffer = load_fidCS(fidpath,max_blocks,ntraces,npoints, ...
 %
 % data_type = 'single' or 'double' Need doubles a lot of the time so its
 % best.
-    
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson    
 
 %5 May 2017, BJA: Added only_non_zeros flag, which only pulls out acquired
 %data and arranges it in a 2D array, where dim1 is the fully sampled

@@ -7,7 +7,9 @@ function [ file_size_in_bytes] = get_remote_filesize( remote_path,remote_machine
 %   password on the remote machine should only need to be entered once.
 %   It is unclear how the password prompt will be handled if this is part
 %   of a compiled MATLAB executable.
-
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 main_cmd = ['wc -c ' remote_path ' | cut -d '' '' -f1 ']; % -f4 worked on rootbeerfloat instead of -f1
 

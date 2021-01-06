@@ -1,4 +1,6 @@
 function get_subvolume_from_fid(input_fid,local_fidpath,volume_number,bbytes,scanner,user)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 local_operation_only=1; % This can run locally just as well, though it is designed for remote deployment (when scanner is specified).
 test=0;

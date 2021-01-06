@@ -16,6 +16,8 @@ function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series
 %  change, as they can only be reconstructed once the scan has completely
 %  finished.
 %
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 recon_type = 'CS_v2.1';
 typical_pa=1.8;

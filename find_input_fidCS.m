@@ -5,6 +5,9 @@ function [ input_fid, local_or_streaming_or_static ] = find_input_fidCS( ...
 %      1 => local fid found,
 %      2 -> using fid of in-progress scan, 
 %      3 -> using fid in its remote static location;
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 if ~exist('user','var')
     user='omega';
 end

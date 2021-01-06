@@ -2,6 +2,8 @@ function [ file_name ] = create_slurm_batch_files(...
     file_name,cell_of_commands,slurm_option_struct )
 % Formats, in a consistent manner, batch files to be called from sbatch
 %   
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
   
     if ~exist('slurm_option_struct','var')
         slurm_option_struct = struct;

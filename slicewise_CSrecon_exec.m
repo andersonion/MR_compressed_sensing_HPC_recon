@@ -1,5 +1,8 @@
 function slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
 % slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
  
 
 if ~isdeployed    

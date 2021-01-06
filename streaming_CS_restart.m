@@ -3,6 +3,9 @@ function streaming_CS_restart(runno,opt_text)
 % Restarts a streaming CS recon based on the runno string.
 % optionally add more options in opt_text, a plain text field appended to
 % command
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 mf=matfile(fullfile(getenv('BIGGUS_DISKUS'),[runno '.work' ],[runno 'recon.mat']));
 mfo=mf.options;
 if ~exist('opt_text','var')

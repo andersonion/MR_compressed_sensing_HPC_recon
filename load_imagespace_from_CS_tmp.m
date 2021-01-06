@@ -1,4 +1,6 @@
 function complex_vol=load_imagespace_from_CS_tmp(WORKFOLDER)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 mat_files=wildcardsearch(WORKFOLDER,'*_raw_qsm.mat')
 if numel(mat_files)==0

@@ -2,6 +2,9 @@ function setup_volume_work_for_CSrecon_exec(setup_variables,volume_number_string
 %CS_RECON_CLUSTER_SETUP_WORK_EXEC An executable MATLAB script for setting
 %up each volume of CS reconstruction in order to avoid saturating the
 %master node (in the context of DTI, with many many volumes to recon.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 %% Update of original version (implied _v1)
 if ~isdeployed

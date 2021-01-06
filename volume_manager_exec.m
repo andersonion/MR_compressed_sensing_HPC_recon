@@ -6,6 +6,9 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 
 % for all execs run this little bit of code which prints start and stop time using magic.

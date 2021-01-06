@@ -26,6 +26,9 @@ function [ starting_point ,log_msg,vol_status] = check_status_of_CSrecon( ...
 %   study
 %   series
 %   bbytes (bytes per fid block)
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 %{
 if ~isdeployed

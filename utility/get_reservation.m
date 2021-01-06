@@ -2,6 +2,9 @@ function active_reservation=get_reservation(resopt)
 % resopt is a logical or string 
 % This should work fine, even if CS_reservation is not set.
 % it will just be a blank in that case.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 active_reservation=getenv('CS_reservation'); 
 
 % normal system variables, if these are set we should use these and ignore

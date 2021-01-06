@@ -5,6 +5,9 @@ function status_CS_recon(base_runno,varargin)
 % if you speicify an alternate work directyory will check there instead.
 % if you add the word Write will write the orthocenter to a file in base
 % working folder.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~exist('base_runno','var')
     error('must supply runno');
 end

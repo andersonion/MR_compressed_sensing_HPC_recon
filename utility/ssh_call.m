@@ -2,6 +2,9 @@ function [status,stdout]=ssh_call(ssh_cmd,fail_on_error)
 % This probably belongs someplace else, like the group common utils...
 % purpose is act just like system and splice in ssh options to scp/ssh calls 
 % failing on errors.
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 if ~exist('fail_on_error','var')
     fail_on_error=true;
 end

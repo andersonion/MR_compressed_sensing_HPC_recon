@@ -16,6 +16,9 @@ function [skiptable, dim2, dim3, pa, pb, ds_lvl] = extract_info_from_CStable(pro
 %
 %   Modified again by BJ Anderson on 13 Jan 2017 to be able to handle CS
 %   tables directly.
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
+
 
 % 18 September 2017 Revision (BJ Anderson, CIVM)
 % Code Flow: 

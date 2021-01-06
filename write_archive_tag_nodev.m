@@ -11,6 +11,9 @@ function archive_string=write_archive_tag(runno,spacename, slices, projectcode, 
 %
 % example
 %B00663_m081,androsspace,128,10.eds.02,.raw
+%
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 % this code relies on the spacename not being a real directory, this fixes
 % it just in case. 

@@ -1,4 +1,6 @@
 function CS_allocate_temp_file(original_dims,recon_dims,logbits,work_subfolder,volume_runno,temp_file)
+% Copyright Duke University
+% Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 log_mode=logbits.log_mode;
 log_file=logbits.log_file;
 % last three inputs probably better as a varrgin with either 1 or 2 pieces.
