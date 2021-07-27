@@ -16,11 +16,25 @@ for arg in $@; do
 	args="'$arg'";
     fi;
 done
+USER_BIGGUS="$BIGGUS_DISKUS";
+if [ ! -z "$2" ];then
+    USER_BIGGUS="$2";
+fi;
+if [ ! -d "$USER_BIGGUS" ];then
+    echo "ERROR: missing dir $USER_BIGGUS" 1>&2;
+    exit 1;
+fi;
 
 cd ${WKS_SHARED}/pipeline_utilities;
 #echo /usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit";exit;
 s_file_raw=$HOME/".CS_recon_${runno}.rstatus";
 s_file=$HOME/"CS_recon_${runno}.status";
+
+log_file=$(ls -dtr "$USER_BIGGUS/${runno}.work/${runno}"*"recon"*"log" 2> /dev/null |tail -n1);
+if [ -z "$log_file" ];then
+    echo "Cant get log file ${runno}*recon*log in $USER_BIGGUS/${runno}.work" 1>&2;
+    exit 1;
+fi;
 
 # use a lock file to prevent double running in case that happens accidentially. 
 # but, that adds complication of potentially stuck locks.
@@ -45,29 +59,44 @@ if [ ! -f "$lck_file" ]; then
     # 
     # touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && sed 's/[^[:print:]]//g' "$s_file_raw" > "$s_file" && rm "$lck_file";
     s_last="NO_LAST";
-    if [ -f "$s_file" ];then
-	echo -n '';  
-	# old file existts... lets stash it
-	s_last="$(basename ${s_file})";
-	s_last="$(dirname ${s_file})/${s_last%.*}.last";
-	mv -f "$s_file" "$s_last";
-    fi;
+    skip_collect=0;
     run_error=0;
-    # | sed 's/[^[:print:]]//g'
-    # | perl -pi -e 's/[^[:ascii:]]//g' 
-    # | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' 
-    touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nojvm -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && grep  -iE '([0-9]+[.][0-9]+%|stage|total)' "$s_file_raw"  | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' > "$s_file" || run_error=1;
-
-    if diff -s "$s_file" "$s_last" > /dev/null; then 
-	# identicle
-	# preserve timestamp by squashing current f.
-	mv -f "$s_last" "$s_file"; 
+    if [ ! -e "$log_file" -o ! -e "$s_file" ] ||
+	[ -e "$log_file" -a -e "$s_file" -a "$log_file" -nt "$s_file" ];
+    then
+	echo -n "Collecing data beacuase"
+	if [ ! -e "$log_file" -o ! -e "$s_file" ]; then
+	    echo " missing $s_file or $log_file";
+	elif [ -e "$log_file" -a -e "$s_file" -a "$log_file" -nt "$s_file" ]; then
+	    echo " newer $log_file";
+	fi;
+	if [ -f "$s_file" ];then
+	    echo -n '';  
+	    # old file existts... lets stash it
+	    s_last="$(basename ${s_file})";
+	    s_last="$(dirname ${s_file})/${s_last%.*}.last";
+	    mv -f "$s_file" "$s_last";
+	fi;
+	# | sed 's/[^[:print:]]//g'
+	# | perl -pi -e 's/[^[:ascii:]]//g' 
+	# | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' 
+	# log file and status exist, and log file is older, then  we dont need to update.
+	touch "$lck_file" && /usr/local/bin/matlab -nodisplay -nojvm -nosplash -nodesktop -noFigureWindows -r "status_CS_recon($args);exit" 2>&1 > "$s_file_raw" && grep  -iE '([0-9]+[.][0-9]+%|stage|total)' "$s_file_raw"  | perl -ne 'print "$1\n" if /((?:[0-9]+[.][0-9]+%|stage|total).*$)/i' > "$s_file" || run_error=1;
+	#if [ -e "$log_file" -a -e "$s_file" -a "$log_file" -ot "$s_file" ];then
+    
+	if diff -s "$s_file" "$s_last" > /dev/null; then 
+	    # identicle
+	    # preserve timestamp by squashing current f.
+	    mv -f "$s_last" "$s_file"; 
+	else
+	    # different, keep updated remove last
+	    rm "$s_last";
+	fi;
+	#ls -lt $lck_stuck_t $s_file;
     else
-	# different, keep updated remove last
-	rm "$s_last";
+	skip_collect=1;
     fi;
-    #ls -lt $lck_stuck_t $s_file;
-    if [ "$s_file" -ot "$lck_stuck_t" ];then 
+    if [ "$s_file" -ot "$lck_stuck_t" -a $skip_collect -eq 0 ];then 
 	hchk=$(cluster_status_CS_recon);
 	if [ "$hchk" == "Healthy" ];then 
 	    echo "Not to worry, cluster is healthy"; 
@@ -78,9 +107,12 @@ if [ ! -f "$lck_file" ]; then
     else
 	echo -n "$s_file:";
     fi;
+    if [ -e "$log_file" ];then
+	touch -r "$log_file" "$s_file";
+    fi;
     grep -i total "$s_file"
     
-    if [ $run_error -eq 0 ];then 
+    if [ $run_error -eq 0 -a $skip_collect -eq 0 ];then 
 	rm "$lck_file" && rm "$s_file_raw";
     fi;
     if [ -e "$s_file_raw" ];then
