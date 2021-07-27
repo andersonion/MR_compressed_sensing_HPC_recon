@@ -2,9 +2,9 @@
 
 # To keep up with ever improving boiler plate ideas, this exists to capture them
 # Boilerplate code is rarely updated, but often it's a good idea.
-# So this'll exist as a record of the "current standard" maybe, riddled with me 
+# So this'll exist as a record of the "current standard" maybe, riddled with me
 # explaining things to ... me.
-# 
+#
 # Special sha-bang finds default perl. This should be correct most the time from here forward.
 
 use strict;
@@ -20,7 +20,7 @@ BEGIN {
     my @errors;
     use Env @env_vars;
     foreach (@env_vars ) {
-	push(@errors,"ENV missing: $_") if (! defined(eval("\$$_")) );
+        push(@errors,"ENV missing: $_") if (! defined(eval("\$$_")) );
     }
     die "Setup incomplete:\n\t".join("\n\t",@errors)."\n  quitting.\n" if @errors;
 }
@@ -29,7 +29,7 @@ use lib split(':',$RADISH_PERL_LIB);
 use civm_simple_util qw(activity_log printd $debug_val);
 # On the fence about including pipe utils every time
 use pipeline_utilities;
-# pipeline_utilities uses GOODEXIT and BADEXIT, but it doesnt choose for you which you want. 
+# pipeline_utilities uses GOODEXIT and BADEXIT, but it doesnt choose for you which you want.
 $GOODEXIT = 0;
 $BADEXIT  = 1;
 # END BOILER PLATE
@@ -89,7 +89,7 @@ $conf->read_headfile();
 ($v_ok,my $email_domain)=$conf->get_value_check('email_domain');
 $email_domain="" if !$v_ok;
 if ($debug_val<50){
-    
+
     ($v_ok,$coder)=$conf->get_value_check("coder");
     $coder="" if !$v_ok;
     ($v_ok, $sysadmin)=$conf->get_value_check("sysadmin");
@@ -99,14 +99,14 @@ if ($debug_val<50){
 }
 #these are email strings, so comma separated.
 # Also, need to lead with comma.
-# That requrement comes from how they're used in the template, and could stand revision. 
+# That requrement comes from how they're used in the template, and could stand revision.
 my $EXTRA_USERS="";
 $EXTRA_USERS="$EXTRA_USERS,$coder" if $coder ne "";
 $EXTRA_USERS="$EXTRA_USERS,$sysadmin" if $sysadmin ne "";
 my $IMG_USERS="";
 $IMG_USERS=",$director" if $director ne "";
 
-#RUNNO.cron will be added to this and saved to u_crond to keep track of what we've done. 
+#RUNNO.cron will be added to this and saved to u_crond to keep track of what we've done.
 my $cron_file_prefix="CS_recon_watch_";
 
 if ( ! -e $u_crond ) {
@@ -116,7 +116,7 @@ if ( ! -e $u_crond ) {
 
 
 # options enable, disable cleanup.
-# shelly code helpers from cs recon used to get the currently operational recons. 
+# shelly code helpers from cs recon used to get the currently operational recons.
 my $cron_template=File::Spec->catfile($CSRECON_DIR,'utility','template_CS_recon_watch_status.cron');
 if ( ! -e $cron_template )  {
     die "Missing template $cron_template" unless $watch_mode =~/cleanup/;
@@ -174,7 +174,7 @@ Config::Crontab cpan module. though its a bit old and not updated.
 =cut
 
 use Config::Crontab;
-if ( 0 ) { 
+if ( 0 ) {
 my $template = new Config::Crontab( -file => $cron_template);
 #$template->mode('block');
 $template->read or die $template->error;
@@ -184,8 +184,8 @@ for my $block ( $template->blocks ) {
     print "---\n";
 }
 #print("set: $set_line\n");
-my ($set_line)=$template->select( -type => 'env', 
-		   -name_re => 't_run=');
+my ($set_line)=$template->select( -type => 'env',
+                   -name_re => 't_run=');
 print $set_line->dump ."\n";
 }
 
@@ -210,47 +210,47 @@ for (@runnos) {
     next if $watch_mode =~ /cleanup/x;
     my $r_cron_path =File::Spec->catfile($u_crond,$cron_file_prefix."$_.cron");
     # check if block is already in ct
-    my ($r_run)=$ct->select( -type => 'env', 
-			     -name_re => 't_run',
-			     -value_re => "^$_\$");
+    my ($r_run)=$ct->select( -type => 'env',
+                             -name_re => 't_run',
+                             -value_re => "^$_\$");
     my $block;
     if(defined $r_run) {
-	$block=$ct->block($r_run);
-	if($watch_mode =~ /enable/x ) {
-	    printd(25,"CS_recon_watch previously enabled:$_\n");
-	} elsif($watch_mode =~ /disable/x ) {
-	    printd(25,"CS_recon_watch disable:$_\n");
-	    $ct->remove($block);
-	    $update++;
-	}
-	next;
+        $block=$ct->block($r_run);
+        if($watch_mode =~ /enable/x ) {
+            printd(25,"CS_recon_watch previously enabled:$_\n");
+        } elsif($watch_mode =~ /disable/x ) {
+            printd(25,"CS_recon_watch disable:$_\n");
+            $ct->remove($block);
+            $update++;
+        }
+        next;
     }
     next if($watch_mode =~ /disable/x );
     my $cron_file=$cron_template;
     if ( -e $r_cron_path ) {
-	$cron_file=$r_cron_path;
+        $cron_file=$r_cron_path;
 
     }
     if( ! defined $block) {
-	my $cron_stub = new Config::Crontab( -file => $cron_file);
-	$cron_stub->read or die $cron_stub->error;
-	# env line
-	my ($e_l)=$cron_stub->select( -type => 'env', 
-				      -name_re => 't_run');
-	$e_l->value($_);
-	$block=$cron_stub->block($e_l);
-	# This whole mail setup needs a lttle re-architecting 
-	# to let errors go to sysdmin+dev and output go to users/img users as desired
-	($e_l)=$cron_stub->select( -type => 'env', 
-				   -name_re => 'MAILTO');
-	$e_l->value($ENV{'USER'}.$email_domain);
-	($e_l)=$cron_stub->select( -type => 'env', 
-			       -name_re => 'EXTRA_USERS');
-	$e_l->value($EXTRA_USERS) if $EXTRA_USERS ne "";
-	($e_l)=$cron_stub->select( -type => 'env', 
-				   -name_re => 'IMG_USERS');
-	$e_l->value($IMG_USERS) if $IMG_USERS ne "";
-	$cron_stub->write($r_cron_path);
+        my $cron_stub = new Config::Crontab( -file => $cron_file);
+        $cron_stub->read or die $cron_stub->error;
+        # env line
+        my ($e_l)=$cron_stub->select( -type => 'env',
+                                      -name_re => 't_run');
+        $e_l->value($_);
+        $block=$cron_stub->block($e_l);
+        # This whole mail setup needs a lttle re-architecting
+        # to let errors go to sysdmin+dev and output go to users/img users as desired
+        ($e_l)=$cron_stub->select( -type => 'env',
+                                   -name_re => 'MAILTO');
+        $e_l->value($ENV{'USER'}.$email_domain);
+        ($e_l)=$cron_stub->select( -type => 'env',
+                               -name_re => 'EXTRA_USERS');
+        $e_l->value($EXTRA_USERS) if $EXTRA_USERS ne "";
+        ($e_l)=$cron_stub->select( -type => 'env',
+                                   -name_re => 'IMG_USERS');
+        $e_l->value($IMG_USERS) if $IMG_USERS ne "";
+        $cron_stub->write($r_cron_path);
     }
     printd(25,"CS_recon_watch adding:$_\n");
     $ct->last($block);
@@ -259,15 +259,15 @@ for (@runnos) {
 
 # get all blocks, if their t_run value is not an active runno remove them
 if(${$opts->{"check"}}) {
-    my @e_ls=$ct->select( -type =>  'env' , 
-			  -name_re => 't_run', 
-			  -value_nre => '^'.join('|',@runnos).'$' );
+    my @e_ls=$ct->select( -type =>  'env' ,
+                          -name_re => 't_run',
+                          -value_nre => '^'.join('|',@runnos).'$' );
     printd(5,"Cleaning up complete work\n") if scalar(@e_ls);
     foreach (@e_ls) {
-	my $block=$ct->block($_);
-	printd(25,"Removing cron job non-running".$_->value."\n");
-	$ct->remove($block);
-	$update++;
+        my $block=$ct->block($_);
+        printd(25,"Removing cron job non-running".$_->value."\n");
+        $ct->remove($block);
+        $update++;
     }
 }
 
@@ -275,25 +275,25 @@ if(${$opts->{"check"}}) {
 my ($c_l)=$ct->select( -command_re => 'CS_recon_watch.*cleanup');
 # active lines indicating we have more cs_recon status calls to work on.
 # chose this instead of command becuase this more likly template lines
-my @a_ls=$ct->select( -type =>  'env' , 
-		      -name_re => 't_run' );
+my @a_ls=$ct->select( -type =>  'env' ,
+                      -name_re => 't_run' );
 # active lines
 #my @a_ls=$ct->select(-command_re => 'status_CS_recon' );
 if(scalar(@a_ls)>=1 && ! defined $c_l) {
-# some commands found so, we need a cleanup call but we dont have one. 
+# some commands found so, we need a cleanup call but we dont have one.
     my $cron_file=$cron_cleanup_template;
     my $cron_stub = new Config::Crontab( -file => $cron_file);
     $cron_stub->read or die $cron_stub->error;
     my ($e_l)=$cron_stub->select( -command_re => 'CS_recon_watch.*cleanup');
-    ($e_l)=$cron_stub->select( -type => 'env', 
-			       -name_re => 'MAILTO');
+    ($e_l)=$cron_stub->select( -type => 'env',
+                               -name_re => 'MAILTO');
     $e_l->value("$coder,$sysadmin") if $coder ne "";
     #$e_l->value($_);
     my $block=$cron_stub->block($e_l);
     $ct->last($block);
     $update++;
 } elsif(scalar(@a_ls)==0 && defined $c_l) {
-    # no commands found, and we have a cleanup call, so lets get rid ofit. 
+    # no commands found, and we have a cleanup call, so lets get rid ofit.
     my $block=$ct->block($c_l);
     $ct->remove($block);
     $update++;
@@ -326,9 +326,7 @@ _BLOCK_
 
 # Plan is, when this runs it gets all running runnos, then it checks for watcher lines already in existence
 # have to use runno regex to find runnos we're watching.
-# for any are not in the run list, we remove the block. 
+# for any are not in the run list, we remove the block.
 # for any are not in the watch list, we add
-# 
+#
 # need config sysadmin, coder, director, offer them as additional watchers for things Save as default to user dir.
-
-

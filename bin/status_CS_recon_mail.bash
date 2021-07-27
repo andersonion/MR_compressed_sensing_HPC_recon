@@ -5,13 +5,13 @@ if [ -z $1 ];then
     echo "please specify runno!";
     exit;
 fi;
-t_run=$1;shift 
+t_run=$1;shift
 args="";
-for arg in $@; do 
+for arg in $@; do
     if [ ! -z "$args" ];then
-	args="$args,$arg";
+        args="$args,$arg";
     else
-	args="$arg";
+        args="$arg";
     fi;
 done
 
@@ -27,9 +27,7 @@ do if [ ! -z "$at" ];
 done
 
 exit 0;
-# Could convert to use mail_dir to send one series of mail. 
-# Only really important if we've got more than one attachment. 
-# Someting like, mkdir good subjname; foreach attacmnent ln -s $attachment 
+# Could convert to use mail_dir to send one series of mail.
+# Only really important if we've got more than one attachment.
+# Someting like, mkdir good subjname; foreach attacmnent ln -s $attachment
 # Decided aginst it because we'd rather get these one at a time with their volumename.
-
-

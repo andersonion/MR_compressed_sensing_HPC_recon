@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 # To keep up with ever improving boiler plate ideas, this exists to capture them
 # Boilerplate code is rarely updated, but often it's a good idea.
-# So this'll exist as a record of the "current standard" maybe, riddled with me 
+# So this'll exist as a record of the "current standard" maybe, riddled with me
 # explaining things to ... me.
-# 
+#
 # Special sha-bang finds default perl. This should be correct most the time from here forward.
 use strict;
 use warnings;
@@ -27,7 +27,7 @@ use lib split(':',$RADISH_PERL_LIB);
 use civm_simple_util qw(activity_log printd $debug_val);
 # On the fence about including pipe utils every time
 use pipeline_utilities;
-# pipeline_utilities uses GOODEXIT and BADEXIT, but it doesnt choose for you which you want. 
+# pipeline_utilities uses GOODEXIT and BADEXIT, but it doesnt choose for you which you want.
 $GOODEXIT = 0;
 $BADEXIT  = 1;
 # END BOILER PLATE
@@ -52,7 +52,7 @@ if ( -d $parent_path && ! -d ${results_path} ) {
 }
 
 chdir "${parent_path}";
-#for folder in $(ls -d ${runno}_m*); do 
+#for folder in $(ls -d ${runno}_m*); do
 my @runno_things=glob($runno."_m*");
 my @runnos;
 
@@ -61,12 +61,12 @@ foreach my $folder ( @runno_things ){
     my $slice_db={};
     my $slice_fails={};
 # slice db will be a hash of hashes, primary key on slice number.
-# 
-# ex, 
+#
+# ex,
 # slice_db->{1}->{time_slice}=120.132; # seconds
 # slice_db->{1}->{iterations}=400; # equivalent to itnlim
 # slice_db->{1}->{time_load}=5.4; # seconds
-    if ( -f $folder ){ 
+    if ( -f $folder ){
         next;
     }
     push(@runnos,$folder);
@@ -74,59 +74,59 @@ foreach my $folder ( @runno_things ){
     my ($cmd,@in_f,@out);
     @in_f=glob("${folder}/*log");
     if(! scalar(@in_f)) {
-	printd(15,"%  No log\n");
-	next;
+        printd(15,"%  No log\n");
+        next;
     }elsif( scalar(@in_f)>1) {
-	die "error('Mutiple logs found, bailing %s', $folder)";
+        die "error('Mutiple logs found, bailing %s', $folder)";
     }
     my @logA;
     load_file_to_array($in_f[0],\@logA);
     for my $line (@logA){
-	chomp($line);
-	#$cmd="sed -nr 's/.*Time to rec.*:[ ]*([0-9]+[.][0-9]+)[ ]+.*/\\1/p' ${folder}/*log > ${txt_T}";
-	#$cmd="sed -nr 's/Slice[ ]+([0-9]+)[ ]*:[ ]+Time to rec.*/\\1/p' ${folder}/*log > ${txt_N}";*
-	#$cmd="sed -nr 's/.*Reconstruction flag [(][\"](.*)[\"][)].*/\\1/p' ${folder}/*log > ${txt_I}";
+        chomp($line);
+        #$cmd="sed -nr 's/.*Time to rec.*:[ ]*([0-9]+[.][0-9]+)[ ]+.*/\\1/p' ${folder}/*log > ${txt_T}";
+        #$cmd="sed -nr 's/Slice[ ]+([0-9]+)[ ]*:[ ]+Time to rec.*/\\1/p' ${folder}/*log > ${txt_N}";*
+        #$cmd="sed -nr 's/.*Reconstruction flag [(][\"](.*)[\"][)].*/\\1/p' ${folder}/*log > ${txt_I}";
 
-	# Works for slice time to reconstruct, but cant tell on flag
-	my ($N,$T,$V,$TRAIL,$K);
-	if ($line =~ m/time\s to\s recon[a-z]*\s data/ix) {
-	    #print("Time\n");
-	    ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
+        # Works for slice time to reconstruct, but cant tell on flag
+        my ($N,$T,$V,$TRAIL,$K);
+        if ($line =~ m/time\s to\s recon[a-z]*\s data/ix) {
+            #print("Time\n");
+            ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
               (?: (time\sto\srec[a-z]+[^:]+)[:]
               \s+ ($num_ex) \s seconds[.]
               )
                   (.*?)$/ix;
-	    $K="time_recon";
-	} elsif ($line =~ m/time\s to\s load\s sparse\s data/ix) {
-	    #print("Time\n");
-	    ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
+            $K="time_recon";
+        } elsif ($line =~ m/time\s to\s load\s sparse\s data/ix) {
+            #print("Time\n");
+            ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
               (?: (time\sto\sload\ssparse\sdata)\s*[:]
               \s+ ($num_ex) \s seconds[.]
               )
                   (.*?)$/ix;
-	    $K="time_load";
-	}  elsif ($line =~ m/time\s to\s set\s up\s recon/ix) {
-	    #print("Time\n");
-	    ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
+            $K="time_load";
+        }  elsif ($line =~ m/time\s to\s set\s up\s recon/ix) {
+            #print("Time\n");
+            ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* [:] \s+
               (?: (time\s to\s set\s up\s recon)\s*[:]
               \s+ ($num_ex) \s seconds[.]
               )
                   (.*?)$/ix;
-	    $K="time_setup";
-	}  elsif ($line =~ m/(recon[a-z]+\sflag)/ix) {
-	    #print("flag\n");
-	    ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* : \s+
+            $K="time_setup";
+        }  elsif ($line =~ m/(recon[a-z]+\sflag)/ix) {
+            #print("flag\n");
+            ($N,$T,$V,$TRAIL) = $line=~m/^Slice\s+([0-9]+)\s* : \s+
                  (recon[a-z]+\sflag)
                   [^"]+["]($num_ex)["]
                  (.*)$/ix;
-	    $K="iterations";
-	} else {
-	    next;
-	}
-	
+            $K="iterations";
+        } else {
+            next;
+        }
+
 
 =item
-	$line=~m/^Slice\s+([0-9]+)\s* : \s+
+        $line=~m/^Slice\s+([0-9]+)\s* : \s+
               (?: (time\sto\srec[a-z]+[^:]+):
               \s+ ($num_ex) \s seconds[.]
             )|(?: (recon[a-z]+\sflag)
@@ -138,14 +138,14 @@ foreach my $folder ( @runno_things ){
 =item
 
 
-	$line=~m/^Slice\s+([0-9]+)\s* : \s+
+        $line=~m/^Slice\s+([0-9]+)\s* : \s+
               (?: (recon[a-z]+\sflag)
                   [^"]+["]($num_ex)["]
                )
                (.*?)$/ix;
 
 
-	$line=~m/^Slice\s+([0-9]+)\s* [:] \s+ (?:
+        $line=~m/^Slice\s+([0-9]+)\s* [:] \s+ (?:
               (?: (recon[a-z]+\sflag)
                   [^"]+["]($num_ex)["]
               )
@@ -156,74 +156,74 @@ foreach my $folder ( @runno_things ){
               (.*?)$/ix;
 =cut
 
-	#$line=~m/^Slice\s+([0-9]+)\s* : \s+
+        #$line=~m/^Slice\s+([0-9]+)\s* : \s+
         #     (?: (recon[a-z]+\sflag)[^"]+["]($num_ex)["])
         #      (.*)/ix;
-	
-	#$line=~m/^Slice\s+([0-9]+)\s* : \s+
+
+        #$line=~m/^Slice\s+([0-9]+)\s* : \s+
         #     (?: (recon[a-z]+\sflag))(.)
         #      (.*)/ix;
-		
-	#$line=~m/^Slice\s+([0-9]+)\s*:
+
+        #$line=~m/^Slice\s+([0-9]+)\s*:
         #      (?:\s+ (time\sto\srec[a-z]+[^:]+):
         #      \s+ ($num_ex) \s seconds[.]
         #      (.*))/ix;
-	#$line=~m/^Slice\s+([0-9]+)\s*:
+        #$line=~m/^Slice\s+([0-9]+)\s*:
         #      \s+ (time\sto\srec[a-z]+[^:]+)
         #z     .*/ix;
-	#$line=~m/^(Slice\s+.*)$/ix;
-	if(defined $N){
-	    # noticed one slice with no recon time
-	    # inserted stop here for debuggy.
-	    #if($N !~ /1031/x) {
-	    #next;
-	    #}
-	#if( defined $N){ printf("S:($N)\t($V)\t($T) TRAILING  ($TRAIL) n$num_ex\n");die; }
-	#if( defined $N){ printf("S:($N)\t($V)\t($T)\n");die;}
-	    #printf("S:($N)\t($V)\t($T)\n");
-	#printf("$line\nS:($N)\t($V)\t($T) TRAILING  ($TRAIL)\n") if defined $N && defined $V;
-	    if(!exists $slice_db->{$N}){
-		$slice_db->{$N}={};
-		$slice_db->{$N}->{"attempts"}=1;
-	    }
-	    if(!exists $slice_db->{$N}->{$K}) {
-		$slice_db->{$N}->{$K}=[$V];
-	    } else {
-		print("% shunting previous $N to fails\n");
-		my $r=$slice_db->{$N};
-		my %h=%$r;
-		if(!exists $slice_fails->{$N}){
-		    $slice_fails->{$N}=[];
-		}
-		push(@{$slice_fails->{$N}},\%h);
-		delete $slice_db->{$N};
-		$slice_db->{$N}->{$K}=[$V];
-		$slice_db->{$N}->{"attempts"}=$h{"attempts"}+1;
-	    } 
+        #$line=~m/^(Slice\s+.*)$/ix;
+        if(defined $N){
+            # noticed one slice with no recon time
+            # inserted stop here for debuggy.
+            #if($N !~ /1031/x) {
+            #next;
+            #}
+        #if( defined $N){ printf("S:($N)\t($V)\t($T) TRAILING  ($TRAIL) n$num_ex\n");die; }
+        #if( defined $N){ printf("S:($N)\t($V)\t($T)\n");die;}
+            #printf("S:($N)\t($V)\t($T)\n");
+        #printf("$line\nS:($N)\t($V)\t($T) TRAILING  ($TRAIL)\n") if defined $N && defined $V;
+            if(!exists $slice_db->{$N}){
+                $slice_db->{$N}={};
+                $slice_db->{$N}->{"attempts"}=1;
+            }
+            if(!exists $slice_db->{$N}->{$K}) {
+                $slice_db->{$N}->{$K}=[$V];
+            } else {
+                print("% shunting previous $N to fails\n");
+                my $r=$slice_db->{$N};
+                my %h=%$r;
+                if(!exists $slice_fails->{$N}){
+                    $slice_fails->{$N}=[];
+                }
+                push(@{$slice_fails->{$N}},\%h);
+                delete $slice_db->{$N};
+                $slice_db->{$N}->{$K}=[$V];
+                $slice_db->{$N}->{"attempts"}=$h{"attempts"}+1;
+            }
 
-	#printf("$line\nS:($N)\t($V)\t($T) TRAILING  ($TRAIL)\n") if defined $N;
-	}
+        #printf("$line\nS:($N)\t($V)\t($T) TRAILING  ($TRAIL)\n") if defined $N;
+        }
     }
     #Data::Dump::dump($slice_db);die;
     my @nums=sort { $a <=> $b } keys($slice_db);
     #my @out;
     push(@out,sprintf("Slice\tLoad\tSetup\tRecon\tIterations\tAttempts\n"));
     for my $Slice (@nums) {
-# HIDDEN DETAIL, setup time includes load time, 
-	# would subtract it here, but its not always defined.
-	#my $attempts=scalar(@$Load);
-	my $attempts=$slice_db->{$Slice}->{"attempts"};
-	for(my $i=0;$i<1;$i++){
-	    my $Load=$slice_db->{$Slice}->{"time_load"}->[$i];
-	    my $Setup=$slice_db->{$Slice}->{"time_setup"}->[$i];
-	    my $Recon=$slice_db->{$Slice}->{"time_recon"}->[$i];
-	    my $Iterations=$slice_db->{$Slice}->{"iterations"}->[$i];
-	    $Load="" if! defined $Load;
-	    $Setup="" if! defined $Setup;
-	    $Recon="" if! defined $Recon;
-	    $Iterations="" if! defined $Iterations;
-	    push(@out,sprintf("$Slice\t$Load\t$Setup\t$Recon\t$Iterations\t$attempts\n"));
-	}
+# HIDDEN DETAIL, setup time includes load time,
+        # would subtract it here, but its not always defined.
+        #my $attempts=scalar(@$Load);
+        my $attempts=$slice_db->{$Slice}->{"attempts"};
+        for(my $i=0;$i<1;$i++){
+            my $Load=$slice_db->{$Slice}->{"time_load"}->[$i];
+            my $Setup=$slice_db->{$Slice}->{"time_setup"}->[$i];
+            my $Recon=$slice_db->{$Slice}->{"time_recon"}->[$i];
+            my $Iterations=$slice_db->{$Slice}->{"iterations"}->[$i];
+            $Load="" if! defined $Load;
+            $Setup="" if! defined $Setup;
+            $Recon="" if! defined $Recon;
+            $Iterations="" if! defined $Iterations;
+            push(@out,sprintf("$Slice\t$Load\t$Setup\t$Recon\t$Iterations\t$attempts\n"));
+        }
     }
     my $txt_out="$results_path/${folder}_timing.csv";
     write_array_to_file($txt_out,\@out);
@@ -244,7 +244,7 @@ foreach my $folder ( @runno_things ){
     #    #my $sh_cmd="grep '(\"' ${folder}/*log | cut -d ' ' -f2 | cut -d ':' -f1 > ${txt_2}";
     #    #my $sh_cmd="sed -nr 's/Slice[ ]+([0-9]+)[ ]*:[ ]+Reconstruction flag.*/\\1/p' ${folder}/*log > ${txt_2}"#;
     #    # For some reason we didnt have the right number of written Reconstruction flag lines,
-    #    # so we switched to our time to rec line since that has to match, and iterations done. 
+    #    # so we switched to our time to rec line since that has to match, and iterations done.
     #    my $sh_cmd="sed -nr 's/Slice[ ]+([0-9]+)[ ]*:[ ]+Time to rec.*/\\1/p' ${folder}/*log > ${txt_2}";
     #    my @out=qx($sh_cmd);# this dumps to the txt file
     #}

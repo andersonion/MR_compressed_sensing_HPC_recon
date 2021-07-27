@@ -18,9 +18,9 @@ fi;
 
 
 stat_queue=$("slurm_queue_snapshot" "$the_user");
-#echo "queue_capture=$stat_queue"
-#echo "Looking up jobid's for $the_runno";
-ids=$(grep -i pend $stat_queue|grep -iE "$the_runno" |awk '{print $1}');
+#echo "queue_capture=$stat_queue" >&2 ;
+#echo "Looking up jobid's for $the_runno" >&2 ;
+ids=$(grep -iE "$the_runno" $stat_queue |awk '{print $1}');
 echo "$ids";
 # this is a list of files.
 #list=$(for id in $(echo $ids|xargs);

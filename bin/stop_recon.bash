@@ -6,16 +6,16 @@ echo "ctrl+c to cancel.";
 sleep 5;
 if [ ! -z "$1" ];then
     base_runno=$1;
-else 
+else
     echo "ERROR: Please specify your base_runno!";
-    exit 1; 
+    exit 1;
 fi;
 
 if [ ! -z "$PROTO_BIN" ];then
     cd $PROTO_BIN
-else 
+else
     echo "ERROR: no prototype bin for (drain|undrain)_node";
-    exit 1; 
+    exit 1;
 fi;
 
 list_file="$HOME/.CS_jobs_${base_runno}";

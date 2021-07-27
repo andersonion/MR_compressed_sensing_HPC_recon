@@ -8,21 +8,21 @@ if [ -z "$MATLAB_EXEC_PATH" ]; then
     declare -x MATLAB_EXEC_PATH=$WORKSTATION_HOME/matlab_execs;
 fi;
 exec_path="$MATLAB_EXEC_PATH/streaming_CS_recon_main_executable/$CS_CODE_DEV/run_streaming_CS_recon_main_exec_builtin_path.sh";
-if [ ! -f $exec_path ]; then 
+if [ ! -f $exec_path ]; then
 echo "ERROR: Missing $CS_CODE_DEV exec!($exec_path)";
 echo "Available exec versions...";
 ls -tr $MATLAB_EXEC_PATH/streaming_CS_recon_main_executable/
 exit;
 fi;
-# added chunk size force to try to make cs_recon easier on the slurm scheduler. 
+# added chunk size force to try to make cs_recon easier on the slurm scheduler.
 chunk_size_set=$(echo $@ |grep -c chunk_size);
 c_force="";
-if [ $chunk_size_set -eq 0 ] ;then 
+if [ $chunk_size_set -eq 0 ] ;then
     c_force="planned_ok chunk_size=30";
 fi;
 echo "# start $CS_CODE_DEV exec ($exec_path)"
 echo "# with args ( $@ $c_force)";
-# this echo captures the command used to the activity_log. 
+# this echo captures the command used to the activity_log.
 # It might be good to use the activity_log matab function, but I dont think it works for execs.
 echo -e "$(date +"%F_%T")\t$USER\t$0\t$@ $c_force" >> $BIGGUS_DISKUS/activity_log.txt
 # Run recon.

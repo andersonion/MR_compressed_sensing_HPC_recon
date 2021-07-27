@@ -1,12 +1,12 @@
 #!/bin/bash
-# Count the characters 1 and 0 in a file 
+# Count the characters 1 and 0 in a file
 # show the sum of those, and the true character count
 # warn if there is a discrepancy.
 # This was created to help validate CS acq tables in tablib
 # James Cook 2019-08-09
 if [ -z "$1" ];
 then echo "Please specify a table file";
-    exit 1; 
+    exit 1;
 fi
 t="$1";
 if [ ! -f $t ];
@@ -26,4 +26,3 @@ if [ "$result" -ne "$total" ];
 then echo "WARNING: total($total) is not $result";
     exit 1;
 fi;
-
