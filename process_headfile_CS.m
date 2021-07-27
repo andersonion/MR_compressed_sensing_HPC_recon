@@ -64,6 +64,9 @@ if exist(procpar_path,'file')
     end
     %% 
     procpar = read_headfile(a_file,true);
+    if isfield(partial_info,'comment') && isfield(procpar,'comment')
+        partial_info.comment=[procpar.comment, partial_info.comment];
+    end
     output_headfile = combine_struct(procpar,partial_info);
     
     if ~isfield(output_headfile,'B_recon_type')
