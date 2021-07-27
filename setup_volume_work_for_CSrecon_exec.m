@@ -133,15 +133,24 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         preview_stamp=fullfile(setup_var.workdir,'.preview.time');
         system(sprintf('touch %s',preview_stamp));
         preview_imgs=CS_preview_data(recon_mat.original_mask,data,fullfile(setup_var.workdir,volume_runno),options.CS_preview_data);
+        scp_cmds=cell(1,numel(preview_imgs)+1);
         for pn=1:numel(preview_imgs)
             scp_to_engine=sprintf('scp -p %s %s@%s.dhe.duke.edu:/%sspace/',...
                 preview_imgs{pn},getenv('USER'),options.target_machine,options.target_machine);
             shell_s=sprintf('if [ %s -nt %s ]; then %s & fi',...
                 preview_imgs{pn}, preview_stamp, scp_to_engine);
+            scp_cmds{pn}=shell_s;
+            %{
             [s,sout]=system(shell_s);
             if s~=0 
                 warning('problem sending %s: %s',preview_imgs{pn},sout);
             end
+            %}
+        end
+        scp_cmds{end}='wait';
+        [s,sout]=system(strjoin(scp_cmds,' ; '));
+        if s~=0
+            warning('problem sending %s: %s',preview_imgs{pn},sout);
         end
         preview_time=toc(t_preview);
         log_msg=sprintf('Volume %s: Preview and scp time is %0.2f\n',volume_runno,preview_time);
