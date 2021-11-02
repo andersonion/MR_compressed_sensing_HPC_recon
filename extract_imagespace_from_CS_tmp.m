@@ -10,7 +10,9 @@ function extract_imagespace_from_CS_tmp(mat_file)
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 mat=matfile(mat_file,'Writable',true);
-if ~mat.keep_work
+
+if (isfield('mat','temp_file') && ~exist(mat.temp_file,'file') ) ...
+    || (isfield('mat','keep_work') && ~mat.keep_work )
   error('keep_work needed to be on for this to work, sorry, you''ll probably need to recon_again.');
 end
 % Comically poorly named write_qsm option internal to volume_cleanup

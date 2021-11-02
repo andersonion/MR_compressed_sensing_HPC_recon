@@ -183,10 +183,16 @@ if ~exist('w2','var') || ~w2
     warning('Fermi filter w2 not set! fermi code will use its internal default');
 %    w2 = 0.75;
 end
-if ~exist('write_qsm','var')
+try 
+    write_qsm=setup_var.write_qsm;
+catch
+%if ~exist('write_qsm','var')
     write_qsm=0;
 end
-if ~exist('qsm_fermi_filter','var')
+try 
+    qsm_fermi_filer=setup_var.qsm_fermi_filter;
+%if ~exist('qsm_fermi_filter','var')
+catch
     qsm_fermi_filter=0;
 end
 
@@ -395,11 +401,11 @@ fclose(fid);
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
 % applied.
 if write_qsm
-    qsm_folder = [workdir '/qsm/'];
+    qsm_folder = fullfile(setup_var.workdir,'qsm');
     if ~exist(qsm_folder,'dir')
         system(['mkdir ' qsm_folder]);
     end
-    qsm_file = [qsm_folder setup_var.volume_runno '_raw_qsm.mat'];
+    qsm_file = fullfile(qsm_folder, [setup_var.volume_runno '_raw_qsm.mat']);
 end
 if ~qsm_fermi_filter
     if write_qsm
