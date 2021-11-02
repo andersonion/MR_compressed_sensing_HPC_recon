@@ -26,9 +26,14 @@ if [ ! -d "$USER_BIGGUS" ];then
 fi;
 
 cd ${WKS_SHARED}/pipeline_utilities;
+status_dir="$HOME/CS_recon_status";
 #echo /usr/local/bin/matlab -nodesktop -noFigureWindows -nojvm -r "status_CS_recon($args);exit";exit;
 s_file_raw=$HOME/".CS_recon_${runno}.rstatus";
-s_file=$HOME/"CS_recon_${runno}.status";
+s_file_old=$HOME/"CS_recon_${runno}.status";
+s_file="$status_dir/${runno}.status";
+if [ ! -d "$status_dir"  ];then 
+    mkdir $status_dir;
+fi;
 
 log_file=$(ls -dtr "$USER_BIGGUS/${runno}.work/${runno}"*"recon"*"log" 2> /dev/null |tail -n1);
 if [ -z "$log_file" ];then
@@ -61,11 +66,14 @@ if [ ! -f "$lck_file" ]; then
     s_last="NO_LAST";
     skip_collect=0;
     run_error=0;
-    if [ ! -e "$log_file" -o ! -e "$s_file" ] ||
+    # auto-clean old format.
+    if [ -f "$s_file_old" ];then
+        mv -v $s_file_old $s_file;fi
+    if [ ! -s "$log_file" -o ! -s "$s_file" ] ||
         [ -e "$log_file" -a -e "$s_file" -a "$log_file" -nt "$s_file" ];
     then
-        echo -n "Collecing data beacuase"
-        if [ ! -e "$log_file" -o ! -e "$s_file" ]; then
+        echo -n "Collecting data becauase"
+        if [ ! -s "$log_file" -o ! -s "$s_file" ]; then
             echo " missing $s_file or $log_file";
         elif [ -e "$log_file" -a -e "$s_file" -a "$log_file" -nt "$s_file" ]; then
             echo " newer $log_file";
