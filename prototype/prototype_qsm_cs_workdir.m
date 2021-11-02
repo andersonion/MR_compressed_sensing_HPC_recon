@@ -1,4 +1,5 @@
 %% pull the data and create raw image
+function prototype_qsm_cs_workdir(runno)
 % addpath('/glusterspace/AgilentReconScripts')
 % addpath('/home/nian/MATLAB_scripts_rmd/AgilentReconScripts')
 % addpath('/home/nian/MATLAB_scripts_rmd/MTools')
@@ -17,7 +18,7 @@ addpath(genpath(code_dir_QSM_STI_star));
 % series = 'ser13';
 % rad_mat('heike','N56302','N56275_02/ser12.fid',{'skip_filter'});  %%%%GRE
 scanner = 'kamy';
-runno = 'S69054s';
+%runno = 'S69054s';
 study = 'S200221_05';
 series = 'ser49';
 
@@ -26,7 +27,7 @@ series = 'ser49';
 % copied from RUNNO.work to RUNNO
 % hard links were created from fid to RUNNO.fid
 % and procpar to RUNNO.procpar
-runno = 'S69240';
+%runno = 'S69240';
 study='localdata';
 series='localseries';
 use_new_CS=1;
@@ -45,6 +46,11 @@ end
 workpath=fullfile(getenv('BIGGUS_DISKUS'),[runno '.work']);
 %workpath='/mnt/duhsnas-pri.dhe.duke.edu/civm-projectdata/jjc29/clusterscratch/S69222.work'
 cd(workpath);
+
+if exist('star_qsm.nii.gz','file')
+    warning('%s complete',workpath);
+    return;
+end
 
 %% example to load CS data
 if use_new_CS
@@ -100,40 +106,48 @@ raw = iftME(phase_ramp_remove1(raw));
 img=single(raw);
 %
 %%
-% additional step for mag_sos
-mag_sos = zeros(size(raw(:,:,:,1)));
-for echo_num = 1:size(raw,4)
-    mag_sos = (abs(raw(:,:,:,echo_num))).^2 + mag_sos;
+if ~exist('mag_sos.nii','file')
+    % additional step for mag_sos
+    mag_sos = zeros(size(raw(:,:,:,1)));
+    for echo_num = 1:size(raw,4)
+        mag_sos = (abs(raw(:,:,:,echo_num))).^2 + mag_sos;
+    end
+    mag_sos = sqrt(mag_sos);
+    mat2nii(mag_sos);
+    % show3(mag_sos);
 end
-
-mag_sos = sqrt(mag_sos);
-mat2nii(mag_sos);
-
-% show3(mag_sos);
-
-mag=abs(img);
-mat2nii(mag)
-[T2,R2]=T2mapMaskedWeighted(mag,TE*1000);
-mat2nii(T2)
-mat2nii(R2)
-save img img -v7.3
+if ~exist('mag.nii','file')
+    mag=abs(img);
+    mat2nii(mag)
+end
+if ~exist('R2.nii.gz','file')
+    [T2,R2]=T2mapMaskedWeighted(mag,TE*1000);
+    mat2nii(T2)
+    mat2nii(R2)
+end
+if ~exist('img.mat','file')
+    save img img -v7.3
+end
 
 %% mask generation
 %tic
+if ~exist('msk.nii.gz','file')
 [~] = brainext(abs(mag_sos),3,0.45);
 %[~] = brainext(abs(mag_sos),2,0.65);
 display('Threshold Mag SOS in ImageJ then combine with scripted msk')
-%%
-msk = open_nii('msk.nii.gz');
-try
-    msk_thresh = open_nii('msk_thresh.nii');
-    msk_comb = msk.*msk_thresh;
-catch
-    warning('no mask_comb, just using small mask');
-    msk_comb=msk;
 end
-mat2nii(msk_comb);
-
+%%
+if ~exist('msk_comb.nii.gz','file')
+    msk = open_nii('msk.nii.gz');
+    try
+        msk_thresh = open_nii('msk_thresh.nii');
+        msk_comb = msk.*msk_thresh;
+    catch
+        warning('no mask_comb, just using small mask');
+        msk_comb=msk;
+    end
+    mat2nii(msk_comb);
+end
 
 
 %% QSM Recon Pipe
@@ -145,10 +159,13 @@ mat2nii(msk_comb);
 % vox - array of voxelsize
 % Determine SNR and calculate T2 map
 img = raw;
-mask = load_nii('msk_comb.nii.gz');
-mask = single(mask.img);
-
-autoSNR(abs(img),mask);
+if ~exist('mask','var')
+    mask = load_nii('msk_comb.nii.gz');
+    mask = single(mask.img);
+end
+if ~exist('meanSNR.mat','file')
+    autoSNR(abs(img),mask);
+end
 load meanSNR
 % these should already be in memory from above.
 % load('TE.mat') % array with echo times such as TE = [0.04 0.08 ...]
@@ -157,13 +174,12 @@ load meanSNR
 % before img had been converted to magnitude
 %T2 = T2mapMaskedWeighted(img(:,:,:,1:4),TE(1:4),mask,meanSNR(1:4));
 T2 = T2mapMaskedWeighted(abs(img),TE,mask,meanSNR);
-
 save_nii(make_nii(T2),'T2.nii');
 
 % QSM
 
 % clear all;
-clear R2 T2 msk msk_comb mask 
+clear R2 T2 msk msk_comb mask
 
 % prep
 prepad = 1;
@@ -176,11 +192,14 @@ tic
 %load dims % array with dimensions of raw img ex. dims = [256 256 256 4]
 %load TE
 raw_img_file = 'img.nii';
-mask = open_nii('msk_comb.nii.gz');
-mask = imdilate(mask,strel3d(2));
-mask = imerode(mask,strel3d(2)); 
-save_nii(make_nii(mask,[1 1 1],[0 0 0],2),'maskE.nii');
-
+if ~exist('maskE.nii.gz','file')
+    mask = open_nii('msk_comb.nii.gz');
+    mask = imdilate(mask,strel3d(2));
+    mask = imerode(mask,strel3d(2));
+    save_nii(make_nii(mask,[1 1 1],[0 0 0],2),'maskE.nii');
+else
+    mask=open_nii('maskE.nii.gz');
+end
 %autocrop(mask,padsize);
 toc
 
@@ -207,47 +226,48 @@ Freq = zeros([dims],'single');
 if TE(1) < 1
     TE = TE*1e3; % s -> ms
 end
-for necho = 1:dims(4);
-    necho
-    ScalingCoeff = ScalingFactor(B0,TE(necho));
-    
-    % if necho <= size(mask,4)
-    %     mask2 = applyautocrop(single(mask(:,:,:,necho)));
-    % else
-    %     mask2 = applyautocrop(mask(:,:,:,1));
-    % end
-    
-    if necho <= size(mask,4)
-        mask2 = (single(mask(:,:,:,necho)));
-    else
-        mask2 = single(mask(:,:,:,1));
+if ~exist('Freq_v.nii.gz','file')
+    for necho = 1:dims(4);
+        necho
+        ScalingCoeff = ScalingFactor(B0,TE(necho));
+        
+        % if necho <= size(mask,4)
+        %     mask2 = applyautocrop(single(mask(:,:,:,necho)));
+        % else
+        %     mask2 = applyautocrop(mask(:,:,:,1));
+        % end
+        
+        if necho <= size(mask,4)
+            mask2 = (single(mask(:,:,:,necho)));
+        else
+            mask2 = single(mask(:,:,:,1));
+        end
+        
+        %TissuePhase = iHARPERELLA(applyautocrop(single(angle( ...
+        %open_nii(raw_img_file,necho)))),mask2,'padsize',prepadsize);
+        
+        % raw_img_file was NOT present!
+        %%one_echo=open_nii(raw_img_file,necho);
+        % NOT certain that raw is the same here!
+        % however, the output looks correct.
+        one_echo=squeeze(raw(:,:,:,necho));
+        UnwrapPhase = LaplacianPhaseUnwrap( ...
+            (single(angle(one_echo))),'padsize',prepadsize);
+        
+        TissuePhase = V_SHARP(UnwrapPhase,single(mask2),'padsize',prepadsize);
+        TissuePhase_all(:,:,:,necho) = TissuePhase;
+        
+        Freq_v(:,:,:,necho) = (TissuePhase)*ScalingCoeff.Freq;
+        %figure;imshow(Freq_v(:,:,160,necho),[])
+        %drawnow;
     end
-    
-    %TissuePhase = iHARPERELLA(applyautocrop(single(angle( ...
-    %open_nii(raw_img_file,necho)))),mask2,'padsize',prepadsize);
-    
-    % raw_img_file was NOT present! 
-    %%one_echo=open_nii(raw_img_file,necho);
-    % NOT certain that raw is the same here!
-    % however, the output looks correct.
-    one_echo=squeeze(raw(:,:,:,necho));
-    UnwrapPhase = LaplacianPhaseUnwrap( ...
-    (single(angle(one_echo))),'padsize',prepadsize);
-    
-    TissuePhase = V_SHARP(UnwrapPhase,single(mask2),'padsize',prepadsize);
-    TissuePhase_all(:,:,:,necho) = TissuePhase;
-    
-    Freq_v(:,:,:,necho) = (TissuePhase)*ScalingCoeff.Freq;
-    %figure;imshow(Freq_v(:,:,160,necho),[])
-    %drawnow;
+    mat2nii(Freq_v);
+    % mat2nii(UnwrapPhase)
+    mat2nii(TissuePhase_all)
+    clear UnwrapPhase TissuePhase TissuePhase_all
 end
-clear UnwrapPhase TissuePhase
-mat2nii(Freq_v);
-% mat2nii(UnwrapPhase)
-mat2nii(TissuePhase_all)
 
-
-% Combine echoes to enhance images and save results in Nifti format.
+%% Combine echoes to enhance images and save results in Nifti format.
 
 % statmask = HeartT2Mask('mag.nii',1,2);
 % mat2nii(statmask);
@@ -269,15 +289,16 @@ ncounts = histc(T2pix,T2vec);
 figure(4392); plot(T2vec,ncounts);
 [~,T2idx] = max(ncounts);
 meanT2 = T2vec(T2idx);
+save MEWeight meanT2
 clear T2 T2pix TissuePhase maskE2 raw T2mask
 
 max_echo = 2;
 % meanT2 = open_nii('T2.nii');
 % combine frequency data
-[~,FreqC_v] = nanMEW(TE(1:max_echo)/1e3,meanT2,Freq_v(:,:,:,1:max_echo));
-mat2nii(FreqC_v);
-save MEWeight meanT2
-
+if ~exist('FreqC_v.nii.gz','file')
+    [~,FreqC_v] = nanMEW(TE(1:max_echo)/1e3,meanT2,Freq_v(:,:,:,1:max_echo));
+    mat2nii(FreqC_v);
+end
 clear Freq_v
 
 % Star QSM
@@ -287,4 +308,6 @@ FreqC_v_sc = FreqC_v/ (1./mean(TE(1:max_echo))./2./pi)*2*pi/1e3;
 star_qsm = QSM_star(FreqC_v_sc ,single(mask2),'H',H, 'voxelsize',vox,'padsize', prepadsize,'TE',mean(TE(1:max_echo)),'B0',B0,'tau',0.000001);
 %star_qsm = star_qsm*2*pi/1e3;
 mat2nii(star_qsm)
+
+close all;
 
