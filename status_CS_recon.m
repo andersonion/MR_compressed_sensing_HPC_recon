@@ -1,10 +1,21 @@
 function status_CS_recon(base_runno,varargin)
-% function recon_report_progress(rx,biggus_diskus|Write)
+% function recon_report_progress(rx,biggus_diskus|Write|range|check_scanner|test)
 % 
 % function to report total progress of a cs recon. 
-% if you speicify an alternate work directyory will check there instead.
-% if you add the word Write will write the orthocenter to a file in base
-% working folder.
+% Supports several optional args
+%   alternate BIGGUS_DISKUS to check other peoples recon progress
+%   range will take the next parameter and treat it as a matlab
+%         expression (DANGEROUS CODE EVAL) will then check only those
+%         working folders.
+%   check_scanner normally skips ssh checking, this will use ssh to go ask
+%         the scanner the current progress 
+%   Write will save an orthocenter to a file in base working folder.
+%   test  test orthoo mode telling the output path but not bothering to run
+%         the othocenter extraction
+% 
+% example using all options(except test)
+%   stats_CS_recon N12345 range 8:12 Write check_scanner /mnt/alternate_scratch_space
+% 
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
@@ -14,6 +25,7 @@ end
 data_directory=getenv('BIGGUS_DISKUS');
 save_ortho_centers=false;
 test_mode=false;
+check_scanner=0;
 if nargin>1
     vu=ones(size(varargin));
     for ai=1:nargin-1
@@ -29,7 +41,10 @@ if nargin>1
         elseif strcmp(varargin{ai},'range')
             range=eval(varargin{ai+1});
             vu(ai)=0;
-vu(ai+1)=0;
+            vu(ai+1)=0;
+        elseif strcmp(varargin{ai},'check_scanner')
+            check_scanner=1;
+            vu(ai)=0;
         end
     end
     if sum(vu)>0
@@ -38,7 +53,7 @@ vu(ai+1)=0;
     end
 end
 
-
+% TODO convert this to a matlab only function.
 [s,ls_blob]=system(sprintf('ls -d %s/%s.work/%s_m*/',data_directory,base_runno,base_runno)); % the */ forces a trailing slash.
 if s==0 % unix status check
     ls_blob=strtrim(ls_blob);
@@ -49,10 +64,10 @@ if s==0 % unix status check
     rundata = C(index);clear C index;
     progress=0;
     range_start=1;
-    range_end=numel(rundata)
+    range_end=numel(rundata);
     if exist('range','var')
       range_start=range(1);
-      range_end=range(2);
+      range_end=range(end);
     end
     for ri=range_start:range_end
         if isempty(rundata{ri})
@@ -62,7 +77,12 @@ if s==0 % unix status check
         % of how we use ls to get the directory. 
         vd=rundata{ri}(1:end-1);
         [~,vr]=fileparts(vd);
-        [~,lm,pc]=check_status_of_CSrecon(vd,vr);
+        if ~check_scanner
+            [~,lm,pc]=check_status_of_CSrecon(vd,vr);
+        else
+            [~,lm,pc]=check_status_of_CSrecon(vd,vr,[],base_runno);
+        end
+        %  (volume_dir,volume_runno,scanner,base_runno,study,agilent_series,bbytes )
         fprintf('%05.2f%% - %s',pc,lm);
         
         progress=progress+pc;

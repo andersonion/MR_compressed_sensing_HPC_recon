@@ -1,5 +1,5 @@
 function [ starting_point ,log_msg,vol_status] = check_status_of_CSrecon( ...
-    volume_dir,volume_runno,scanner,runno,study,agilent_series,bbytes )
+    volume_dir,volume_runno,scanner,runno,agilent_study,agilent_series,bbytes )
 % check status of an individual volume in the cs recon.
 %%% NOTEABLY bbytes can be omitted.
 %
@@ -131,7 +131,6 @@ if ~exist(send_archive_tag,'file') || ~headfile_complete
                 end; clear a sf;
             catch
                 warning('Setupfile didn''t code recon_file old recons in progress should use the old code');
-                recon_file = fullfile(volume_dir, '..',[ runno '_recon.mat']);
             end
             %[s,o]=system(sprintf('ls %s',recon_file));o=strtrim(o);
             %if s==0
@@ -146,6 +145,16 @@ if ~exist(send_archive_tag,'file') || ~headfile_complete
             else
                 error('couldnt find recon file');
             end
+        end
+        if ~exist('recon_file','var') && exist('runno','var') && ~exist('agilent_study','var')
+            recon_file = fullfile(volume_dir, '..',[ runno '_recon.mat']);
+            rf=matfile(recon_file);
+            %options=rf.options;
+            agilent_series=rf.agilent_series;
+            agilent_study=rf.agilent_study;
+            scanner=rf.scanner;
+            bbytes=rf.bbytes;
+            %rf.scanner_name
         end
         % the 90 is so slices only account for 90%
         vol_status=vol_status-90*slice_remain_frac;
@@ -181,8 +190,8 @@ if ~exist(send_archive_tag,'file') || ~headfile_complete
                     vol_status=vol_status-4;
                     % Need to remember to  handle differently for single
                     % blocks scans...I think (I haven't put in the split code for this yet!).
-                    if (exist('scanner','var') && exist('runno','var') && exist('study','var') && exist('agilent_series','var'))
-                        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
+                    if (exist('scanner','var') && exist('runno','var') && exist('agilent_study','var') && exist('agilent_series','var'))
+                        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
                         if (local_or_streaming_or_static == 2)
                             remote_user='omega';
                             if exist('bbytes','var')
