@@ -6,35 +6,39 @@ function prototype_qsm_cs_workdir(runno)
 % addpath('/home/nian/MATLAB_scripts_rmd/AgilentReconScripts')
 % addpath('/home/nian/MATLAB_scripts_rmd/MultipleEchoRecon')
 % addpath('/home/nw61/MATLAB_scripts_rmd')
-addpath(genpath('/home/nw61/MATLAB_scripts_rmd'));
-code_dir_QSM_STI_star=fullfile(getenv('WKS_HOME'),'recon','CS_v2','QSM','QSM_STI_star');
-addpath(genpath(code_dir_QSM_STI_star));
 
+funct_path=which('QSM_star');
+if isempty(funct_path)
+    addpath(genpath('/home/nw61/MATLAB_scripts_rmd'));
+    code_dir_QSM_STI_star=fullfile(getenv('WKS_HOME'),'recon','CS_v2','QSM','QSM_STI_star');
+    addpath(genpath(code_dir_QSM_STI_star));
+end
 % rad_mat('heike','N56315','N56275_02/ser53.fid');  %%%%DTI NO fermi filter
 
-% scanner = 'kamy';
-% runno = 'S66730';
-% study = 'S66730_01';a
-% series = 'ser13';
-% rad_mat('heike','N56302','N56275_02/ser12.fid',{'skip_filter'});  %%%%GRE
-scanner = 'kamy';
-%runno = 'S69054s';
-study = 'S200221_05';
-series = 'ser49';
 
 % reset for new test data where we have fetched from archive.
 % To fit the old data setuo to get started, a CS_v2 recon work folder was
 % copied from RUNNO.work to RUNNO
 % hard links were created from fid to RUNNO.fid
 % and procpar to RUNNO.procpar
-%runno = 'S69240';
-study='localdata';
-series='localseries';
 use_new_CS=1;
-skip_mask=1;
+% MASKING IMPORTANT FOR GOOD RESULT!
+skip_mask=0;
 
 %% old fashioned get data from scanner out of use
 if ~use_new_CS
+    % scanner = 'kamy';
+    % runno = 'S66730';
+    % study = 'S66730_01';a
+    % series = 'ser13';
+    % rad_mat('heike','N56302','N56275_02/ser12.fid',{'skip_filter'});  %%%%GRE
+    scanner = 'kamy';
+    %runno = 'S69054s';
+    study = 'S200221_05';
+    series = 'ser49';
+    %runno = 'S69240';
+    study='localdata';
+    series='localseries';
     % workpath returned by agilent2nas4(and similar
     % scripts) it is a old format CS recon folder.
     %workpath = agilent2glusterspace_k(scanner,runno,study,series,'o');
@@ -47,21 +51,29 @@ end
 workpath=fullfile(getenv('BIGGUS_DISKUS'),[runno '.work']);
 %workpath='/mnt/duhsnas-pri.dhe.duke.edu/civm-projectdata/jjc29/clusterscratch/S69222.work'
 cd(workpath);
+if ~exist('qsm','dir')
+    mkdir('qsm');
+end
+cd('qsm');
 
-if exist('star_qsm.nii.gz','file')
+
+if exist('star_qsm.nii.gz','file') || exist('star_qsm.nii','file')
     warning('%s complete',workpath);
     return;
 end
 
 %% example to load CS data
+must_raw=1; %% somehow be nice to hold onto th e "raw" data instead of re-calculating.
 if use_new_CS
-    raw=load_imagespace_from_CS_tmp(workpath);
-    % get back to kspace
-   % raw=ifftshift(raw);
-    raw = ifft(raw,[],1);
-    raw = ifft(raw,[],2);
-    raw = ifft(raw,[],3);
-    raw=ifftshift(raw);
+    if ~exist('mag.nii','file')||must_raw
+        raw=load_imagespace_from_CS_tmp(workpath);
+        % get back to kspace
+        % raw=ifftshift(raw);
+        raw = ifft(raw,[],1);
+        raw = ifft(raw,[],2);
+        raw = ifft(raw,[],3);
+        raw=ifftshift(raw);
+    end
     %disp_vol_center(raw(:,:,:,1))
     %
     procpar=readprocpar(fullfile(workpath,'procpar'));
@@ -73,17 +85,19 @@ if use_new_CS
     %blocks_per_vol=nblocks/nvols;
     fov=[procpar.lro procpar.lpe procpar.lpe2].*10; %fov in mm this may not be right for multislice data
     res=fov./voldims;
-    vox=res; save vox vox; clear res;
     
     if exist('procpar','var')
         nechoes = numel(procpar.TE);
     else
         nechoes = 1;
     end
-    TE = procpar.TE/1000; 
-    dims = [voldims nechoes];
+    TE_ms= procpar.TE;
+    TE_s = procpar.TE/1000; 
+    %dims = [voldims nechoes];
 elseif exists('cartesean_sample_example','var')
     %% this was written for NON-CS data!
+    % AND has not been updated for adjustments made to other parts of the
+    % script!(sorry)
     mkdir ser12
     cd ser12
     save fov fov
@@ -101,24 +115,44 @@ elseif exists('cartesean_sample_example','var')
     toc
     cd ..
 end
-raw = iftME(phase_ramp_remove1(raw));
-[raw,shift_vector] = autoC(raw); save shift_vector shift_vector;
-%show3(abs(raw(:,:,:,1)));
-img=single(raw);
+
+vox=res; save vox vox; clear res;
+%
+% WAWRNING: run-rerun variability, a re-loaded mag will be single precision
+% but a fresh recon mag will be double! (hopefully that doesn't matter)
+%
+if ~exist('mag.nii','file')||must_raw
+    [raw,phase_shift]=phase_ramp_remove1(raw);
+    save phase_shift phase_shift; clear phase_shift;
+    raw = iftME(raw);
+    % autoC is auto-centering, this is MORE prmitive than our typical centering
+    % which finds BOTH minimums near the volume edge, and centers the data
+    % between them.
+    [raw,shift_vector] = autoC(raw); save shift_vector shift_vector;
+    mag=abs(raw);
+    mat2nii(mag)
+else
+    mag=open_nii('mag');
+end
+%show3(mag(:,:,:,1));
 %
 %%
-if ~exist('mag.nii','file')
-    mag=abs(img);
-    mat2nii(mag)
+if ~exist('R2.nii','file')
+    % WARNING: t2 will later be replaced by running this function again
+    % providing the mask
+    warning('Choosing to skip this becuase T2 will be replaced anyway, and R2 is not used in this function');
+    %{
+    % note, R2 looked like hell when it was checked... maybe mask required?
+    % so this shouldn't be done at all until then?
+    [T2,R2]=T2mapMaskedWeighted(mag,TE_s);
+    mat2nii(T2);
+    mat2nii(R2);
+    clear T2 R2;
+    %}
 end
-if ~exist('R2.nii.gz','file')
-    [T2,R2]=T2mapMaskedWeighted(mag,TE*1000);
-    mat2nii(T2)
-    mat2nii(R2)
-end
-if ~exist('img.mat','file')
-    warning('SKIP SAVINGING IMG becuase its slower than re-calculating!');
-    %save img img -v7.3
+if ~exist('raw.mat','file')
+    warning('SKIP SAVINGING mat_format raw becuase its slower than re-calculating!');
+    %save raw raw -v7.3
 end
 
 %% mask generation
@@ -126,31 +160,61 @@ end
 %tic
 if ~skip_mask
     if ~exist('mag_sos.nii','file')&& ~skip_mask
-        % additional step for mag_sos
-        mag_sos = zeros(size(raw(:,:,:,1)));
+        % additional step for mag_sos (sum of squares)
+        %% inline method
+        % inline may be better on memory/time.
+        mag_sos=mag.^2;
+        mag_sos=sum(mag_sos,4);
+        mag_sos=sqrt(mag_sos);
+        mag_sos=single(mag_sos);
+        %% loop method
+        %{
+        vdim=size(raw);vdim=vdim(1:3);
+        mag_sos = zeros(vdim);
         for echo_num = 1:size(raw,4)
             mag_sos = (abs(raw(:,:,:,echo_num))).^2 + mag_sos;
         end
         mag_sos = sqrt(mag_sos);
+        %}
         mat2nii(mag_sos);
         % show3(mag_sos);
+    elseif exist('mag_sos.nii','file')
+        %mag_sos=load_niigz('mag_sos.nii');mag_sos=mag_sos.img;
+        mag_sos=open_nii('mag_sos');
     end
     if ~exist('msk.nii.gz','file')
-        [~] = brainext(abs(mag_sos),3,0.45);
-        %[~] = brainext(abs(mag_sos),2,0.65);
+        % brainext inputs are data_vol, threshold_zero, threshold
+        % multiplier
+        % its rather funny to choose a higher threhold zero, and then
+        % reduce the threshold multiplier... but this is the state i found
+        % this in. In testing these two calls are just about literally
+        % identical AND leave too much non-brain behind!
+        % brainext(mag_sos,3,0.45);
+        % brainext(mag_sos,2,0.65);
+        % moving this up, and intentioanlly removing a bit more to help the
+        % qsm.
+        try
+            brainext(mag_sos,3,1.3);
+        catch
+            brainext(mag_sos);
+        end
         display('Threshold Mag SOS in ImageJ then combine with scripted msk')
     end
     %%
     if ~exist('msk_comb.nii.gz','file')
-        msk = open_nii('msk.nii.gz');
+        mask = open_nii('msk');
+        save_comb_mask=0;
         try
-            msk_thresh = open_nii('msk_thresh.nii');
-            msk_comb = msk.*msk_thresh;
+            msk_thresh = open_nii('msk_thresh');
+            mask_comb = mask.*msk_thresh;
+            save_comb_mask=1;
+            mat2nii(mask_comb);
+            mask=mask_comb; clear mask_comb;
         catch
             warning('no mask_comb, just using small mask');
-            msk_comb=msk;
+
+            % msk_comb=msk;
         end
-        mat2nii(msk_comb);
     end
 end
 
@@ -162,21 +226,20 @@ end
 % TE - array of TE
 % vox - array of voxelsize
 % Determine SNR and calculate T2 map
-img = raw;
 if ~exist('mask','var') && ~skip_mask
     mask = load_nii('msk_comb.nii.gz');
     mask = single(mask.img);
 end
 if ~exist('meanSNR.mat','file')
     if ~exist('mask','var')
-        autoSNR(abs(img));
+        autoSNR(mag);
     else
-        autoSNR(abs(img),mask);
+        autoSNR(mag,mask);
     end
 end
 load meanSNR
 if skip_mask
-    mask=ones(voldims,'single');
+    mask=ones(size(mag),'single');
 end
 % these should already be in memory from above.
 % load('TE.mat') % array with echo times such as TE = [0.04 0.08 ...]
@@ -184,14 +247,18 @@ end
 
 % before img had been converted to magnitude
 %T2 = T2mapMaskedWeighted(img(:,:,:,1:4),TE(1:4),mask,meanSNR(1:4));
-T2 = T2mapMaskedWeighted(abs(img),TE,mask,meanSNR);
-save_nii(make_nii(T2),'T2.nii');
+% confusingly, we've already run this function and saved an image called
+% T2.nii, difference here is that we've also provided the mask and meanSNR
+% inputs to the function
+T2 = T2mapMaskedWeighted(mag,TE_s,mask,meanSNR);
+% save_nii(make_nii(T2),'T2.nii');
+mat2nii(T2);
 
-% QSM
 % clear all;
 clear R2 T2 msk msk_comb
 
-%% prep
+%% QSM
+% prep
 prepad = 1;
 %nprepad = 16;
 nprepad = 12;
@@ -202,15 +269,16 @@ tic
 %load dims % array with dimensions of raw img ex. dims = [256 256 256 4]
 %load TE
 raw_img_file = 'img.nii';
-if ~exist('maskE.nii.gz','file') 
+if ~exist('maskE.nii','file') 
     if ~skip_mask
-        %mask = open_nii('msk_comb.nii.gz');
+        %mask = open_nii('msk_comb');
         mask = imdilate(mask,strel3d(2));
         mask = imerode(mask,strel3d(2));
-        save_nii(make_nii(mask,[1 1 1],[0 0 0],2),'maskE.nii');
+        % NOT saving the erroded mask!
+        % save_nii(make_nii(mask,[1 1 1],[0 0 0],2),'maskE.nii');
     end
 else
-    mask=open_nii('maskE.nii.gz');
+    mask=open_nii('maskE');
 end
 %autocrop(mask,padsize);
 toc
@@ -233,13 +301,18 @@ X_flag = 1;
 
 % Freq = zeros([dims(1:3) 8],'single');
 % manually set num echos to use: 3
-Freq = zeros([dims],'single');
-
-if TE(1) < 1
-    TE = TE*1e3; % s -> ms
-end
-for necho = 1:dims(4);
-    necho
+% Freq = zeros([dims],'single');
+ 
+% TE from here forward needs to be in MS
+% have switched to keeping TE_s and TE_ms to reduce confusion
+% if TE(1) < 1
+%     TE = procpar.TE; % s -> ms
+% end
+%disp(TE_s);
+%disp(TE_ms);
+back = 0; time = 0;
+for necho = 1:nechoes;
+    [back,time] = progress(necho,nechoes,'Phaes unwrap and V_SHARP echo',back,time);
     % if necho <= size(mask,4)
     %     mask2 = applyautocrop(single(mask(:,:,:,necho)));
     % else
@@ -251,10 +324,10 @@ for necho = 1:dims(4);
     else
         mask2 = single(mask(:,:,:,1));
     end
-    if exist('Freq_v.nii.gz','file')
+    if exist('Freq_v.nii.gz','file') || exist('Freq_v.nii','file')
         continue;
     end
-    ScalingCoeff = ScalingFactor(B0,TE(necho));
+    ScalingCoeff = ScalingFactor(B0,TE_ms(necho));
     
     %TissuePhase = iHARPERELLA(applyautocrop(single(angle( ...
     %open_nii(raw_img_file,necho)))),mask2,'padsize',prepadsize);
@@ -267,6 +340,10 @@ for necho = 1:dims(4);
     UnwrapPhase = LaplacianPhaseUnwrap( ...
         (single(angle(one_echo))),'padsize',prepadsize);
     
+    %%%
+    %%% WARNING WARNING WARNING! TissuePhase result will change based on
+    %%% mask, but it is not clear how!
+    %%%
     TissuePhase = V_SHARP(UnwrapPhase,single(mask2),'padsize',prepadsize);
     TissuePhase_all(:,:,:,necho) = TissuePhase;
     
@@ -274,11 +351,11 @@ for necho = 1:dims(4);
     %figure;imshow(Freq_v(:,:,160,necho),[])
     %drawnow;
 end
-if ~exist('Freq_v.nii.gz','file')
+if ~exist('Freq_v.nii','file') && ~exist('Freq_v.nii.gz','file')
     mat2nii(Freq_v);
     % mat2nii(UnwrapPhase)
     mat2nii(TissuePhase_all)
-    clear UnwrapPhase TissuePhase TissuePhase_all    
+    clear UnwrapPhase TissuePhase TissuePhase_all
 end
 
 %% Combine echoes to enhance images and save results in Nifti format.
@@ -287,13 +364,13 @@ end
 % mat2nii(statmask);
 if ~exist('MEWeight.mat','file')
     % First acquire T2* information
-    % T2mask = open_nii('statmask.nii');
-    % T2mask = open_nii('maskE.nii');
+    % T2mask = open_nii('statmask');
+    % T2mask = open_nii('maskE');
     T2mask = mask;
     T2mask(T2mask ~= 1) = 0;
     % T2file = dir('T2*.nii');
     % T2 = open_nii(T2file.name);
-    T2 = open_nii('T2.nii');
+    T2 = open_nii('T2');
     T2pix = T2(logical(T2mask(:,:,:,1)));
     T2pix(isinf(T2pix)) = [];
     T2pix(isnan(T2pix)) = [];
@@ -310,21 +387,24 @@ end
 clear T2 T2pix TissuePhase maskE2 raw T2mask
 
 max_echo = 2;
-% meanT2 = open_nii('T2.nii');
+% meanT2 = open_nii('T2');
 % combine frequency data
-if ~exist('FreqC_v.nii.gz','file')
-    [~,FreqC_v] = nanMEW(TE(1:max_echo)/1e3,meanT2,Freq_v(:,:,:,1:max_echo));
+if ~exist('FreqC_v.nii.gz','file') && ~exist('FreqC_v.nii','file')
+    [~,FreqC_v] = nanMEW(TE_ms(1:max_echo)/1000,meanT2,Freq_v(:,:,:,1:max_echo));
     mat2nii(FreqC_v);
 else
-    FreqC_v=open_nii('FreqC_v.nii.gz');
+    FreqC_v=open_nii('FreqC_v');
 end
 clear Freq_v
 % Star QSM
-%QSM_star = QSM_STI_Star(FreqC_v,single(mask2),9.4,[0 0 1],[1 1 1],[12 12 12],10,0.6);
-FreqC_v_sc = FreqC_v/ (1./mean(TE(1:max_echo))./2./pi)*2*pi/1e3;
-star_qsm = QSM_star(FreqC_v_sc ,single(mask2),'H',H, 'voxelsize',vox,'padsize', prepadsize,'TE',mean(TE(1:max_echo)),'B0',B0,'tau',0.000001);
-%star_qsm = star_qsm*2*pi/1e3;
-mat2nii(star_qsm)
+
+if ~exist('star_qsm.nii.gz','file') && ~exist('star_qsm.nii','file')
+    %QSM_star = QSM_STI_Star(FreqC_v,single(mask2),9.4,[0 0 1],[1 1 1],[12 12 12],10,0.6);
+    FreqC_v_sc = FreqC_v/ (1./mean(TE_ms(1:max_echo))./2./pi)*2*pi/1000;
+    star_qsm = QSM_star(FreqC_v_sc ,single(mask2),'H',H, 'voxelsize',vox,'padsize', prepadsize,'TE',mean(TE_ms(1:max_echo)),'B0',B0,'tau',0.000001);
+    %star_qsm = star_qsm*2*pi/1000;
+    mat2nii(star_qsm)
+end
 
 close all;
 
