@@ -1,20 +1,7 @@
 %% pull the data and create raw image
 function prototype_qsm_cs_workdir(runno)
-% addpath('/glusterspace/AgilentReconScripts')
-% addpath('/home/nian/MATLAB_scripts_rmd/AgilentReconScripts')
-% addpath('/home/nian/MATLAB_scripts_rmd/MTools')
-% addpath('/home/nian/MATLAB_scripts_rmd/AgilentReconScripts')
-% addpath('/home/nian/MATLAB_scripts_rmd/MultipleEchoRecon')
-% addpath('/home/nw61/MATLAB_scripts_rmd')
-
-funct_path=which('QSM_star');
-if isempty(funct_path)
-    addpath(genpath('/home/nw61/MATLAB_scripts_rmd'));
-    code_dir_QSM_STI_star=fullfile(getenv('WKS_HOME'),'recon','CS_v2','QSM','QSM_STI_star');
-    addpath(genpath(code_dir_QSM_STI_star));
-end
 % rad_mat('heike','N56315','N56275_02/ser53.fid');  %%%%DTI NO fermi filter
-
+C__ = onCleanup(@() cd(pwd));
 
 % reset for new test data where we have fetched from archive.
 % To fit the old data setuo to get started, a CS_v2 recon work folder was
@@ -65,6 +52,7 @@ end
 %% example to load CS data
 must_raw=1; %% somehow be nice to hold onto th e "raw" data instead of re-calculating.
 if use_new_CS
+    procpar=readprocpar(fullfile(workpath,'procpar'));
     if ~exist('mag.nii','file')||must_raw
         raw=load_imagespace_from_CS_tmp(workpath);
         % get back to kspace
@@ -75,8 +63,6 @@ if use_new_CS
         raw=ifftshift(raw);
     end
     %disp_vol_center(raw(:,:,:,1))
-    %
-    procpar=readprocpar(fullfile(workpath,'procpar'));
     %vars=matfile([runno 'recon.mat']);
     
     voldims=[procpar.np/2 procpar.nv procpar.nv2];
@@ -285,12 +271,19 @@ toc
 
 % Calculate unwrapped and filtered phase
 
-%B0 = 3.0; H = [1 0 0]; % define B0 and direction of main field H
 warning('hard coding B0 and H field');
-% agilent 9t
-B0 = 9.4; H = [0 0 1];
-% agilent 7t
-B0 = 7.0; H = [0 0 1];
+%B0 = 3.0; H = [1 0 0]; % define B0 and direction of main field H
+if runno(1) == 'N'
+    % agilent 9t
+    B0 = 9.4; H = [0 0 1];
+elseif runno(1) == 'S'
+    % agilent 7t
+    B0 = 7.0; H = [0 0 1];
+else
+    warning('guess of field strength not available, set manually right now, also warnings have been forced to dbstop, clear that if you want.');
+    dbstop if warning;
+    dbstop if error;
+end
 niter = 50;
 %%
 
@@ -311,8 +304,11 @@ X_flag = 1;
 %disp(TE_s);
 %disp(TE_ms);
 back = 0; time = 0;
-for necho = 1:nechoes;
-    [back,time] = progress(necho,nechoes,'Phaes unwrap and V_SHARP echo',back,time);
+
+TissuePhase_all=zeros(size(raw),'single');
+Freq_v=zeros(size(raw),'single');
+for necho = 1:nechoes
+    [back,time] = progress(necho,nechoes,'Phase unwrap and V_SHARP per echo',back,time);
     % if necho <= size(mask,4)
     %     mask2 = applyautocrop(single(mask(:,:,:,necho)));
     % else
@@ -328,6 +324,11 @@ for necho = 1:nechoes;
         continue;
     end
     ScalingCoeff = ScalingFactor(B0,TE_ms(necho));
+    if ScalingCoeff.Freq == 0
+        msg='ScalingCoeff calc failed! Freq is 0!';
+        db_inplace(mfilename,msg);
+        warning(msg);
+    end
     
     %TissuePhase = iHARPERELLA(applyautocrop(single(angle( ...
     %open_nii(raw_img_file,necho)))),mask2,'padsize',prepadsize);
@@ -339,14 +340,22 @@ for necho = 1:nechoes;
     one_echo=squeeze(raw(:,:,:,necho));
     UnwrapPhase = LaplacianPhaseUnwrap( ...
         (single(angle(one_echo))),'padsize',prepadsize);
-    
+    if nnz(UnwrapPhase)==0
+        msg='LaplacianPhaseUnrwarp failed! all elements 0';
+        db_inplace(mfilename,msg);
+        warning(msg);
+    end
     %%%
     %%% WARNING WARNING WARNING! TissuePhase result will change based on
     %%% mask, but it is not clear how!
     %%%
     TissuePhase = V_SHARP(UnwrapPhase,single(mask2),'padsize',prepadsize);
+    if nnz(TissuePhase)==0
+        msg='V_SHARP failed! all elements 0';
+        db_inplace(mfilename,msg);
+        warning(msg);
+    end
     TissuePhase_all(:,:,:,necho) = TissuePhase;
-    
     Freq_v(:,:,:,necho) = (TissuePhase)*ScalingCoeff.Freq;
     %figure;imshow(Freq_v(:,:,160,necho),[])
     %drawnow;
@@ -391,6 +400,9 @@ max_echo = 2;
 % combine frequency data
 if ~exist('FreqC_v.nii.gz','file') && ~exist('FreqC_v.nii','file')
     [~,FreqC_v] = nanMEW(TE_ms(1:max_echo)/1000,meanT2,Freq_v(:,:,:,1:max_echo));
+    if nnz(FreqC_v)==0
+        error('nanMEW failed and generated a 0 volume');
+    end
     mat2nii(FreqC_v);
 else
     FreqC_v=open_nii('FreqC_v');
