@@ -1,7 +1,18 @@
 
+%% 21.das.01 test run
+%{
+runs={'S69222'}; % diffusion N58204
+t_start=tic;
+prototype_qsm_group(runs);
+t_elapsed=toc(t_start)
+return;
+%}
 %% 19.gaj.43
 runs={'N58207'}; % diffusion N58204
+t_start=tic;
 prototype_qsm_group(runs);
+t_19gaj43=toc(t_start);
+fprintf('gaj runs took %g hours\n',t_19gaj43/60/60);
 
 %% das study
 return;
