@@ -1,4 +1,4 @@
-function [pdf,val] = genPDF_wn_v2(imSize,pa,pctg,pb,disp)
+function [pdf, val] = genPDF_wn_v2(imSize, pa, pctg, pb, disp)
 
 %[pdf,val] = genPDF(imSize,p,pctg [,distType,radius,disp])
 %
@@ -29,6 +29,10 @@ if length(imSize)==1
 	imSize = [imSize,1];
 end
 %}
+if 3 < numel(imSize)
+    % many values, assume it is an example file
+    imSize=size(imSize);
+end
 if numel(imSize)<2
     imSize(2)=imSize(1);
 end
