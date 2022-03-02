@@ -1,4 +1,4 @@
-function [skiptable, dim2, dim3, pa, pb, ds_lvl] = extract_info_from_CStable(procpar_or_CStable,name_decode_only)
+function [skiptable, dim2, dim3, pa, pb, cs_factor] = extract_info_from_CStable(procpar_or_CStable,name_decode_only)
 %  
 %   Pull skiptable (petableCS) information from Agilent procpar and
 %   reconstruct as CS sampling mask.
@@ -70,48 +70,16 @@ if ~exist('target_folder','var')
 end
 clear t_var;
 table_target = fullfile(target_folder,CS_table_name);
-%% get info from the file name
-% expected name format of CS tables
-% Currently CS tables are square; future non-square tables should be named...
-% with 'CS{dim2}x{dim3}_'... format. E.g.: 'CS256x184_'...
-% CS0000_0x_pa00_pb00
-% or CS0000x0000_0x_pa00_pb00
-% ex
-% CS256_8x_pa18_pb54
-% CS256x256_8x_pa18_pb54
 
-% current expected correct regex
-cs_table_regex='CS([0-9]+)(x[0-9]+)?_([0-9]+([.][0-9]+)?)x_pa([0-9]+)_pb([0-9]+)';
-% allowing for CSa, or CStable prefix
-cs_table_regex='CS(?:a|table)?([0-9]+)(x[0-9]+)?_([0-9]+([.][0-9]+)?)x_pa([0-9]+)_pb([0-9]+)';
-% allowing for additional prefix and _ after pa/pb
-%cs_table_regex='CS(?:a|table)?([0-9]+)(x[0-9]+)?_([0-9]+([.][0-9]+)?)x_pa_?([0-9]+)_pb_?([0-9]+)';
+[mask_size, pa, pb, cs_factor]= cs_table_name_decode(table_target);
+dim2=mask_size(1); dim3=mask_size(2);
 
-regres=regexp(CS_table_name,cs_table_regex,'tokens');
-regres=regres{1};
-if numel(regres) ~=5
-    error('failed to parse cstable name %s did not match regex %s',CS_table_name,cs_table_regex);
-end
-if ~exist('dim2','var')
-    dim2=str2double(regres{1});
-end
-if ~exist('dim3','var')
-    if isempty(regres{2})
-        regres{2}=regres{1};
-    end
-    dim3=str2double(regres{2});
-end
-ds_lvl=str2double(regres{3});
-pa=str2double(regres{4})/10;
-pb=str2double(regres{5})/10;
-if (~isnumeric(dim2) || ~isnumeric(dim3))
-    error('Unable to derive numeric values for dim2 and/or dim3 from CStable:%s.',full_CS_table_path);
-end
 if name_decode_only
     skiptable=[];
     return;
 end
 if ~exist(table_target,'file')
+    error('table not present, and i think this code shouldn''t fetch it');
     % Guess which scanner is the CStable source based on runno prefix
     [~,Tname]=fileparts(target_folder);
     if (strcmp(Tname(1),'N'))
@@ -125,6 +93,7 @@ if ~exist(table_target,'file')
     if ~exist(table_target,'file')
         error('Unable to retrieve CS table: %s.', full_CS_table_path);
     end
+    clear cmd;
 end
 %% cache handling for CS tables 
 cache_folder=fullfile(getenv('WORKSTATION_DATA'),'petableCS');
@@ -134,25 +103,4 @@ if ~table_integrity
     pause(3);
 end
 
-
-%% Open CS table and format into a bit mask (aka skiptable).
-fid=fopen(table_target);
-% potentially could use *char=>logical or uint.
-skiptable=fread(fid,inf,'*char');
-fclose(fid);
-% convert to logical, and converts any unnecessary space chars to 0.
-skiptable=(skiptable=='1');
-%% enforce exact size
-while numel(skiptable)<dim2*dim3
-    % using a while is not necessary here, however if more than one 0 is
-    % missing this will be extra spammy, which seems like a good thing.
-    warning('TABLE UNDERSIZED! Adding 0''s to fill it out!');
-    skiptable(end+1)=0;
-end
-if numel(skiptable)~= dim2*dim3
-    warning('TABLE oversize! truncating! (You may have had trailing spaces converted to 0.)');
-    skiptable=skiptable(1:dim2*dim3); % BJA - Trims off any zero padding
-end
-skiptable=reshape(skiptable,[dim2 dim3]);
-end
-
+skiptable=load_cs_table(table_target,mask_size);
