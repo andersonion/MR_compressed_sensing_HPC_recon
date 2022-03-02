@@ -12,9 +12,9 @@ defacto_table='';
 for i_t=numel(cell_of_tables):-1:1
     try
         % [~,y,z,pa,pb,ds_lvl]=extract_info_from_CStable(cell_of_tables{i_t},1);
-        [m_dims,pa,pb,ds_lvl]=cs_table_name_decode(cell_of_tables{i_t});
+        [m_dims,pa,pb,cs_factor]=cs_table_name_decode(cell_of_tables{i_t});
         y=m_dims(1);z=m_dims(2);
-        if y*z/ds_lvl~=ntraces
+        if y*z/cs_factor~=ntraces
             cell_of_tables(i_t)=[];
             continue;
         end
