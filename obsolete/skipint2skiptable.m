@@ -1,4 +1,5 @@
 function [skiptable, dim2, dim3] = skipint2skiptable(procpar_or_CStable)
+error('function out of use');
 %  
 %   Pull skiptable (petableCS) information from Agilent procpar and
 %   reconstruct as CS sampling mask.
@@ -40,7 +41,8 @@ function [skiptable, dim2, dim3] = skipint2skiptable(procpar_or_CStable)
 
 % Determine if input is a procpar file or a CS_table
 procpar=procpar_or_CStable;
-full_CS_table_path = procpar_or_CStable; % Assume CStable by default.
+% Assume CStable by default.
+full_CS_table_path = procpar_or_CStable; 
 
 test=strsplit(procpar,'.'); 
 if strcmp('procpar',test{end}) % A procpar file should end in '.procpar'
@@ -64,6 +66,16 @@ if strcmp('procpar',test{end}) % A procpar file should end in '.procpar'
 end
 
 % Build path of local CStable and check for existence
+if iscell(full_CS_table_path) 
+    if numel(full_CS_table_path)==1
+        full_CS_table_path=full_CS_table_path{1};
+    else
+        error('cell CS table wtf is going on');
+    end
+end
+
+[target_folder,CS_table_name,ext]=fileparts(full_CS_table_path);
+
 CS_table_parts = strsplit(full_CS_table_path{1},'/');
 CS_table_name = CS_table_parts{end};
 
@@ -78,8 +90,10 @@ if ~exist(table_target,'file')
     
     if (strcmp(test_letter,'N'))
         scanner = 'heike';
-    else
+    elseif (strcmp(test_letter,'K'))
         scanner = 'kamy';
+    else 
+        error('unknown scanner letter %s',test_letter);
     end
     
     pull_table_cmd = [ 'ssh civmcluster1 puller_simple  -o -f file ' scanner ' ''../../../../home/vnmr1/vnmrsys/tablib/' CS_table_name ''' ' target_folder];   
