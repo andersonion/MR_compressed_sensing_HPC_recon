@@ -40,11 +40,10 @@ function [skiptable, dim2, dim3, pa, pb, cs_factor] = extract_info_from_CStable(
 if ~exist('name_decode_only','var')
     name_decode_only=0;
 end
-
 % Determine if input is a procpar file or a CS_table
-procpar=procpar_or_CStable;
 full_CS_table_path = procpar_or_CStable; % Assume CStable by default.
-if strcmp('procpar',procpar(end-6:end))
+if ~isempty(strfind(procpar_or_CStable,'procpar'))
+    procpar=procpar_or_CStable;
     % A procpar file should end in 'procpar' ( or be only procpar :D )
     if ~exist(procpar,'file')
         error('Unable to find specified procpar file %s.', procpar);
