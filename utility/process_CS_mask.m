@@ -13,17 +13,20 @@ dim_2=size(mask,1);
 dim_3=size(mask,2);
 %}
 cs_table=procpar_or_CStable;
+if ~isempty(strfind(procpar_or_CStable,'procpar'))
+    cs_table=find_cs_table(procpar_or_CStable);
+end
+
 [mask_size,pa,pb,cs_factor]=cs_table_name_decode(cs_table);
 dim_2=mask_size(1);
 dim_3=mask_size(2);
 mask=load_cs_table(cs_table,mask_size);
 
-% this is not guarnteed correct, so maybe we use the precise measurment?
-% BUT its generated via the cs_factor, which we use with genPDF, so lets
-% use the table name val
-sampling_fraction = 1/cs_factor;
 n_sampled_lines=nnz(mask);
 %sampling_fraction = n_sampled_lines/length(mask(:));
+sampling_fraction = 1/cs_factor;
+% 1/cs_factor is not guarnteed 100% correct. we use it because it is the
+% original input to genPDF.
 
 % Generate sampling PDF (this is NOT the sampling mask)
 [CSpdf,~] = genPDF_wn_v2(size(mask),pa,sampling_fraction,pb,false);
