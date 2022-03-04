@@ -136,7 +136,7 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         scp_cmds=cell(1,numel(preview_imgs)+1);
         for pn=1:numel(preview_imgs)
             scp_to_engine=sprintf('scp -p %s %s@%s.dhe.duke.edu:/%sspace/',...
-                preview_imgs{pn},getenv('USER'),options.target_machine,options.target_machine);
+                preview_imgs{pn},sys_user(),options.target_machine,options.target_machine);
             shell_s=sprintf('if [ %s -nt %s ]; then %s & fi',...
                 preview_imgs{pn}, preview_stamp, scp_to_engine);
             scp_cmds{pn}=shell_s;

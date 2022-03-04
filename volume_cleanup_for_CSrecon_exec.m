@@ -357,7 +357,7 @@ for ss=1:recon_dims(1)
     volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),hist_bins); % Cumulative build a volume histogram
     
     %{
-        if ~isdeployed && strcmp(getenv('USER'),'rja20') && ~mod(ss,10)
+        if ~isdeployed && strcmp(sys_user(),'rja20') && ~mod(ss,10)
             figure(60)
             %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
             plot(hist_bins(2:end),volume_hist)
@@ -454,7 +454,7 @@ if options.fermi_filter|| exist('output_size','var')
 end
 %{
 % show the code dev a central slice.
-if ~isdeployed && strcmp(getenv('USER'),'THECODEDEV')
+if ~isdeployed && strcmp(sys_user(),'THECODEDEV')
     figure(666)
     %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
     imagesc(abs(squeeze(data_out(:,:,round(original_dims(3)/2)))))

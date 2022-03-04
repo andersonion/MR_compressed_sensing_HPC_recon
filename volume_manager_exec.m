@@ -567,7 +567,7 @@ else
             '\t  \t  %s;\n'...
             '\t  fi;\n'...
             'fi'],at_success_flag, success_flag, hf_success_flag, ...
-            local_archive_tag,getenv('USER'),target_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+            local_archive_tag,sys_user(),target_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
         vol_mat = matfile(setup_variables,'Writable',true);
         vol_mat.handle_archive_tag_cmd=handle_archive_tag_cmd;
         %% STAGE4 Scheduling
@@ -604,10 +604,10 @@ else
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
                 mkdir_cmd = sprintf('ssh %s@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',...
-                    getenv('USER'),target_host_name,target_machine,volume_runno,volume_runno);
+                    sys_user(),target_host_name,target_machine,volume_runno,volume_runno);
                 scp_cmd = sprintf(['echo "Attempting to transfer data to %s.";' ...
                     'scp -pr %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
-                    target_machine,t_images_dir,getenv('USER'),target_host_name,target_machine,volume_runno);
+                    target_machine,t_images_dir,sys_user(),target_host_name,target_machine,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
                 local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
@@ -618,7 +618,7 @@ else
                 n_raw_images = recon_mat.dim_z;
                 shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
                 shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', getenv('USER'), target_host_name,  target_machine);
+                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', sys_user(), target_host_name,  target_machine);
                 shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
                 shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
                 shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
