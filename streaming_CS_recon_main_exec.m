@@ -18,7 +18,7 @@ function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
-
+matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 recon_type = 'CS_v2.1';
 typical_pa=1.8;
 typical_pb=5.4;
@@ -256,7 +256,7 @@ if ~options.scanner_user
 else
     scanner_user=options.scanner_user;
 end
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+
 %% Reservation/ENV support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
@@ -269,15 +269,97 @@ workdir =  fullfile(scratch_drive,[runno '.work']);
 log_file = fullfile(workdir,[ runno '_recon.log']);
 % local_fid= fullfile(workdir,[runno '.fid']);
 local_fid= fullfile(workdir,'fid');
-agilent_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
+complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
+%% read system/scanner settings
+% check that important things are found
+engine_constants = load_engine_dependency();
+scanner_constants = load_scanner_dependency(scanner);
+% validate normal commands are functional 
+[s,sout]=system('puller_simple');
+if s~=0 && ispc
+    % if pc do special handling (annoying git-bash->windows pathing frustration)
+    % ensure we have a functional bash command, and HOPE that will actually
+    % work. If we dont have the right cmd specified insert a default guess.
+    matlab_system_prefix='bash -c -- ';
+    if isfield(engine_constants,'engine_app_matlab_system_prefix')
+        matlab_system_prefix = engine_constants.engine_app_matlab_system_prefix;
+    else
+        engine_constants.engine_app_matlab_system_prefix = matlab_system_prefix;
+    end    
+    [s,sout]=system(sprintf('%s ', matlab_system_prefix, 'ls'));
+    if s~=0
+        error('cannot use terminal commands');
+    end
+end
 %% do main work and schedule remainder
-if ~exist(agilent_study_flag,'file')
+if ~exist(complete_study_flag,'file')
     % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
     recon_file = fullfile(workdir,[runno '_recon.mat']);
+    %{
+      % building replacement code in comment
+      param_file_name=sprintf('%s.param,runno);
+      param_file_path=fullfile(engine_constants.engine_recongui_paramfile_directory,...
+                               param_file_name);
+      if ~exist(param_file_path,'file')
+        % basic call out to the gui program, should enhance to replace
+        % CS_GUI_mess
+        args=sprintf('%s %s %s',...
+            engine_constants.engine_constants_path , ...
+            headfile.U_scanner ,... 
+            param_file_name );
+        %if ~ispc
+        % add quotes after setting up args may need to waffle on the type
+        % of quotes.
+        args=sprintf('"%s"',args);
+        %end
+        gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
+        [s,sout]=system(gui_cmd);
+        if s~=0 
+            error(sout);
+        end
+      end
+
+
+      m = matfile(recon_file,'Writable',true);
+      % intentionally re-writing these params instead of avoiding it.
+      m.headfile.U_runno=runno;
+      m.headfile.U_scanner=scanner;
+      m.headfile=combine_struct(scanner_constants,engine_constants);
+      m.headfile=combine_struct(headfile,gui_params,'U_');
+
+      m.recon_type = recon_type;
+      m.study_workdir = workdir;
+      m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
+      m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
+
+
+    %}
     % t_vars will be cleared after this section to maintain the original
     % code flow and var bloat. Need to revisit this when we have time.
+    %
+    % To clean this up, lets document what happened.
+    % 
+    % t_db holds engine_constants, scanner_constants, headfile,
+    % input_headfile
+    % engine/scanner constants are what they say
+    % headfile is constants + U_runno, U_scanner
+    % input_headfile is blank
+    % 
+    % t_opt has testmode warning_pause and debug_mode, param_file
+    % t_opt values are all 0 except param_file
+    % param_file is [runno '.param']
+
+    %         gui_info = read_headfile(fullfile(temp.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
+    %         gui_info=rmfield(gui_info,'comment');
+    %         temp.headfile = combine_struct(temp.headfile,bh);
+    %         temp.headfile = combine_struct(temp.headfile,gui_info,'U_');
+    %         temp.headfile=rmfield(temp.headfile,'comment');
+
+
+    %
+    %
     if ~exist(recon_file,'file')
         [t_db,t_opt]=CS_GUI_mess(scanner,runno,recon_file);
     else
@@ -285,46 +367,20 @@ if ~exist(agilent_study_flag,'file')
         t_db=m.databuffer;
         t_opt=m.optstruct;
     end
-    t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory,t_opt.param_file);
+    t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory, t_opt.param_file);
     if exist(t_param_file,'file')
         t_params=read_headfile(t_param_file,0);
     end
     %% Give options feedback to user, with pause so they can cancel
     fprintf('Ready to start! Here are your recon options:\n');
     fprintf('  (Ctrl+C to abort)\n');
-    fields=fieldnames(options);
-    for fn=1:numel(fields)
-        if iscell(options.(fields{fn}))
-            ot='cell array!';
-        elseif isstruct(options.(fields{fn}))
-            ot='struct!';
-        elseif ~ischar(options.(fields{fn}))
-            ot=sprintf('%g ',options.(fields{fn}));
-        else
-            ot=options.(fields{fn});
-        end
-        if islogical(options.(fields{fn})) ...
-                && ~options.(fields{fn})
-            % skip any "off" fields.... may be bad idea, we'll see.
-            continue;
-        end
-        fprintf('\t%s = \t%s\n',fields{fn},ot);
-    end; clear fields fn;
+    struct_disp(options,'ignore_zeros')
     if exist('t_params','var')
         fprintf('Here are the recon gui settings\n');
         fprintf('  to adjust, delete %s\n',t_param_file);
-        fields=fieldnames(t_params);
-        for fn=1:numel(fields)
-            if iscell(t_params.(fields{fn}))
-                ot='cell array!';
-            else
-                ot=t_params.(fields{fn});
-            end
-            fprintf('\t%s = \t%s\n',fields{fn},ot);
-        end
-        clear t_params t_param_file;
+        struct_disp(t_params);
     end
-    %% wait until user affirms they like parameters as seen.
+    % wait until user affirms they like parameters as seen.
     while isempty( ...
             regexpi(input( ...
             sprintf('Enter (Y)es to continue\n'),'s'), ...
@@ -340,14 +396,18 @@ if ~exist(agilent_study_flag,'file')
     fprintf('Continuing in %i seconds ...\n',forced_wait);
     pause(forced_wait); 
     %% Write initialization info to log file.
-    if ~exist(workdir,'dir');
+    if ~exist(workdir,'dir')
         mkdir_cmd = sprintf('mkdir %s',workdir);
         system(mkdir_cmd);
     end
+    
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
         system(['touch ' log_file]);
     end
+
+    
+    
     ts=fix(clock);
     t=datetime(ts(1:3));
     month_string = month(t,'name');
@@ -363,6 +423,7 @@ if ~exist(agilent_study_flag,'file')
     log_msg=sprintf('%sUser: %s\n',log_msg,user);
     log_msg=sprintf('%sExec Set: %s\n',log_msg,cs_exec_set);
     yet_another_logger(log_msg,log_mode,log_file);
+    
     
     if ~exist(recon_file,'file')
         % This should be an impossible condition!
@@ -477,7 +538,8 @@ if ~exist(agilent_study_flag,'file')
                         log_msg=sprintf('%sit will be listed last.\n',log_msg); 
                         log_msg=sprintf('%sFor best clarity please specify when in streaming mode.\n',log_msg);
                         log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
-                        log_msg=sprintf('Vaild tables for pa %0.2f and pb %0.2f this data:\n\t%s\n%s',typical_pa,typical_pb,strjoin(valid_tables,'\n\t'),log_msg);
+                        log_msg=sprintf('Vaild tables for pa %0.2f and pb %0.2f this data:\n\t%s\n%s',...
+                            typical_pa,typical_pb,strjoin(valid_tables,'\n\t'),log_msg);
                         yet_another_logger(log_msg,3,log_file,0);
                         fprintf('  (Ctrl+C to abort)\n');
                         options.CS_table='';
@@ -513,13 +575,14 @@ if ~exist(agilent_study_flag,'file')
     end
     %% process skiptable/mask set up common part of headfile output
     % add sktiptable/mask stuff to our recon.mat
-    % we can check if we've done this before using the whos command
+    % we do check if we've done this before using the missing matfile check
     varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [m.dim_y,m.dim_z,m.n_sampled_lines,m.sampling_fraction,m.mask,m.CSpdf,m.phmask,m.recon_dims,...
             m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(procpar_or_CStable,m.dim_x,options);
+        
         m.nechoes = 1;
         if (m.nblocks == 1)
             m.nechoes = round(m.ntraces/m.n_sampled_lines); % Shouldn't need to round...just being safe.
@@ -568,7 +631,8 @@ if ~exist(agilent_study_flag,'file')
     for vn = 1:m.n_volumes
         vol_string =sprintf(['%0' num2str(numel(num2str(m.n_volumes-1))) 'i' ],vn-1);
         volume_runno = sprintf('%s_m%s',runno,vol_string);
-        volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
+        volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
+            workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
         vol_strings{vn}=vol_string;
         [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
         if exist(volume_flag,'file') && pc >= 100
@@ -650,7 +714,8 @@ if ~exist(agilent_study_flag,'file')
                 % becuase mgre fid splitter makes directories, we dont do this
                 % check for mgre
                 if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
-                    log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ',volume_runno,volume_dir);
+                    log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ', ...
+                        volume_runno,volume_dir);
                     yet_another_logger(log_msg,log_mode,log_file,1);
                     if isdeployed
                         quit force
@@ -659,6 +724,7 @@ if ~exist(agilent_study_flag,'file')
                     end
                 end
             end
+            % vm is "volume manager"
             vm_slurm_options=struct;
             vm_slurm_options.v=''; % verbose
             vm_slurm_options.s=''; % shared; volume manager needs to share resources.
@@ -688,7 +754,8 @@ if ~exist(agilent_study_flag,'file')
                     or_dependency='afterok-or';
                 end
                 c_running_jobs = dispatch_slurm_jobs(batch_file,'',running_jobs,or_dependency);
-                log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n',volume_runno,c_running_jobs);
+                log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n', ...
+                    volume_runno,c_running_jobs);
                 yet_another_logger(log_msg,log_mode,log_file);
             elseif options.live_run
                 eval(sprintf('volume_manager_exec %s',vm_args));
