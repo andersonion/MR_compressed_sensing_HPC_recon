@@ -1,4 +1,4 @@
-function streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series, varargin )
+function streaming_CS_recon_main_exec(scanner_name,runno,agilent_study,agilent_series, varargin )
 % streaming_CS_recon_main_exec(scanner,runno,agilent_study,agilent_series, options_cell_array )
 %  Initially created on 14 September 2017, BJ Anderson, CIVM
 % SUMMARY
@@ -44,8 +44,8 @@ end
 % number(Itnlim), or string(CS_table).
 % Side effect of doing it this way, we'll now accept them in either order. 
 for pc=1:min(2,length(varargin))
-    if isempty(regexpi(varargin{pc},'=')) % there is no equals sign
-        if ~isempty(regexpi(varargin{pc},'^[0-9]+$'))
+    if ~reg_match(varargin{pc},'=')
+        if reg_match(varargin{pc},'^[0-9]+$')
             warning('Specifing iteration limit loosely is not recommended, use Itnlim=%i instead.',varargin{pc});
             if numel(strfind(strjoin(varargin),'Itnlim'))==0
                 varargin{pc}=sprintf('Itnlim=%s',varargin{pc});
@@ -53,7 +53,7 @@ for pc=1:min(2,length(varargin))
                 error('Found loose number(%s), but also specified Itnlim later, not sure what to do with it!',varargin{pc});
                 % pause(3);
             end
-        elseif ~isempty(regexpi(varargin{pc},'^CS[0-9]+_[0-9]+x_.*$'))
+        elseif reg_match(varargin{pc},'^CS[0-9]+_[0-9]+x_.*$')
             warning('Specifing CS table loosly on commandline is not recommended, use CS_table=%s instead.',varargin{pc});
             % example CS_table 'CS256_8x_pa18_pb54' In theory, this regular expression allows
             % out to infinity size and compression
@@ -186,7 +186,7 @@ end
 if options.CS_preview_data
    if islogical(options.CS_preview_data)
        options.CS_preview_data='slice';
-   elseif isempty(regexpi(options.CS_preview_data,'slice|volume'));
+   elseif ~reg_match(options.CS_preview_data,'slice|volume')
        error('bad CS_preview_data value, choose slice or volume');
    end
 end
@@ -267,14 +267,21 @@ cs_queue=CS_env_queue();
 scratch_drive = getenv('BIGGUS_DISKUS');
 workdir =  fullfile(scratch_drive,[runno '.work']);
 log_file = fullfile(workdir,[ runno '_recon.log']);
-% local_fid= fullfile(workdir,[runno '.fid']);
-local_fid= fullfile(workdir,'fid');
+% fid_path.local= fullfile(workdir,[runno '.fid']);
+% fid_path.local= fullfile(workdir,'fid');
 complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 %% read system/scanner settings
 % check that important things are found
-engine_constants = load_engine_dependency();
-scanner_constants = load_scanner_dependency(scanner);
+%engine_constants = load_engine_dependency();
+% scanner_constants = load_scanner_dependency(scanner_name);
+the_workstation= wks_settings();
+the_scanner=scanner(scanner_name);
 % validate normal commands are functional 
+%{
+%
+% TODO: integrate this in engine settings! this doesnt really belong here!
+%   engine settings SHOULD include hints for this sort of trouble!
+%
 [s,sout]=system('puller_simple');
 if s~=0 && ispc
     % if pc do special handling (annoying git-bash->windows pathing frustration)
@@ -291,23 +298,25 @@ if s~=0 && ispc
         error('cannot use terminal commands');
     end
 end
+%}
 %% do main work and schedule remainder
 if ~exist(complete_study_flag,'file')
     % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
     recon_file = fullfile(workdir,[runno '_recon.mat']);
-    %{
-      % building replacement code in comment
-      param_file_name=sprintf('%s.param,runno);
-      param_file_path=fullfile(engine_constants.engine_recongui_paramfile_directory,...
-                               param_file_name);
-      if ~exist(param_file_path,'file')
-        % basic call out to the gui program, should enhance to replace
-        % CS_GUI_mess
+    param_file_name=sprintf('%s.param',runno);
+    param_file_path=fullfile(the_workstation.recongui_paramfile_directory,...
+        param_file_name);
+    % this will only run if we havnt before BECAUSE we dont want to let
+    % users re-write unintentionally, and we'll add these values quickly to
+    % recon_file.
+    if ~exist(recon_file,'file') && ~exist(param_file_path,'file')
+        % basic call out to the gui program, instead of CS_GUI_mess or
+        % specid 2 recon mat
         args=sprintf('%s %s %s',...
-            engine_constants.engine_constants_path , ...
-            headfile.U_scanner ,... 
+            the_workstation.file_path , ...
+            scanner_name ,...
             param_file_name );
         %if ~ispc
         % add quotes after setting up args may need to waffle on the type
@@ -316,69 +325,21 @@ if ~exist(complete_study_flag,'file')
         %end
         gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
         [s,sout]=system(gui_cmd);
-        if s~=0 
+        if s~=0
             error(sout);
         end
-      end
-
-
-      m = matfile(recon_file,'Writable',true);
-      % intentionally re-writing these params instead of avoiding it.
-      m.headfile.U_runno=runno;
-      m.headfile.U_scanner=scanner;
-      m.headfile=combine_struct(scanner_constants,engine_constants);
-      m.headfile=combine_struct(headfile,gui_params,'U_');
-
-      m.recon_type = recon_type;
-      m.study_workdir = workdir;
-      m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
-      m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
-
-
-    %}
-    % t_vars will be cleared after this section to maintain the original
-    % code flow and var bloat. Need to revisit this when we have time.
-    %
-    % To clean this up, lets document what happened.
-    % 
-    % t_db holds engine_constants, scanner_constants, headfile,
-    % input_headfile
-    % engine/scanner constants are what they say
-    % headfile is constants + U_runno, U_scanner
-    % input_headfile is blank
-    % 
-    % t_opt has testmode warning_pause and debug_mode, param_file
-    % t_opt values are all 0 except param_file
-    % param_file is [runno '.param']
-
-    %         gui_info = read_headfile(fullfile(temp.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
-    %         gui_info=rmfield(gui_info,'comment');
-    %         temp.headfile = combine_struct(temp.headfile,bh);
-    %         temp.headfile = combine_struct(temp.headfile,gui_info,'U_');
-    %         temp.headfile=rmfield(temp.headfile,'comment');
-
-
-    %
-    %
-    if ~exist(recon_file,'file')
-        [t_db,t_opt]=CS_GUI_mess(scanner,runno,recon_file);
-    else
-        m = matfile(recon_file,'Writable',true);
-        t_db=m.databuffer;
-        t_opt=m.optstruct;
     end
-    t_param_file=fullfile(t_db.engine_constants.engine_recongui_paramfile_directory, t_opt.param_file);
-    if exist(t_param_file,'file')
-        t_params=read_headfile(t_param_file,0);
+   if exist(param_file_path,'file')
+        gui_info=read_headfile(param_file_path,0);
     end
     %% Give options feedback to user, with pause so they can cancel
     fprintf('Ready to start! Here are your recon options:\n');
     fprintf('  (Ctrl+C to abort)\n');
     struct_disp(options,'ignore_zeros')
-    if exist('t_params','var')
+    if exist('gui_info','var')
         fprintf('Here are the recon gui settings\n');
-        fprintf('  to adjust, delete %s\n',t_param_file);
-        struct_disp(t_params);
+        fprintf('  to adjust, delete %s\n',param_file_path);
+        struct_disp(gui_info);
     end
     % wait until user affirms they like parameters as seen.
     while isempty( ...
@@ -395,25 +356,49 @@ if ~exist(complete_study_flag,'file')
     end
     fprintf('Continuing in %i seconds ...\n',forced_wait);
     pause(forced_wait); 
-    %% Write initialization info to log file.
+    %% setup working folder, initialization info to log file, and create recon.mat
     if ~exist(workdir,'dir')
         mkdir_cmd = sprintf('mkdir %s',workdir);
         system(mkdir_cmd);
     end
-    
+    m = matfile(recon_file,'Writable',true);
+    % intentionally re-writing these params instead of avoiding it.
+    % cannot directly access structs, so we have to pull headfile out.
+    if matfile_missing_vars(recon_file,'headfile')
+        headfile=struct;
+    else
+        headfile=m.headfile;
+    end
+    m.runno = runno;
+    m.scanner_name = scanner_name;
+    % TODO: generic for studdy/series but wee dont know how new sys will be
+    % organized yet
+    m.agilent_study = agilent_study;
+    m.agilent_series = agilent_series;
+    headfile.U_runno=runno;
+    headfile.U_scanner=scanner_name;
+    headfile=combine_struct(headfile,the_scanner.hf);
+    headfile=combine_struct(headfile,the_workstation.hf);
+    if exist('gui_info','var')
+        gui_info=rmfield(gui_info,'comment');
+        headfile=combine_struct(headfile,gui_info,'U_');
+    end
+    headfile.B_recon_type = recon_type;
+    % now stuff it back in the mfile
+    m.headfile=headfile;
+    m.study_workdir = workdir;
+    m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
+    m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
         system(['touch ' log_file]);
     end
-
-    
-    
     ts=fix(clock);
     t=datetime(ts(1:3));
     month_string = month(t,'name');
     start_date=sprintf('%02i %s %04i',ts(3),month_string{1},ts(1));
     start_time=sprintf('%02i:%02i',ts(4:5));
-    user = getenv('USER');
+    user = sys_user();
     log_msg=sprintf('\n');
     log_msg=sprintf('%s----------\n',log_msg);
     log_msg=sprintf('%sCompressed sensing reconstruction initialized on: %s at %s.\n',log_msg,start_date, start_time);
@@ -423,17 +408,7 @@ if ~exist(complete_study_flag,'file')
     log_msg=sprintf('%sUser: %s\n',log_msg,user);
     log_msg=sprintf('%sExec Set: %s\n',log_msg,cs_exec_set);
     yet_another_logger(log_msg,log_mode,log_file);
-    
-    
-    if ~exist(recon_file,'file')
-        % This should be an impossible condition!
-        m = specid_to_recon_file(t_db,t_opt,recon_file);
-        clear t_db t_opt;
-    end
-    m.recon_type = recon_type;
-    m.agilent_study_workdir = workdir;
-    m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
-    m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
+    m.log_file = log_file;
     %% Test ssh connectivity using our perl program which has robust ssh handling.
     %{ 
     % but the scanner is probably fine and not where we'll have trouble
@@ -442,56 +417,43 @@ if ~exist(complete_study_flag,'file')
         scanner,options.CS_table,workdir,options.CS_table);
     [s,sout]=system(puller_test);
     %}
-    puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
-        getenv('USER'),options.target_machine,options.target_machine,getenv('USER'));
-    fprintf('Test target_machine (%s) connection...\n',options.target_machine);
-    if options.skip_target_machine_check
-        puller_test='echo "Skipping ssh check";';
-    end
-    [s,sout]=system(puller_test);
-    if s~=0
-        error('Problem on testing of connection to %s\n%s\n',...
-            options.target_machine,sout);
-    else 
-        fprintf('Connect to %s succesful\n',options.target_machine);
+    if ~options.skip_target_machine_check
+        puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
+            sys_user(),options.target_machine,options.target_machine,sys_user());
+        fprintf('Test target_machine (%s) connection...\n',options.target_machine);
+        [s,sout]=system(puller_test,'-echo');
+        if s~=0
+            error('Problem on testing of connection to %s\n%s\n',...
+                options.target_machine,sout);
+        else
+            fprintf('Connect to %s succesful\n',options.target_machine);
+        end
     end
     
     %% Second First things first: determine number of volumes to be reconned
     % local_hdr = fullfile(workdir,[runno '_hdr.fid']);
-    try
-        [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,agilent_study,agilent_series);
-    catch merr
-        if options.debug_mode<50
-            error(merr.message)
-        else
-            warning(merr.message)
-            local_or_streaming_or_static=3;
-            warning('Trouble finding fid, gonna hope a more interesting error stops us later');
-        end
+    % refactoring local_streaming_or_static 1,2,3 var into a word data_mode
+    % will use local, streaming, or remote
+    % data_mode='UNKNOWN';
+    [data_mode,fid_path]=get_data_mode(the_scanner,workdir,agilent_study,agilent_series);
+    if isfield(fid_path,'remote')
+        % old rad_mat var was kspace_data_path, but it was for the local
+        % file, we only use the local file when it exists, so i'm not
+        % saving it separately
+        m.fid_path_remote=fid_path.remote;
     end
-    %if ~exist(local_hdr,'file');
-    % get_hdr_from_fid(input_fid,local_hdr);
-    % get_hdr_from_fid(input_fid,local_hdr,scanner);
-    %end
-    if (local_or_streaming_or_static == 1)
-        fid_consistency = write_or_compare_fid_tag(input_fid,m.fid_tag_file,1);
-    else
-        if (local_or_streaming_or_static == 2)
-            log_msg =sprintf('WARNING: Inputs not found locally or on scanner; running in streaming mode.\n');
-            yet_another_logger(log_msg,log_mode,log_file);
-        end
-        fid_consistency = write_or_compare_fid_tag(input_fid,m.fid_tag_file,1,scanner,scanner_user);
-    end
-    if ~fid_consistency
+    if ~the_scanner.fid_consistency(fid_path.current,m.fid_tag_file,0)
+        % may want to skip fid consistency for local becuase we have the 
+        % whole thing to work on ?
+        % decided against that becuase if we're local we'd want to be
+        % consistent too, and its an inexpensive check
         log_msg=sprintf('FID consistency check failed!\n');
         yet_another_logger(log_msg,3,log_file,1);
-        if isdeployed
-            quit force;
-        else
-            error(log_msg);
-        end
+        if isdeployed; quit force; else; error(log_msg); end
     end
-    
+    % load basic info from the header we scrapped during the
+    % fid_consistency check. Why was this being done here? if seems this
+    % should MOVE 
     varlist='npoints,nblocks,ntraces,bitdepth,bbytes,dim_x';
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
@@ -502,11 +464,7 @@ if ~exist(complete_study_flag,'file')
         if floor(dx) ~= dx
             log_msg=sprintf('ERROR pulling dim_x from fid hdr field npoints!\n');
             yet_another_logger(log_msg,3,log_file,1);
-            if isdeployed
-                quit force;
-            else
-                error(log_msg);
-            end
+            if isdeployed; quit force; else; error(log_msg); end
         end
         m.dim_x=dx;
         vs=strsplit(varlist,',');
@@ -514,66 +472,94 @@ if ~exist(complete_study_flag,'file')
             if isnumeric(m.(vs{vn})) % && ~ischar(m.(vs{vn}))
                 m.(vs{vn})=double(m.(vs{vn}));
             end
-        end; clear vs vn
+        end; clear vs vn dx
     end
+    %% get a cs table into work folder
+    % first we see if we've got one, otherwise we check if user specified
+    % one
+    tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
+    local_cs_table_path='';
+    if ~isempty(tables_in_workdir)
+        if ischar(options.CS_table) && ~strcmp(options.CS_table,tables_in_workdir(1).name)
+            % have user specified, lets error if they're different
+            error('existing table in working folder doesnt match user specified table! \nuser:\t%s\nworkdir:\',...
+                options.CS_table, tables_in_workdir(1).name)
+        elseif numel(tables_in_workdir)>1
+            error('Multiple CS tables in work dir! %s',workdir);
+        end
+        options.CS_table=tables_in_workdir(1).name;
+        local_cs_table_path=fullfile(workdir,options.CS_table);
+        log_msg = sprintf('Using first CS_table found in work directory: ''%s''.\n',options.CS_table);
+    elseif options.CS_table
+        % user specified table 
+        local_cs_table_path=fullfile(workdir,options.CS_table);
+    end
+    % set local procpar location, and if possible fetch it now
     procpar_file = fullfile(workdir,'procpar');
     procpar_file_legacy = fullfile(workdir,[runno '.procpar']);
     if exist(procpar_file_legacy,'file')
         warning('Legacy procpar file name detected!');
         procpar_file=procpar_file_legacy;
     end;clear procpar_file_legacy;
-    procpar_or_CStable= procpar_file;
-    if ~exist(procpar_file,'file')
-        if (local_or_streaming_or_static == 2) 
-            %% streaming mode
-            tables_in_workdir=dir([workdir '/CS*_*x*_*']);
-            if (isempty(tables_in_workdir))
-                if (~options.CS_table)
-                    %options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
-                    list_cs_tables_cmd = [ 'ssh ' scanner_user '@' scanner ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
-                    [~,available_tables]=ssh_call(list_cs_tables_cmd);
-                    valid_tables=select_valid_tables(available_tables,m.ntraces,typical_pa,typical_pb);
-                    if numel(valid_tables)>1
-                        log_msg=sprintf('CS_table ambiguous, If a table matches our default params,\n');
-                        log_msg=sprintf('%sit will be listed last.\n',log_msg); 
-                        log_msg=sprintf('%sFor best clarity please specify when in streaming mode.\n',log_msg);
-                        log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
-                        log_msg=sprintf('Vaild tables for pa %0.2f and pb %0.2f this data:\n\t%s\n%s',...
-                            typical_pa,typical_pb,strjoin(valid_tables,'\n\t'),log_msg);
-                        yet_another_logger(log_msg,3,log_file,0);
-                        fprintf('  (Ctrl+C to abort)\n');
-                        options.CS_table='';
-                        while isempty( ...
-                                regexpi(options.CS_table,sprintf('^%s$',strjoin(valid_tables,'|'),'once') ) ...
-                                )
-                            options.CS_table=input( ...
-                                sprintf('Type in a name to continue\n'),'s');
-                        end
-                    elseif numel(valid_tables)==1
-                        options.CS_table=valid_tables{1};
-                        warning('Only one possible CS_table found. If this is incorrect Ctrl+c now.\n%s',options.CS_table);
-                        pause(5);
-                    else
-                        % no valid tables
-                        error('Table listing: %s\nCS_table not specified and couldn''t find valid CS table,\n\tMaybe this isn''t a CS acq?',available_tables);
-                    end
-                end
-                log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
-            else
-                options.CS_table=tables_in_workdir(1).name;
-                log_msg = sprintf('Using first CS_table found in work directory: ''%s''.\n',options.CS_table);
+    m.procpar_file = procpar_file;
+    if ~strcmp(data_mode,'streaming') && isempty(local_cs_table_path)
+        %%% local or static mode
+        if ~exist(procpar_file,'file')
+            % considering deactivating this so all recons will proceed through the same
+            % code path
+            % datapath=fullfile('/home/mrraw',agilent_study,[agilent_series '.fid']);
+            % mode =2; % Only pull procpar file
+            % puller_glusterspaceCS_2(runno,datapath,scanner_name,workdir,mode);
+            pull_cmd=sprintf('puller_simple -oer -f file %s %s/%s.fid/procpar %s.work',... 
+                 the_scanner.name, agilent_study,agilent_series,runno);
+            [s,sout] = system(pull_cmd);
+            if s~=0
+                error(sout);
             end
-            procpar_or_CStable=fullfile(workdir,options.CS_table);
-            yet_another_logger(log_msg,log_mode,log_file);
+        end
+        remote_table_path=procpar_get_petableCS(procpar_file);
+        [~,n,e]=fileparts(remote_table_path);
+        options.CS_table=sprintf('%s%s',n,e);
+        local_cs_table_path=fullfile(workdir,options.CS_table);
+    elseif strcmp(data_mode,'streaming')
+        error('NOT FOR TESTING')
+        if ischar(options.CS_table)
+            local_cs_table_path=fullfile(workdir,options.CS_table);
+        else % if islogical options.CS_table
+            % streaming you had to tell the cs table, find_cs_table might work,
+            % but its not well tested
+            remote_table_path=find_cs_table(the_scanner,m.ntraces,typical_pa,typical_pb);
+            [~,n,e]=fileparts(remote_table_path);
+            options.CS_table=sprintf('%s%s',n,e);
+            local_cs_table_path=fullfile(workdir,options.CS_table);
+            % we have either found a cs table in work folder, or we have a procpar,
+            % and pulled the location from there, if it is not in the work dir we
+            % need to fetch it now....
+            % new param for search up the table
+            % scanner_skip_table_directory
+            error('no table specified');
+        end
+    end
+    if ~exist(local_cs_table_path,'file')
+        if exist('remote_table_path','var')
+            % need to fix the ../ requirement!
+            pull_cmd=sprintf('puller_simple -oer -f file %s ../../../../../../%s %s.work',...
+                the_scanner.name, remote_table_path, runno);
+            [s,sout] = system(pull_cmd);
+            if s~=0
+                error(sout);
+            end
         else
-            %% local or static mode
-            %datapath='/home/mrraw/' agilent_study '/' agilent_series '.fid'];
-            datapath=fullfile('/home/mrraw',agilent_study,[agilent_series '.fid']);
-            mode =2; % Only pull procpar file
-            puller_glusterspaceCS_2(runno,datapath,scanner,workdir,mode);
+            error('need CS table to proceed, must have table resolve logic fault! local path set, but remote is not local(%s)',local_cs_table_path)
         end
     end
     %% process skiptable/mask set up common part of headfile output
+    cache_folder=fullfile(getenv('WORKSTATION_DATA'),'petableCS');
+    [table_integrity,last_path]=cache_file(cache_folder,local_cs_table_path);
+    if ~table_integrity
+        warning('CS table was updated! Old file was preserved as %s',last_path);
+        pause(3);
+    end
     % add sktiptable/mask stuff to our recon.mat
     % we do check if we've done this before using the missing matfile check
     varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
@@ -581,7 +567,7 @@ if ~exist(complete_study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [m.dim_y,m.dim_z,m.n_sampled_lines,m.sampling_fraction,m.mask,m.CSpdf,m.phmask,m.recon_dims,...
-            m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(procpar_or_CStable,m.dim_x,options);
+            m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(local_cs_table_path, m.dim_x, options.hamming_window);
         
         m.nechoes = 1;
         if (m.nblocks == 1)
@@ -598,7 +584,7 @@ if ~exist(complete_study_flag,'file')
         %}
         % Please enhance later to not be so clumsy (include these variables
         % in the missing variable list elsewhere in this function.
-        
+        % dataBufferHeafile <- bh
         bh=struct;
         original_dims=m.original_dims;
         bh.dim_X=original_dims(1);
@@ -611,18 +597,12 @@ if ~exist(complete_study_flag,'file')
         bh.CS_working_array=m.recon_dims;
         bh.CS_sampling_fraction = m.sampling_fraction;
         bh.CS_acceleration = 1/m.sampling_fraction;
-        bh.B_recon_type=m.recon_type;
-        
+
         %bh.U_runno = volume_runno;
-        temp=m.databuffer;
-        gui_info = read_headfile(fullfile(temp.engine_constants.engine_recongui_paramfile_directory,[runno '.param']));
-        gui_info=rmfield(gui_info,'comment');
-        temp.headfile = combine_struct(temp.headfile,bh);
-        temp.headfile = combine_struct(temp.headfile,gui_info,'U_');
-        temp.headfile=rmfield(temp.headfile,'comment');
-        m.databuffer=temp;
-        clear temp gui_info bh
-    end; 
+        headfile=combine_struct(bh,m.headfile);
+        m.headfile=headfile;
+        clear bh
+    end
     %% Check all n_volumes for incomplete reconstruction
     %WARNING: this code relies on each entry in recon status being
     %filled in. This should be fine, but take care when refactoring.
@@ -634,9 +614,15 @@ if ~exist(complete_study_flag,'file')
         volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
             workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
         vol_strings{vn}=vol_string;
-        [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
+        [~,~,pc]=volume_status(fullfile(workdir,volume_runno),volume_runno);
+        % [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
         if exist(volume_flag,'file') && pc >= 100
             recon_status(vn)=1;
+        end
+        if isnumeric(options.last_volume) && options.last_volume
+            if vn~=1 && vn>options.last_volume
+                break;
+            end
         end
     end
     %reconned_volumes=find(recon_status);
@@ -652,6 +638,7 @@ if ~exist(complete_study_flag,'file')
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
         %% tangled web of support scanner name ~= host name.
+        %{
         if ~exist('scanner_host_name','var')
             try 
                 aa=m.scanner_constants;
@@ -669,16 +656,13 @@ if ~exist(complete_study_flag,'file')
                 scanner_user=aa.scanner_user;
             end
         end
-        scanner_name = scanner;
+        scanner_name = scanner_name;
         m.scanner_name=scanner_name;
-        scanner=scanner_host_name;
-        m.scanner = scanner;
-        %% continue stuffing vars to matfile.
-        m.runno = runno;
-        m.agilent_study = agilent_study;
-        m.agilent_series = agilent_series;
-        m.procpar_file = procpar_file;
-        m.log_file = log_file;
+        scanner_name=scanner_host_name;
+        m.scanner = scanner_name;
+        %}
+        % m.the_scanner=the_scanner;
+        % insert options to matfile.
         m.options = options;
 
         running_jobs = '';
@@ -704,16 +688,18 @@ if ~exist(complete_study_flag,'file')
             vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
             work_subfolder = fullfile(volume_dir, 'work');
             images_dir     = fullfile(volume_dir,[volume_runno 'images']);
+            mkdir_s=zeros([1,4]);
+            dir_cell={volume_dir,vol_sbatch_dir,work_subfolder,images_dir};
             if ~exist(images_dir,'dir')
                 %%% mkdir commands pulled into here from check status,
-                fprintf('Making voldir,sbatch,work,images,directories\n');    
-                mkdir_s(1)=system(['mkdir ' volume_dir]);
-                mkdir_s(2)=system(['mkdir ' vol_sbatch_dir]);
-                mkdir_s(3)=system(['mkdir ' work_subfolder]);
-                mkdir_s(4)=system(['mkdir ' images_dir]);
+                fprintf('Making voldir,sbatch,work,images,directories\n');
+                for dn=1:numel(dir_cell)
+                    [mkdir_s(dn), dir_cell{dn}]=system(sprintf('mkdir "%s"', dir_cell{dn}));
+                end
                 % becuase mgre fid splitter makes directories, we dont do this
                 % check for mgre
                 if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
+                    strjoin(dir_cell(mkdir_s~=0),'\n')
                     log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ', ...
                         volume_runno,volume_dir);
                     yet_another_logger(log_msg,log_mode,log_file,1);
@@ -743,7 +729,7 @@ if ~exist(complete_study_flag,'file')
             vm_cmd = sprintf('%s %s %s ', cs_execs.volume_manager, ...
                 matlab_path, vm_args);
             %%% James's happy delay patch
-            if ~options.process_headfiles_only
+            if ~options.process_headfiles_only && ~options.live_run
                 delay_unit=5;
                 vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
             end
@@ -774,8 +760,8 @@ if options.fid_archive && local_or_streaming_or_static==3
         foc='-o';
     end
     pull_cmd=sprintf('puller_simple %s %s %s/%s* %s.work;fid_archive %s %s %s', ...
-        poc,scanner,agilent_study,agilent_series,runno,foc,user,runno);
-    ssh_and_run=sprintf('ssh %s@%s "%s"',getenv('USER'),options.target_machine,pull_cmd);
+        poc,scanner_name,agilent_study,agilent_series,runno,foc,user,runno);
+    ssh_and_run=sprintf('ssh %s@%s "%s"',sys_user(),options.target_machine,pull_cmd);
     log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
     log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -801,7 +787,7 @@ function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
     % volumes. 
     % Unfortunately it's part of sanity checking in gui_info_collect'
     databuffer.headfile.U_runno = runno;
-    databuffer.headfile.U_scanner = scanner;
+    databuffer.headfile.U_scanner = scanner_name;
     databuffer.input_headfile = struct; % Load procpar here.
     databuffer.headfile = combine_struct(databuffer.headfile,databuffer.scanner_constants);
     databuffer.headfile = combine_struct(databuffer.headfile,databuffer.engine_constants);
@@ -832,9 +818,11 @@ end
 function missing=matfile_missing_vars(mat_file,varlist)
 % function missing_count=matfile_missing_vars(mat_file,varlist)
 % checks mat file for list of  vars,
-% mat_file is the path to the .mat file, 
+% mat_file is the path to the .mat file,
 % varlist is the comma separated list of expected variables, WATCH OUT FOR
 % SPACES.
+    if ~exist(mat_file,'file')
+        missing=numel(varlist); return; end
     listOfVariables = who('-file',mat_file);
     lx=strsplit(varlist,',');
     missing=numel(lx);

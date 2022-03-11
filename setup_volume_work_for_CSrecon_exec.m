@@ -67,7 +67,8 @@ end
 volume_number=setup_var.volume_number;
 volume_runno=setup_var.volume_runno;
 %% Immediately check to see if we still need to set up the work (a la volume manager)
-[starting_point, log_msg] = check_status_of_CSrecon(setup_var.workdir,volume_runno);
+% [starting_point, log_msg] = check_status_of_CSrecon(setup_var.workdir,volume_runno);
+[starting_point, log_msg] = volume_status(setup_var.workdir,volume_runno);
 make_workspace = 0;
 make_tmp = 0;
 % recreating vol_mat variable
@@ -77,7 +78,7 @@ make_tmp = 0;
 % this was re-creating vol_mat.temp_file
 if (starting_point == 2)
     try
-    varinfo=whos('-file',setup_var.volume_workspace);
+        varinfo=whos('-file',setup_var.volume_workspace);
     catch
     end
     if ~exist('varinfo','var') ...

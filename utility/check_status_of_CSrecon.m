@@ -1,5 +1,6 @@
 function [ starting_point ,log_msg,vol_status] = check_status_of_CSrecon( ...
     volume_dir,volume_runno,scanner,runno,agilent_study,agilent_series,bbytes )
+error('obsolete function replace with volume_status');
 % check status of an individual volume in the cs recon.
 %%% NOTEABLY bbytes can be omitted.
 %
@@ -196,7 +197,7 @@ if ~exist(send_archive_tag,'file') || ~headfile_complete
                             remote_user='omega';
                             if exist('bbytes','var')
                                 vr_array = strsplit(volume_runno, '_m');
-                                volume_number = str2num(vr_array{end}) + 1;
+                                volume_number = str2double(vr_array{end}) + 1;
                                 ready=check_subvolume_ready_in_fid_quiet(input_fid,volume_number,bbytes,scanner,remote_user);
                                 if ~ready
                                     starting_point = 0;

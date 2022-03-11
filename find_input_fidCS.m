@@ -1,5 +1,6 @@
 function [ input_fid, local_or_streaming_or_static ] = find_input_fidCS( ...
     scanner, runno, study, agilent_series, user )
+error('obsolete function');
 %
 % local_or_streaming_or_static: 
 %      1 => local fid found,

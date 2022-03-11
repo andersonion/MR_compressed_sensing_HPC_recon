@@ -1,6 +1,6 @@
 function [dim_2, dim_3, n_sampled_lines, sampling_fraction, mask, ...
     CSpdf, phmask, recon_dims, original_mask, original_pdf, original_dims]= ...
-    process_CS_mask(procpar_or_CStable, dim_x, options)
+    process_CS_mask(cs_table, dim_x, hamming_window)
 % function process_CS_mask 
 fprintf('process_CS_mask ... this can take a minute.\n');
 %{
@@ -12,10 +12,6 @@ dim_3=dim_z;
 dim_2=size(mask,1);
 dim_3=size(mask,2);
 %}
-cs_table=procpar_or_CStable;
-if ~isempty(strfind(procpar_or_CStable,'procpar'))
-    cs_table=find_cs_table(procpar_or_CStable);
-end
 
 [mask_size,pa,pb,cs_factor]=cs_table_name_decode(cs_table);
 dim_2=mask_size(1);
@@ -53,7 +49,7 @@ original_dims = double([dim_x dim_2 dim_3]);
 recon_dims = [original_dims(1) size(mask)];%size(data);
 
 %mask to grab center frequency
-phmask = zpad(hamming(options.hamming_window)*hamming(options.hamming_window)', ...
+phmask = zpad(hamming(hamming_window)*hamming(hamming_window)', ...
     mask_size(1), mask_size(2));
 %for low-order phase estimation and correction
 phmask = phmask/max(phmask(:));

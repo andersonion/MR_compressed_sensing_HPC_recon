@@ -1,36 +1,34 @@
-function [full_CS_table_path,target_folder]=find_cs_table(procpar)
+function CS_table=find_cs_table(the_scanner,ntraces,typical_pa,typical_pb)
+%options.CS_table = input('Please enter the name of the CS table used for this scan.','s');
+% ls_cmd= [ 'ssh ' the_scanner.user '@' the_scanner.host_name ' ''cd /home/vnmr1/vnmrsys/tablib/; ls CS*_*x_*'''];
+ls_cmd = sprintf('ssh %s@%s cd %s; ls CS*_*x_*',the_scanner.user, the_scanner.host_name,the_scanner.skip_table_directory);
+[~,available_tables]=ssh_call(ls_cmd);
+valid_tables=select_valid_tables(available_tables,ntraces,typical_pa,typical_pb);
+if numel(valid_tables)>1
+    log_msg=sprintf('CS_table ambiguous, If a table matches our default params,\n');
+    log_msg=sprintf('%sit will be listed last.\n',log_msg);
+    log_msg=sprintf('%sFor best clarity please specify when in streaming mode.\n',log_msg);
+    log_msg=sprintf('%s\t(otherwise you will need to wait until the entire scan completes).\n',log_msg);
+    log_msg=sprintf('Vaild tables for pa %0.2f and pb %0.2f this data:\n\t%s\n%s',...
+        typical_pa,typical_pb,strjoin(valid_tables,'\n\t'),log_msg);
+    yet_another_logger(log_msg,3,log_file,0);
+    fprintf('  (Ctrl+C to abort)\n');
+    options.CS_table='';
+    while ~reg_match(options.CS_table, ...
+            sprintf('^%s$',strjoin(valid_tables,'|') )  )
+        options.CS_table=input( ...
+            sprintf('Type in a name to continue\n'),'s');
+    end
+elseif numel(valid_tables)==1
+    CS_table=valid_tables{1};
+    warning('Only one possible CS_table found. If this is incorrect Ctrl+c now.\n%s',options.CS_table);
+    pause(5);
+else
+    % no valid tables
+    error('Table listing: %s\nCS_table not specified and couldn''t find valid CS table,\n\tMaybe this isn''t a CS acq?',available_tables);
+end
+log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
 
-% A procpar file should end in 'procpar' ( or be only procpar :D )
-if ~exist(procpar,'file')
-    error('Unable to find specified procpar file %s.', procpar);
-end
-pp = readprocparCS(procpar);
-if ~isfield(pp,'petableCS')
-    e_string1='Cannot find field ''petableCS'' containing the path to the CStable in procpar file ''';
-    e_string2='''; it is possible that this is not a compressed sending experiment.';
-    error('%s%s%s',e_string1,procpar,e_string2);
-end
-% Get CStable path
-full_CS_table_path = pp.petableCS;
-full_CS_table_path=full_CS_table_path{1};
-target_folder = fileparts(procpar);
-% Get dim_y and dim_z (dim2/dim3)
-dim2 = pp.nv;
-dim3 = pp.nv2;
-if ~exist(table_target,'file')
-    error('table not present, and i think this code shouldn''t fetch it');
-    % Guess which scanner is the CStable source based on runno prefix
-    [~,Tname]=fileparts(target_folder);
-    if (strcmp(Tname(1),'N'))
-        scanner = 'heike';
-    else
-        scanner = 'kamy';
-    end
-    % pull_table
-    cmd = [ 'puller_simple  -o -f file ' scanner ' ''../../../../home/vnmr1/vnmrsys/tablib/' CS_table_name ''' ' target_folder];
-    [skiptable,sout]=system(cmd); if skiptable~=0; warning(sout); end;clear cmd;
-    if ~exist(table_target,'file')
-        error('Unable to retrieve CS table: %s.', full_CS_table_path);
-    end
-    clear cmd;
-end
+yet_another_logger(log_msg,log_mode,log_file);
+
+

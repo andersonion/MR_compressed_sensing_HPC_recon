@@ -1,4 +1,5 @@
 function get_subvolume_from_fid(input_fid,local_fidpath,volume_number,bbytes,scanner,user)
+error('obsolete function, use scanner.fid_get_block');
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 

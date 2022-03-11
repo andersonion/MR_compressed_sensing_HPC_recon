@@ -1,5 +1,6 @@
 function [ready, bhdr]=check_subvolume_ready_in_fid_quiet(...
     input_fid, volume_number, bbytes, scanner, user, options)
+error('obsolete function');
 % [ready,bhdr]=check_subvolume_ready_in_fid(input_fid,volume_number,bbytes,scanner,user,options)
 %Verify's a subvolume is ready in the remote fid.
 % Copyright Duke University

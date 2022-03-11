@@ -6,6 +6,7 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 %
 % Written by BJ Anderson, CIVM
 % 21 September 2017
+% revised james j cook 2017-
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
@@ -15,21 +16,27 @@ function starting_point = volume_manager_exec(recon_file,volume_runno, volume_nu
 C___=exec_startup();
 
 recon_mat=matfile(recon_file);
+% have to unpack structs from the matlab file 
 options=recon_mat.options;
+headfile=recon_mat.headfile;
+
 log_mode=2;
 if options.debug_mode>=10
     log_mode=1;
 end
 log_file=recon_mat.log_file;
 try
-    workdir=fullfile(base_workdir,volume_runno);
+    volume_workdir=fullfile(base_workdir,volume_runno);
 catch merr
-    workdir=fullfile(recon_mat.agilent_study_workdir,volume_runno);
+    volume_workdir=fullfile(recon_mat.study_workdir,volume_runno);
 end
-    
+if ~exist(volume_workdir,'dir')
+    error('Missing expected working directory: %s',volume_workdir);
+end
+remote_workstation=wks_settings(options.target_machine);
+% remote_workstation.
 target_machine=options.target_machine;
-target_host_name=sprintf('%s.dhe.duke.edu',target_machine);% This is a pretty stupid way to fix the unneccessary 'fix' James introduced
-%full_host_name=databuffer.scanner_constants.scanner_host_name; % Just kidding. We can thank James for this red herring.
+target_host_name=sprintf('%s.dhe.duke.edu',target_machine);
 
 % Recon file should contain
 %scale_file
@@ -57,8 +64,8 @@ cs_execs=CS_env_execs();
 if ischar(volume_number)
     volume_number=str2double(volume_number);
 end
-if strcmp('/',workdir(end))
-    workdir=[workdir '/'];
+if strcmp('/',volume_workdir(end))
+    volume_workdir=[volume_workdir '/'];
 end
 
 %% Preflight checks
@@ -76,13 +83,25 @@ end
 % volume cleanup still has yet to run. SO, lets change that(its at the
 % end!).
 
-[starting_point, log_msg] = check_status_of_CSrecon(workdir,...
+%{
+previous more annoyingly specific ugly funciton
+[starting_point, log_msg] = check_status_of_CSrecon(volume_workdir,...
     volume_runno, ...
-    recon_mat.scanner,...
+    recon_mat.scanner_name,...
     recon_mat.runno,...
     recon_mat.agilent_study,...
     recon_mat.agilent_series,...
     recon_mat.bbytes);
+%}
+% new funtion
+[starting_point,log_msg,~,data_mode_check]=volume_status(volume_workdir,...
+    volume_runno, ...
+    recon_mat.scanner_name,...
+    volume_number,...
+    recon_mat.agilent_study,...
+    recon_mat.agilent_series,...
+    recon_mat.bbytes);
+
 if ~islogical(options.CS_preview_data)
     if starting_point>2
         warning('CS_preview_data artificially reducing start point to 2');
@@ -91,31 +110,31 @@ if ~islogical(options.CS_preview_data)
 end
 yet_another_logger(log_msg,log_mode,log_file);
 % Initialize a log file if it doesn't exist yet.
-volume_log_file =fullfile(workdir, [volume_runno '_recon.log']);
+volume_log_file =fullfile(volume_workdir, [volume_runno '_recon.log']);
 if ~exist(volume_log_file,'file')
     system(['touch ' volume_log_file]);
 end
 
 
-setup_variables= fullfile(workdir,   [ volume_runno '_setup_variables.mat']);
-images_dir =     fullfile(workdir,   [ volume_runno 'images']);
-headfile =       fullfile(images_dir,[ volume_runno '.headfile']);
+setup_variables= fullfile(volume_workdir,   [ volume_runno '_setup_variables.mat']);
+images_dir =     fullfile(volume_workdir,   [ volume_runno 'images']);
+hedfile_path =   fullfile(images_dir,[ volume_runno '.headfile']);
 
-work_subfolder = fullfile(workdir, 'work');
+work_subfolder = fullfile(volume_workdir, 'work');
 temp_file =      fullfile(work_subfolder,[ volume_runno '.tmp']);
 volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
 volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
 
 
-hf_fail_flag=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,target_machine));
-hf_success_flag=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,target_machine));
-fail_flag=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,target_machine));
-success_flag=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,target_machine));
-at_fail_flag=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,target_machine));
-at_success_flag=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,target_machine));
+hf_fail_flag=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
+hf_success_flag=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
+fail_flag=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
+success_flag=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
+at_fail_flag=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,remote_workstation.name));
+at_success_flag=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
 
 original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
-local_archive_tag_prefix = [volume_runno '_' target_machine];
+local_archive_tag_prefix = [volume_runno '_' remote_workstation.name];
 local_archive_tag =   sprintf('%s/READY_%s',images_dir,local_archive_tag_prefix);
 
 
@@ -135,7 +154,7 @@ if (exist(variables_file2,'file'))
     mf = matfile(variables_file2,'Writable',true);
     mf.volume_runno = volume_runno;
     write_archive_tag_success_cmd = sprintf('if [[ -f %s ]]; then\n\trm %s;\nfi;\nif [[ ${archive_tag_success} -eq 1 ]];\nthen\n\techo "Archive tag transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',at_fail_flag,at_fail_flag,at_success_flag,at_fail_flag);
-    handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+    handle_archive_tag_cmd = sprintf('if [[ ! -f %s ]]; then\n\tarchive_tag_success=0;\n\tif [[ -f %s ]] && [[ -f %s ]]; then\n\t\tscp -p %s omega@%s:/Volumes/%sspace/Archive_Tags/READY_%s && archive_tag_success=1;\n\t\t%s;\n\tfi;\nfi',at_success_flag, success_flag, hf_success_flag,local_archive_tag,full_host_name,remote_workstation.name,volume_runno,write_archive_tag_success_cmd);
     mf.handle_archive_tag_cmd=handle_archive_tag_cmd;
 end
 %}
@@ -145,15 +164,12 @@ end
 % mark data which is ready.
 % TODO: move this into the cleanup code.
 if ~exist(local_archive_tag,'file')
-    % temporary patch to pull databuffer multi-struct out of the mat file.
-    databuffer=recon_mat.databuffer;
     if ~exist(original_archive_tag,'file')
-        write_archive_tag_nodev(volume_runno,['/' target_machine 'space'], ...
-            recon_mat.dim_z,databuffer.headfile.U_code, ...
-            '.raw',databuffer.headfile.U_civmid,true,images_dir);
+        write_archive_tag_nodev(volume_runno,['/' remote_workstation.name 'space'], ...
+            recon_mat.dim_z,headfile.U_code, ...
+            '.raw',headfile.U_civmid,true,images_dir);
     end
     system(sprintf('mv %s %s',original_archive_tag,local_archive_tag));
-    clear databuffer;
 end
 
 if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && volume_number ~=1  )
@@ -169,10 +185,11 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
-    agilent_study_gatekeeper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
-    [input_fid,~] =find_input_fidCS(recon_mat.scanner,recon_mat.runno,recon_mat.agilent_study,recon_mat.agilent_series);% hint: ~ ==> local_or_streaming_or_static
+    agilent_study_gatekeeper_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
+    % hint: ~ ==> local_or_streaming_or_static
+    [fid_path.current,~] =find_input_fidCS(recon_mat.scanner_name,recon_mat.runno,recon_mat.agilent_study,recon_mat.agilent_series);
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
-        volume_fid, input_fid, recon_mat.scanner, log_file, volume_number, recon_mat.bbytes);
+        volume_fid, fid_path.current, recon_mat.scanner_name, log_file, volume_number, recon_mat.bbytes);
     gatekeeper_cmd = sprintf('%s %s %s ', cs_execs.gatekeeper, matlab_path,...
         gatekeeper_args);
     if ~options.live_run
@@ -191,7 +208,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     %vm_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     vm_slurm_options.reservation = '';
-    volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
+    volume_manager_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
     vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
     if ~options.live_run
@@ -221,17 +238,30 @@ else
     stage_4_running_jobs='';
     stage_5_running_jobs='';
     stage_5e_running_jobs='';
-    
+    the_scanner=scanner(recon_mat.scanner_name);
     if (~options.process_headfiles_only)
         % James pulled this input fid check up out of starting point 1 to
         % make it easier to handle procpar processing decisions later.
         if starting_point<4
-            [input_fid, local_or_streaming_or_static]=find_input_fidCS( ...
-                recon_mat.scanner, recon_mat.runno, ...
+            if isfield(data_mode_check,'data_mode')
+                % volume status which we call really early has to do this
+                % same check internally. If it does that check it will
+                % actually return the value packed into a struct.
+                data_mode=data_mode_check.data_mode;
+                fid_path=data_mode_check.fid_path;
+                clear data_mode_check;
+            else
+                [data_mode,fid_path.current]=get_data_mode(the_scanner,recon_mat.study_workdir,recon_mat.agilent_study,recon_mat.agilent_series);
+            end
+            %{
+            [input_fid, local_or_streaming_or_static]=find_fid_path.currentCS( ...
+                recon_mat.scanner_name, recon_mat.runno, ...
                 recon_mat.agilent_study, recon_mat.agilent_series);
+            %}
         else
-            input_fid='BOGUS_INPUT_FOR_DONE_WORK';
-            local_or_streaming_or_static=3;
+            fid_path.current='BOGUS_INPUT_FOR_DONE_WORK';
+            data_mode='local';
+            % local_or_streaming_or_static=3;
         end
         %% STAGE1 Scheduling
         if (starting_point <= 1 || ~islogical(options.CS_preview_data) )
@@ -244,13 +274,15 @@ else
             % and that is a reasonable fingerprint.
             % Checking other volumes would require getting their data bits
             % first, and that is not likely to fail independently.
+            %{
             if (local_or_streaming_or_static == 1)
-                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,1);
+                fid_consistency = write_or_compare_fid_tag(fid_path.current,recon_mat.fid_tag_file,1);
             else
                 scanner_user='omega';
-                fid_consistency = write_or_compare_fid_tag(input_fid,recon_mat.fid_tag_file,1,recon_mat.scanner,scanner_user);
+                fid_consistency = write_or_compare_fid_tag(fid_path.current,recon_mat.fid_tag_file,1,recon_mat.scanner_name,scanner_user);
             end
-            if fid_consistency
+            %}
+            if the_scanner.fid_consistency(fid_path.current,recon_mat.fid_tag_file)
                 %{
                 % James commented this out because it was killing streaming CS,
                 % when streaming data.
@@ -272,11 +304,15 @@ else
                 end
                 if recon_mat.nechoes == 1
                     % for multi-block fids(diffusion)
-                    if (local_or_streaming_or_static == 1)
-                        get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes);
+                    %if (local_or_streaming_or_static == 1)
+                    %{
+                    if strcmp(data_mode,'local')
+                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bbytes);
                     else
-                        get_subvolume_from_fid(input_fid,volume_fid,volume_number,recon_mat.bbytes,recon_mat.scanner,scanner_user);
+                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bbytes,recon_mat.scanner_name,the_scanner.user);
                     end
+                    %}
+                    the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bbytes);
                 elseif recon_mat.nechoes > 1 && volume_number == 1
                     % for 1 block fids, mgre, and single vol, in theory we
                     % can only operate when static, further we should only
@@ -296,7 +332,7 @@ else
                     end
                     local_fid= fullfile(recon_mat.agilent_study_workdir,'fid');
                     if ~exist(local_fid,'file')
-                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner,recon_mat.agilent_study_workdir,3);
+                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.agilent_study_workdir,3);
                     end
                     if ~exist(local_fid,'file') 
                         % It is assumed that the target of puller is the local_fid
@@ -321,7 +357,7 @@ else
                     fs_args= sprintf('%s %s', local_fid,recon_file);
                     fs_cmd = sprintf('%s %s %s', cs_execs.fid_splitter,matlab_path,fs_args);
                     if ~options.live_run
-                        fid_splitter_batch = [workdir '/sbatch/' recon_mat.runno '_fid_splitter_CS_recon.bash'];
+                        fid_splitter_batch = [volume_workdir '/sbatch/' recon_mat.runno '_fid_splitter_CS_recon.bash'];
                         batch_file = create_slurm_batch_files(fid_splitter_batch,fs_cmd,fs_slurm_options);
                         %fid_splitter_running_jobs
                         stage_1_running_jobs = dispatch_slurm_jobs(batch_file,'');
@@ -334,10 +370,10 @@ else
             else
                 log_mode = 1;
                 error_flag = 1;
-                log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,input_fid);
+                log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,fid_path.current);
                 log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',...
-                    log_msg,input_fid,recon_mat.fid_tag_file,volume_number,recon_mat.scanner,scanner_user);
-                log_msg = sprintf('%sCRITICAL ERROR local_or_streaming_or_static=%i\n',log_msg,local_or_streaming_or_static);
+                    log_msg,fid_path.current,recon_mat.fid_tag_file,volume_number,recon_mat.scanner_name,the_scanner.user);
+                log_msg = sprintf('%sCRITICAL ERROR data_mode=%i\n',log_msg,data_mode);
                 
                 yet_another_logger(log_msg,log_mode,log_file,error_flag);
                 if isdeployed
@@ -363,13 +399,13 @@ else
             %}
             mf.volume_fid = volume_fid;
             mf.volume_workspace = volume_workspace;
-            mf.workdir = workdir;
+            mf.workdir = volume_workdir;
             mf.temp_file = temp_file;
             mf.images_dir =images_dir;
-            mf.headfile = headfile;
+            mf.headfile = hedfile_path;
             %{
-            if exist('target_machine','var')
-                mf.target_machine = target_machine;
+            if exist('remote_workstation.name','var')
+                mf.remote_workstation.name = remote_workstation.name;
             end
             if exist('wavelet_dims','var')
                 mf.wavelet_dims = wavelet_dims;
@@ -397,7 +433,7 @@ else
             %vsu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
             vsu_slurm_options.reservation = '';
-            volume_setup_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
+            volume_setup_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
             vsu_args=sprintf('%s %i',setup_variables, volume_number);
             vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
             if  stage_1_running_jobs
@@ -513,7 +549,7 @@ else
                             slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(ss)))];
                         end
                     end
-                    slicewise_recon_batch = fullfile(workdir, 'sbatch', [ volume_runno '_slice' slice_string '_CS_recon.bash']);
+                    slicewise_recon_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_slice' slice_string '_CS_recon.bash']);
                     swr_args= sprintf('%s %s %s', volume_workspace, slice_string,setup_variables);
                     swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
                     if  stage_2_running_jobs
@@ -567,7 +603,7 @@ else
             '\t  \t  %s;\n'...
             '\t  fi;\n'...
             'fi'],at_success_flag, success_flag, hf_success_flag, ...
-            local_archive_tag,sys_user(),target_host_name,target_machine,volume_runno,write_archive_tag_success_cmd);
+            local_archive_tag,sys_user(),remote_workstation.host_name,remote_workstation.name,volume_runno,write_archive_tag_success_cmd);
         vol_mat = matfile(setup_variables,'Writable',true);
         vol_mat.handle_archive_tag_cmd=handle_archive_tag_cmd;
         %% STAGE4 Scheduling
@@ -582,7 +618,7 @@ else
             %vcu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.
             vcu_slurm_options.reservation = ''; 
-            volume_cleanup_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_cleanup_for_CS_recon.bash']);
+            volume_cleanup_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_cleanup_for_CS_recon.bash']);
             vcu_args=sprintf('%s',setup_variables);
             vcu_cmd = sprintf('%s %s %s', cs_execs.volume_cleanup,matlab_path,vcu_args);
             if ~options.live_run
@@ -604,23 +640,23 @@ else
                 %rm_previous_flag = sprintf('if [[ -f %s ]]; then rm %s; fi',fail_flag,fail_flag);
                 t_images_dir = images_dir;
                 mkdir_cmd = sprintf('ssh %s@%s ''mkdir -p -m 777 /Volumes/%sspace/%s/%simages/''',...
-                    sys_user(),target_host_name,target_machine,volume_runno,volume_runno);
+                    sys_user(),remote_workstation.host_name,remote_workstation.name,volume_runno,volume_runno);
                 scp_cmd = sprintf(['echo "Attempting to transfer data to %s.";' ...
                     'scp -pr %s %s@%s:/Volumes/%sspace/%s/ && success=1'], ...
-                    target_machine,t_images_dir,sys_user(),target_host_name,target_machine,volume_runno);
+                    remote_workstation.name,t_images_dir,sys_user(),remote_workstation.host_name,remote_workstation.name,volume_runno);
                 write_success_cmd = sprintf('if [[ $success -eq 1 ]];\nthen\n\techo "Transfer successful!"\n\ttouch %s;\nelse\n\ttouch %s; \nfi',success_flag,fail_flag);
                 %{
                 local_size_cmd = sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-                remote_size_cmd = sprintf('freespaceK=`ssh omega@%s.dhe.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | cut -d '' '' -f5`',target_machine,target_machine);
+                remote_size_cmd = sprintf('freespaceK=`ssh omega@%s.dhe.duke.edu ''df -k /Volumes/%sspace ''| tail -1 | cut -d '' '' -f5`',remote_workstation.name,remote_workstation.name);
                 eval_cmd = sprintf(['success=0;\nif [[ $freespaceK -lt $gimmespaceK ]]; then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."; '...
-               'else %s; fi; %s'],  images_dir,target_machine, scp_cmd,write_success_cmd);
+               'else %s; fi; %s'],  images_dir,remote_workstation.name, scp_cmd,write_success_cmd);
                 %}
                 n_raw_images = recon_mat.dim_z;
                 shipper_cmds{1}=sprintf('success=0;\nc_raw_images=$(ls %s | grep raw | wc -l | xargs); if [[ "${c_raw_images}"  -lt "%i" ]]; then\n\techo "Not all %i raw images have been written (${c_raw_images} total); no images will be sent to remote machine.";\nelse\nif [[ -f %s ]]; then\n\trm %s;\nfi',images_dir,n_raw_images,n_raw_images,fail_flag,fail_flag);
                 shipper_cmds{2}=sprintf('gimmespaceK=`du -cks %s | tail -n 1 | xargs |cut -d '' '' -f1`',images_dir);
-                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', sys_user(), target_host_name,  target_machine);
+                shipper_cmds{3}=sprintf('freespaceK=`ssh %s@%s ''df -k /Volumes/%sspace ''| tail -1 | xargs | cut -d '' '' -f4`', sys_user(), remote_workstation.host_name,  remote_workstation.name);
                 shipper_cmds{4}=sprintf('if [[ $freespaceK -lt $gimmespaceK ]];');
-                shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,target_machine);
+                shipper_cmds{5}=sprintf('then\n\techo "ERROR: not enough space to transfer %s to %s; $gimmespaceK K needed, but only $freespaceK K available."',images_dir,remote_workstation.name);
                 shipper_cmds{6}=sprintf('else\n\t%s;\n\t%s;\nfi',mkdir_cmd,scp_cmd);
                 shipper_cmds{7}=sprintf('fi\n%s',write_success_cmd);
                 shipper_cmds{8}=sprintf('%s',handle_archive_tag_cmd);
@@ -629,11 +665,11 @@ else
                 shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
                 shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
                 shipper_slurm_options.p=cs_queue.gatekeeper; % For now, will use gatekeeper queue for volume manager as well
-                shipper_slurm_options.job_name = [volume_runno '_ship_to_' target_machine];
+                shipper_slurm_options.job_name = [volume_runno '_ship_to_' remote_workstation.name];
                 %shipper_slurm_options.reservation = active_reservation;
                 % using a blank reservation to force no reservation for this job.
                 shipper_slurm_options.reservation = '';
-                shipper_batch = fullfile(workdir, 'sbatch', [ volume_runno '_shipper.bash']);
+                shipper_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_shipper.bash']);
                 %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
                 if ~exist(success_flag,'file')
                     batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
@@ -707,7 +743,7 @@ else
         %vm_slurm_options.reservation = active_reservation;
         % using a blank reservation to force no reservation for this job.
         vm_slurm_options.reservation = '';
-        volume_manager_batch = fullfile(workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
+        volume_manager_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
         vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
         vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
         if ~options.live_run
