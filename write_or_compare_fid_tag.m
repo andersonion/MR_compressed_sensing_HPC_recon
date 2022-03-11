@@ -74,6 +74,11 @@ transfer_size=header_size+block_header+data_bits;
 
 tmp_fid_tag=sprintf('/tmp/%s_%i_%i.fid',datestr(now,30),volume_number,ceil(rand(1)*10000));
 
+local_tmp_fid_tag=tmp_fid_tag;
+if ~isempty(getenv('TEMP'))
+    local_tmp_fid_tag=strrep(local_tmp_fid_tag,'/tmp',getenv('TEMP'));
+end
+
 lin_dd_status=' status=noxfer';
 lin_of=[' of=' tmp_fid_tag];
 lin_append=' oflag=append';
@@ -113,18 +118,18 @@ else
     % runs dd command remotely.
     ssh_dd=sprintf('ssh %s@%s "%s"',user,scanner,dd_cmd);
     % fetches the fid file
-    scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,tmp_fid_tag,tmp_fid_tag);
+    scp_fid=sprintf('scp -p %s@%s:%s %s',user,scanner,tmp_fid_tag,local_tmp_fid_tag);
     ssh_call(ssh_dd);
     ssh_call(scp_fid);
 end
 
-file_meta=dir(tmp_fid_tag);%gets metadata, especially file bytes.
+file_meta=dir(local_tmp_fid_tag);%gets metadata, especially file bytes.
 if file_meta.bytes ~= transfer_size
     error('Problem with the copy/transfer! temporary file is %s',remote_temp_fidpath);
 else
     [tfhd.npoints, tfhd.nblocks, tfhd.ntraces, tfhd.bitdepth, ...
         tfhd.bbytes, tfhd.complete_file_size, ...
-        tbhd] = load_fid_hdr(tmp_fid_tag);
+        tbhd] = load_fid_hdr(local_tmp_fid_tag);
     % blk_hdr.status
     %tready=bitget(tbhd.status,1);
     tready=tbhd.status.hasData;
@@ -135,18 +140,18 @@ else
         consistency_status = 1;
         % set NON friendly permisions to file
         % BECAUSE OVERWRITES OF THIS TAG ARE DANGEROUS!
-        chmod_cmd=sprintf('chmod 444 %s',tmp_fid_tag);
+        chmod_cmd=sprintf('chmod 444 %s',local_tmp_fid_tag);
         [~,~] = system(chmod_cmd); % set perms
-        [~,~] = system(sprintf('mv %s %s',tmp_fid_tag,fid_tag_path));
+        [~,~] = system(sprintf('mv %s %s',local_tmp_fid_tag,fid_tag_path));
     else
         % we already made sure the base comparison tag is ready.
-        diff_cmd = sprintf('diff -q %s %s',fid_tag_path,tmp_fid_tag);
+        diff_cmd = sprintf('diff -q %s %s',fid_tag_path,local_tmp_fid_tag);
         [s,diff_result] = system(diff_cmd);
         if isempty(diff_result) || s==0
             consistency_status = 1;
         end
         % assert(s==0,sprintf('fid tag compare fail %s',diff_result));
-        tmp_rm_cmd = sprintf('rm %s',tmp_fid_tag);
+        tmp_rm_cmd = sprintf('rm %s',local_tmp_fid_tag);
         [s, tmp_rm_out] = system(tmp_rm_cmd);
         assert(s==0,sprintf('dd fail %s',tmp_rm_out));
     end

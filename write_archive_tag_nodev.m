@@ -102,7 +102,8 @@ tag_cells{end+1, 1}=['# recon_person=' civmid];
 tag_cells{end+1, 1}=['# tag_file_creator=' 'CSv2_matlab'];
 % tag_file{end+1, 1}=['# Filtering_method= ' Filtering_method];
 tagfile_name=['READY_' runno{1}];
-dlmcell(['/' out_dir '/' tagfile_name], tag_cells);
+
+dlmcell(fullfile(out_dir,tagfile_name), tag_cells);
 % if length(runno)<35
 archive_string= sprintf('archiveme %s %s',civmid,runno{1});
 % else
