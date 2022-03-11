@@ -1,6 +1,5 @@
-function [pdf, val] = genPDF_wn_v2(imSize, pa, pctg, pb, disp)
-
-%[pdf,val] = genPDF(imSize,p,pctg [,distType,radius,disp])
+function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, disp)
+%[pdf,val] = genPDF_wn_v2(imSize,p,sample_fraction [,distType,radius,disp])
 %
 %	generates a pdf for a 1d or 2d random sampling pattern
 %	with polynomial variable density sampling
@@ -8,7 +7,7 @@ function [pdf, val] = genPDF_wn_v2(imSize, pa, pctg, pb, disp)
 %	Input:
 %		imSize - size of matrix or vector
 %		p - power of polynomial
-%		pctg - partial sampling factor e.g. 0.5 for half
+%		sample_fraction - partial sampling factor e.g. 0.5 for half
 %		distType - 1 or 2 for L1 or L2 distance measure
 %		radius - radius of fully sampled center
 %		disp - display output
@@ -22,7 +21,7 @@ function [pdf, val] = genPDF_wn_v2(imSize, pa, pctg, pb, disp)
 %	[pdf,val] = genPDF([128,128],2,0.5,2,0,1);
 %
 %	(c) Michael Lustig 2007
-% imSize=[256 256]; p=14; pctg=0.125; distType=2; radius=0; disp=1; 
+% imSize=[256 256]; p=14; sample_points=0.125; distType=2; radius=0; disp=1; 
 %{
 val = 0.5;
 if length(imSize)==1
@@ -43,8 +42,8 @@ sx = imSize(1);
 sy = imSize(2);
 sz = imSize(3);
 
-% number of points we're going to sample, formerly was called PCTG
-sample_points = floor(pctg*sx*sy);
+% number of points we're going to sample, formerly was called sample_points
+sample_points = floor(sample_fraction*sx*sy);
 % % a=3;b=2.5;
 %{
 if sum(imSize==1)==0  % 2D
@@ -93,75 +92,54 @@ end
 
 % It appears the bisection loop could be replaced with one line, solving
 % for val
-% PCTG=floor(nnz(pdf)*val+sum(pdf(:)))
-% PCTG-sum(pdf(:))=nnz(pdf)*val
-% (PCTG-sum(pdf(:)))/nnz(pdf)=val
-% this is REALLY close
+% sample_points=floor(nnz(pdf)*val+sum(pdf(:)))
+% sample_points-sum(pdf(:))=nnz(pdf)*val
+% (sample_points-sum(pdf(:)))/nnz(pdf)=val
+% It is REALLY close
 % the floor operator is very hard to account for.
-% could use these as updated minval and maxval
+% Its also hard to account for truncating the points because we dont
+% know how many are going to be too high!
 %
-% I think used will always be numel, but i cant be certain, so this covers
-% my bases. If you know better and it will alwys be, feel free to fix
-% this.
+% I think used_points will always be numel, but i cant be certain, so this 
+% % covers my bases. If you know better and it will alwys be, feel free to
+% fix this.
 used_points=nnz(f);
-val_l=(sample_points-f_sum)/used_points;
-val_h=(sample_points+1-f_sum)/used_points;
-% but it appears simply repeating the val calc will work
-% val=val_l/2+val_h/2;
-val=mean([val_l,val_h]);
-pdf = f + val; pdf(pdf>1) = 1;
-N = floor(sum(pdf(:)));
+minval=(sample_points-f_sum)/used_points;
+% this is not a valid maxval for bisection! it can be too low!
+maxval=(sample_points+1-f_sum)/used_points;
+% this could be used to initialize bisection
+% maxval=(sample_points*1.01-f_sum)/used_points;
+% this might be a closer bisection initializer
+% maxval=(sample_points+10-f_sum)/used_points;
+val=mean([minval,maxval]);
+pdf = f + val;
+pdf_truncate_idx=pdf>1;
+pdf(pdf_truncate_idx) = 1;
+pdf_sum=sum(pdf(:));
+N = floor(pdf_sum);
+% hos much did we not account for, maybe this could be used as the
+% tollerance factor?
+res=sample_points-pdf_sum;
 if N ~= sample_points
-    error('quick method failed');
+    % this has failed me one time, HOWEVER when run a second time with the 
+    % same input it didnt fail! .... no rational explaination available.
+    % running a few more times and it failed consistently.
+    %
+    % the reason this fails is the truncation to 1, we dont know how many
+    % points will be over 1 when we calculate.
+    % 
+    % we could adjust by counting number of points over 1, and remvoing them 
+    % from the used points. We could loop that, but then we're back to
+    % looping.
+    %
+    % we can provide a decent guess of maxval, and run the bisect loop, at 
+    % this point its not clear if the bisect loop was really the problem
+    % with long runtime in this function or not.
+    warning('quick method failed! running bisect loop');
+    truncated_pts=nnz(pdf_truncate_idx);
+    maxval=(sample_points+1-f_sum)/(used_points-truncated_pts);
+    [pdf,val]=bisect_pdf_loop(sample_points,f,minval,maxval);
 end
-
-%{ 
-% begin bisection
-its=0;
-while(1)
-    its=its+1;
-    val = minval/2 + maxval/2;
-    pdf = f + val; pdf(pdf>1) = 1;
-    N = floor(sum(pdf(:)));
-    if N > PCTG % infeasible
-        maxval=val;
-    end
-    if N < PCTG % feasible, but not optimal
-        minval=val;
-    end
-    if N==PCTG % optimal
-        break;
-    end
-end
-%}
-%{
-% same loop as above but with some time wasted collection.
-over_trys=0;
-under_trys=0;
-minval=0;
-maxval=1;
-while(1)
-    val = minval/2 + maxval/2;
-    pdf = f + val;
-    over_idx=pdf>1;
-    pdf(over_idx) = 1;
-    fprintf('%i over 1\n', nnz(over_idx));
-    N = floor(sum(pdf(:)));
-    if N > PCTG % infeasible
-        maxval=val;
-        over_trys=over_trys+1;
-    end
-    if N < PCTG % feasible, but not optimal
-        minval=val;
-        under_trys=under_trys+1;
-    end
-    if N==PCTG % optimal
-        break;
-    end
-end
-fprintf('scaling took %i tries, over target %i times, under target %i times\n', ...
-    over_trys+under_trys, over_trys, under_trys);
-%}
 
 if disp
 	figure,
@@ -173,10 +151,67 @@ if disp
 	end
 end
 
-
-% [mask,stat,actpctg] = genSampling(pdf,10,2);
+% [mask,stat,actsample_points] = genSampling(pdf,10,2);
 %  size(find(mask==1))
 
+end
 
+function [pdf,val]=bisect_pdf_loop(sample_points,f,minval,maxval)
+%{
+% begin bisection
+%%% minval=0;maxval=1;
+its=0;
+while(1)
+    its=its+1;
+    val = minval/2 + maxval/2;
+    pdf = f + val; pdf(pdf>1) = 1;
+    N = floor(sum(pdf(:)));
+    if N > sample_points% infeasible
+        maxval=val;
+    end
+    if N < sample_points % feasible, but not optimal
+        minval=val;
+    end
+    if N==sample_points % optimal
+        break;
+    end
+end
+%}
+
+
+% same loop as above but with some time wasted collection.
+over_trys=0;
+under_trys=0;
+%minval=0;
+%maxval=1;
+limit=1000;
+% if we're given bad min/max vals they could end up equal, trapping us in
+% the loop.
+while(limit && minval~=maxval)
+    val = minval/2 + maxval/2;
+    pdf = f + val;
+    pdf_truncate_idx=pdf>1;
+    pdf(pdf_truncate_idx) = 1;
+    fprintf('%i over 1\n', nnz(pdf_truncate_idx));
+    N = floor(sum(pdf(:)));
+    if N > sample_points % infeasible
+        maxval=val;
+        over_trys=over_trys+1;
+    end
+    if N < sample_points % feasible, but not optimal
+        minval=val;
+        under_trys=under_trys+1;
+    end
+    if N==sample_points % optimal
+        break;
+    end
+    limit=limit-1;
+end
+fprintf('scaling took %i tries, over target %i times, under target %i times\n', ...
+    over_trys+under_trys, over_trys, under_trys);
+if N~=sample_points
+    error('failed to properly scale pdf to %i',sample_points);
+end
+end
 
 
