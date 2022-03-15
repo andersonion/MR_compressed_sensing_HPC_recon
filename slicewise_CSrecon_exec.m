@@ -255,7 +255,7 @@ for index=1:length(slice_numbers)
             % questionable anyways (at least how implemented by me).
             recon_options.convergence_window = 3;
             
-            res=CS_tmp_load(setup_var.temp_file,recon_dims,slice_index);
+            res=load_cstmp(setup_var.temp_file,recon_dims,slice_index);
   
         end
          
