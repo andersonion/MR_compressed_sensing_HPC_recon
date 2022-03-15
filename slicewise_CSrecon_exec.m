@@ -5,8 +5,9 @@ function slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
  
 
-if ~isdeployed    
-   addpath('/cm/shared/workstation_code_dev/recon/CS_v2/sparseMRI_v0.2/'); 
+if ~isdeployed
+    cs_reco_dir=fileparts(mfilename('fullpath'));
+    addpath(fullfile(cs_reco_dir,'sparseMRI_v0.2'));
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     % REQUIRES THE VARIABLE OR IT WONT WORK, We never have to touch the
@@ -25,25 +26,19 @@ slice_numbers=parse_slice_indices(slice_indices);clear slice_indices;
 log_mode = 3;
 log_file ='';
 error_flag=0;
-if  (~exist(matlab_workspace,'file'))
-    error_flag = 1;
-    log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
-else
-    a = who('-file',matlab_workspace,'aux_param');
-    if ~size(a)
-        %error_flag = 1;
-        %log_msg =sprintf('Matlab workspace (''%s'') exists, but parameter ''aux_param'' not found. Dying now.\n',matlab_workspace);
-    else
-        error_flag = 1;
-        log_msg =sprintf('Matlab workspace (''%s'') exists, but legacy parameter ''aux_param'' found. You need to clear work folder and restart recon. Dying now.\n',matlab_workspace);
-    end
+legacy_params={'aux_param'};
+l_count=matfile_missing_vars(matlab_workspace,legacy_params);
+if l_count ~= numel(legacy_params)
+    error_flag=1;
 end
 if error_flag==1
+    % log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
+    log_msg =sprintf('Matlab workspace (''%s'') exists, but legacy parameter ''aux_param'' found. You need to clear work folder and restart recon. Dying now.\n',matlab_workspace);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
     % force a quit when deployed, else return broken
     if isdeployed; quit('force'); end
     return;
-end; clear error_flag;
+end; clear error_flag legacy_params l_count
 
 %% Load common workspace params
 if exist('setup_variables','var')
@@ -106,7 +101,7 @@ if isdeployed
 else
     % when not deployed the log printing takes significant time.
     log_mode=2;
-end;
+end
 log_file = setup_var.volume_log_file;
 
 log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
@@ -145,7 +140,7 @@ param.XFM = XFM;
 param.TV=TVOP    ;
 %% set special options of the BJ fnlCg_verbose function
 recon_options=struct;
-    %{
+%{
 if ~isdeployed
     recon_options.verbosity = 1;
     recon_options.log_file = log_file;
@@ -179,6 +174,9 @@ header_size = 1+recon_dims(1);% 26 September 2017, BJA: 1st uint16 bytes are hea
 for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
     %% read temp_file header for completed work.
+    work_done=read_header_of_CStmp_file(setup_var.temp_file);
+    work_done=work_done';
+    %{
     % this could be done exactly once before looping foreach slice.
     t_id=fopen(setup_var.temp_file,'r+');
     % Should be the same size as header_size 
@@ -189,11 +187,12 @@ for index=1:length(slice_numbers)
     % 8 May 2017, BJA: converting header from binary to double local_scaling
     %work_done = fread(fid,dims(1),'double'); 
     fclose(t_id);
+    %}
     %% decide if we're continuing work or not
     continue_work = 0;
     completed_iterations = work_done(slice_index);
     % completed_iterations formerly previous_Itnlim(and c_work_done)
-    if (completed_iterations > 0);
+    if (completed_iterations > 0)
         %previous_Itnlim = floor(c_work_done/1000000); % 9 May 2017, BJA: Adding ability to continue CS recon with more iterations.
         if (requested_iterations > completed_iterations)
             param.Itnlim = requested_iterations - completed_iterations;
@@ -338,7 +337,7 @@ for index=1:length(slice_numbers)
         t_id=fopen(setup_var.temp_file,'r+');
         header_length = fread(t_id,1,'uint16'); % Should be the same size as header_size
         work_done = fread(t_id,header_length,'uint16');
-        %% Write data
+        %% Write one slice of data, followed by header
         if (~work_done(slice_index) || ((continue_work) ...
                 && (work_done(slice_index) < requested_iterations)))
             s_vector_length = recon_dims(2)*recon_dims(3);
@@ -352,14 +351,16 @@ for index=1:length(slice_numbers)
             if log_mode==2
                 yet_another_logger(log_msg,1,log_file);
             else
-            yet_another_logger(log_msg,log_mode,log_file);
+                yet_another_logger(log_msg,log_mode,log_file);
             end
-            % Write header
+            % Write header flag for this slice only
             %fseek(fid,(slice_index-1),-1);
             header_info = uint16(completed_iterations+iterations_performed);
             %fseek(fid,8*(slice_index-1),-1); % 8 May 2017, BJA: changing header from binary to double local_scaling factor.
             %fseek(fid,2*(slice_index-1),-1); % 15 May 2017, BJA: header stores number of iterations now
             
+            % I think we're having concurrency problems due to many writers
+            % on a shared file syatem, this was always 
             num_written=0;
             for tt=1:30 %% is this a 30 retry count for write?
                 fseek(t_id,2*(slice_index),-1); %Need to account for the first two bytes which store header length.
@@ -400,7 +401,7 @@ end
 %  slices in this job will appear to be reconned then; if any have failed,
 %  will explicitly fail in hopes of triggering backup jobs instead of
 %  another complete cycle of volume_manager, etc.
-[~,~,tmp_header] = read_header_of_CStmp_file(setup_var.temp_file);
+tmp_header = read_header_of_CStmp_file(setup_var.temp_file);
 apparent_iterations = tmp_header(slice_numbers);
 apparent_failures = slice_numbers(apparent_iterations<requested_iterations);
 num_af=length(apparent_failures);

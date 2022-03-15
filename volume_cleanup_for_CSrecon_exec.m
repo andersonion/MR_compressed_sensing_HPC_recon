@@ -230,7 +230,7 @@ if temp_file_error
         log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
     end
 else
-    [~,number_of_at_least_partially_reconned_slices,tmp_header] = read_header_of_CStmp_file(setup_var.temp_file);
+    [tmp_header,slices_with_iterations,~] = read_header_of_CStmp_file(setup_var.temp_file);
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
         unreconned_slices = length(find(tmp_header<options.Itnlim));
@@ -239,7 +239,7 @@ else
         error_flag=1;
         log_msg =sprintf('Volume %s: %i slices appear to be inadequately reconstructed; DYING.\n',setup_var.volume_runno,unreconned_slices);
     else
-        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',setup_var.volume_runno,number_of_at_least_partially_reconned_slices);
+        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',setup_var.volume_runno,slices_with_iterations);
     end
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);

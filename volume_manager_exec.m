@@ -44,8 +44,8 @@ target_host_name=sprintf('%s.dhe.duke.edu',target_machine);
 %dim_x,dim_y,dim_z
 %scanner
 %runno
-%agilent_study
-%agilent_series
+%scanner_patient
+%scanner_acquisition
 % processed options
 %options:
 %target_machine
@@ -89,18 +89,18 @@ previous more annoyingly specific ugly funciton
     volume_runno, ...
     recon_mat.scanner_name,...
     recon_mat.runno,...
-    recon_mat.agilent_study,...
-    recon_mat.agilent_series,...
-    recon_mat.bbytes);
+    recon_mat.scanner_patient,...
+    recon_mat.scanner_acquisition,...
+    recon_mat.bytes_per_block);
 %}
 % new funtion
 [starting_point,log_msg,~,data_mode_check]=volume_status(volume_workdir,...
     volume_runno, ...
     recon_mat.scanner_name,...
     volume_number,...
-    recon_mat.agilent_study,...
-    recon_mat.agilent_series,...
-    recon_mat.bbytes);
+    recon_mat.scanner_patient,...
+    recon_mat.scanner_acquisition,...
+    recon_mat.bytes_per_block);
 
 if ~islogical(options.CS_preview_data)
     if starting_point>2
@@ -185,15 +185,15 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
-    agilent_study_gatekeeper_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
+    scanner_patient_gatekeeper_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_gatekeeper.bash']);
     % hint: ~ ==> local_or_streaming_or_static
-    [fid_path.current,~] =find_input_fidCS(recon_mat.scanner_name,recon_mat.runno,recon_mat.agilent_study,recon_mat.agilent_series);
+    [fid_path.current,~] =find_input_fidCS(recon_mat.scanner_name,recon_mat.runno,recon_mat.scanner_patient,recon_mat.scanner_acquisition);
     gatekeeper_args= sprintf('%s %s %s %s %i %i', ...
-        volume_fid, fid_path.current, recon_mat.scanner_name, log_file, volume_number, recon_mat.bbytes);
+        volume_fid, fid_path.current, recon_mat.scanner_name, log_file, volume_number, recon_mat.bytes_per_block);
     gatekeeper_cmd = sprintf('%s %s %s ', cs_execs.gatekeeper, matlab_path,...
         gatekeeper_args);
     if ~options.live_run
-        batch_file = create_slurm_batch_files(agilent_study_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
+        batch_file = create_slurm_batch_files(scanner_patient_gatekeeper_batch,gatekeeper_cmd,gk_slurm_options);
         running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
     else
         running_jobs='';
@@ -209,7 +209,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     % using a blank reservation to force no reservation for this job.
     vm_slurm_options.reservation = '';
     volume_manager_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
-    vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
+    vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.scanner_patient_workdir);
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(volume_manager_batch, ...
@@ -251,12 +251,12 @@ else
                 fid_path=data_mode_check.fid_path;
                 clear data_mode_check;
             else
-                [data_mode,fid_path.current]=get_data_mode(the_scanner,recon_mat.study_workdir,recon_mat.agilent_study,recon_mat.agilent_series);
+                [data_mode,fid_path.current]=get_data_mode(the_scanner,recon_mat.study_workdir,recon_mat.scanner_patient,recon_mat.scanner_acquisition);
             end
             %{
             [input_fid, local_or_streaming_or_static]=find_fid_path.currentCS( ...
                 recon_mat.scanner_name, recon_mat.runno, ...
-                recon_mat.agilent_study, recon_mat.agilent_series);
+                recon_mat.scanner_patient, recon_mat.scanner_acquisition);
             %}
         else
             fid_path.current='BOGUS_INPUT_FOR_DONE_WORK';
@@ -288,9 +288,9 @@ else
                 % when streaming data.
                 % This code needs to be put someplace correct!
                 if ~exist(procpar_file,'file')
-                    datapath=['/home/mrraw/' agilent_study '/' agilent_series '.fid'];
+                    datapath=['/home/mrraw/' scanner_patient '/' scanner_acquisition '.fid'];
                     mode =2; % Only pull procpar file
-                    puller_glusterspaceCS_2(runno,datapath,scanner,recon_mat.agilent_study_workdir,mode);
+                    puller_glusterspaceCS_2(runno,datapath,scanner,recon_mat.scanner_patient_workdir,mode);
                 end
                 %}
                 % Getting subvolume should be the job of volume setup.
@@ -307,12 +307,12 @@ else
                     %if (local_or_streaming_or_static == 1)
                     %{
                     if strcmp(data_mode,'local')
-                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bbytes);
+                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
                     else
-                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bbytes,recon_mat.scanner_name,the_scanner.user);
+                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block,recon_mat.scanner_name,the_scanner.user);
                     end
                     %}
-                    the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bbytes);
+                    the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
                 elseif recon_mat.nechoes > 1 && volume_number == 1
                     % for 1 block fids, mgre, and single vol, in theory we
                     % can only operate when static, further we should only
@@ -328,11 +328,11 @@ else
                     % due to how ugly puller_glusterpsaceCS_2 is we have to define yet another temply var.
                     % hopefully we can swap the proper terminal puller code
                     if ~exist('datapath','var')
-                        datapath=['/home/mrraw/' recon_mat.agilent_study '/' recon_mat.agilent_series '.fid'];
+                        datapath=['/home/mrraw/' recon_mat.scanner_patient '/' recon_mat.scanner_acquisition '.fid'];
                     end
-                    local_fid= fullfile(recon_mat.agilent_study_workdir,'fid');
+                    local_fid= fullfile(recon_mat.scanner_patient_workdir,'fid');
                     if ~exist(local_fid,'file')
-                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.agilent_study_workdir,3);
+                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.scanner_patient_workdir,3);
                     end
                     if ~exist(local_fid,'file') 
                         % It is assumed that the target of puller is the local_fid
@@ -492,7 +492,7 @@ else
             if exist(temp_file,'file')
                 %Find slices that need to be reconned.
                 % the temp file only exists if setup has run.
-                [~,~,tmp_header] = read_header_of_CStmp_file(temp_file);
+                tmp_header = read_header_of_CStmp_file(temp_file);
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
                     if isfield(options,'keep_work')
@@ -577,9 +577,11 @@ else
                         %starting_point=4;
                     end
                 end
-                stage_3_running_jobs=strjoin(s3jobs,':');
-                if strcmp(':',stage_3_running_jobs(1))
-                    stage_3_running_jobs(1)=[];
+                if ~isempty(s3jobs)
+                    stage_3_running_jobs=strjoin(s3jobs,':');
+                    if strcmp(':',stage_3_running_jobs(1))
+                        stage_3_running_jobs(1)=[];
+                    end
                 end
             end
         end
@@ -744,7 +746,7 @@ else
         % using a blank reservation to force no reservation for this job.
         vm_slurm_options.reservation = '';
         volume_manager_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_volume_manager.bash']);
-        vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.agilent_study_workdir);
+        vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.scanner_patient_workdir);
         vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
         if ~options.live_run
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);

@@ -21,14 +21,10 @@ if numel(valid_tables)>1
     end
 elseif numel(valid_tables)==1
     CS_table=valid_tables{1};
-    warning('Only one possible CS_table found. If this is incorrect Ctrl+c now.\n%s',options.CS_table);
+    warning('Only one possible CS_table found. If this is incorrect Ctrl+c now.\n%s',CS_table);
     pause(5);
 else
     % no valid tables
     error('Table listing: %s\nCS_table not specified and couldn''t find valid CS table,\n\tMaybe this isn''t a CS acq?',available_tables);
 end
-log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
-
-yet_another_logger(log_msg,log_mode,log_file);
-
 

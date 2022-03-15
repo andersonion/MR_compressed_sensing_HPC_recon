@@ -1,53 +1,56 @@
-function [slices_remaining, slices_completed, full_header ] = read_header_of_CStmp_file( temp_file,header_size_or_quick_check)
-%% SUMMARY: Returns status of an in-progres CS recon, by looking at the .tmp file in the work directory.
+function [full_header, slices_with_work, slices_remaining ] = read_header_of_CStmp_file( temp_file, varargin)
+% [full_header, slices_completed, slices_remaining ] = read_header_of_CStmp_file( temp_file )
+% [full_header, slices_completed, slices_remaining ] = read_header_of_CStmp_file( temp_file[[,retries][, header_size]?]?)
+% full_header = array N-compressed slices big
+% slices_with_work = count of non-zero elements of full header
+% slices_remaining = count of zero elements of full header
+% retries = how many attempts until we quit, 0 means 1 attempt with no
+%           delay on fail, 1 means if first try fails, wait 30 seconds and
+%           try again
+% header_size = manually specified header size for files which dont use the
+%               first element to specify size
+% 
+% SUMMARY: Returns status of an in-progres CS recon, by looking at the .tmp file in the work directory.
 %   Written 14 September 2017, BJ Anderson, CIVM
-%   slice_remaining is returned first, thus acting by itself as an exit
-%   code of 0->'success;
+% 
+%   can be used inline for simple do work calls, 
+%   ex if read_header...; disp('work complete'); else disp('do work');end
+% NOTE this is opposition to former behavior of returned slice_remaining first, which could allow 
+%   if ~read_header... ; disp('work complete'); else disp('do work');end
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
-%if ~exist('header_size','var')
-%    header_size = dims(1);
-%end
-quick_check=0;
-if exist('header_size_or_quick_check','var')
-    if iscell(header_size_or_quick_check)
-        quick_check=header_size_or_quick_check{2};
-        if ~isempty(header_size_or_quick_check{1})
-            header_size=header_size_or_quick_check{1};
-        end
-    else
-        header_size=header_size_or_quick_check;
-    end
+retries=0;
+argn=1;
+if numel(varargin)>=argn
+    retries=varargin{argn};argn=argn+1;
 end
+if numel(varargin)>=argn
+    header_size=varargin{argn};argn=argn+1;
+end
+
 fid=fopen(temp_file,'r');
-%work_done=fread(fid,header_size,'double')';
 if ~exist('header_size','var')
-    header_size = fread(fid,1,'uint16');  % In version 2 the first 2 bytes (first uint16 element) gives the length of the header.
-end
-if (header_size == 0)
-    fclose(fid);
-    if quick_check == 0
-        pause(30);
-    end
-    fid=fopen(temp_file,'r');
+      % In version 2 the first 2 bytes (first uint16 element) gives the length of the header.
     header_size = fread(fid,1,'uint16');
-    if (header_size == 0)
-        fclose(fid);
-        % Why not just use the "error" function instead of a fprintf and a
-        % broken status?
-        fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
-        if isdeployed
-            quit force;
-        else
-            error();
-        end
+end
+
+if (header_size > 0 )
+    full_header=fread(fid,header_size,'uint16')';
+    fclose(fid);
+    slices_remaining = length(find(~full_header));
+    slices_with_work = header_size - slices_remaining;
+elseif (header_size == 0 && retries > 0)
+    fclose(fid);
+    pause(30);
+    [full_header,slices_with_work,slices_remaining]=read_header_of_CStmp_file(temp_file,retries,header_size);
+else
+    fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
+    if isdeployed
+        quit force;
+    else
+        error();
     end
 end
-work_done=fread(fid,header_size,'uint16')';
-fclose(fid);
-slices_remaining = length(find(~work_done));
-slices_completed = header_size - slices_remaining;
-full_header=work_done;
 end
