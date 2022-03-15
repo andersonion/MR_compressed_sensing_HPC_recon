@@ -1,9 +1,15 @@
-function [full_header, slices_with_work, slices_remaining, fid] = load_cstmp_hdr( temp_file, varargin)
-% [full_header, slices_completed, slices_remaining ] = load_cstmp_hdr( temp_file )
-% [full_header, slices_completed, slices_remaining ] = load_cstmp_hdr( temp_file[[,retries][, header_size]?]?)
+function [full_header, slices_with_work, slices_remaining, t_id] = load_cstmp_hdr( temp_file, varargin)
+% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file )
+% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file[[,retries][, header_size]?]?)
+% 
 % full_header = array N-compressed slices big
 % slices_with_work = count of non-zero elements of full header
 % slices_remaining = count of zero elements of full header
+% file_handle = the file handle to continue reading, 
+%   WARNING: if file handle requsted it must be closed! 
+%            if not specified it will be closed normally.
+% 
+% temp_file = path to a temp file
 % retries = how many attempts until we quit, 0 means 1 attempt with no
 %           delay on fail, 1 means if first try fails, wait 30 seconds and
 %           try again
@@ -30,27 +36,27 @@ if numel(varargin)>=argn
     header_size=varargin{argn};argn=argn+1;
 end
 
-fid=fopen(temp_file,'r');
+t_id=fopen(temp_file,'r');
 if ~exist('header_size','var')
       % In version 2 the first 2 bytes (first uint16 element) gives the length of the header.
-    header_size = fread(fid,1,'uint16');
+    header_size = fread(t_id,1,'uint16');
 end
 
 if (header_size > 0 )
-    full_header=fread(fid,header_size,'uint16')';
+    full_header=fread(t_id,header_size,'uint16')';
     if nargout ~= 4
-        fclose(fid);
+        fclose(t_id);
     end
     slices_remaining = length(find(~full_header));
     slices_with_work = header_size - slices_remaining;
 elseif (header_size == 0 && retries > 0)
-    fclose(fid);
+    fclose(t_id);
     pause(30);
     if nargout~=4
         [full_header,slices_with_work,slices_remaining]= ...
             load_cstmp_hdr(temp_file,retries,header_size);
     else
-        [full_header,slices_with_work,slices_remaining, fid]= ...
+        [full_header,slices_with_work,slices_remaining, t_id]= ...
             load_cstmp_hdr(temp_file,retries,header_size);
     end
 else
