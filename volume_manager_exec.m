@@ -492,7 +492,7 @@ else
             if exist(temp_file,'file')
                 %Find slices that need to be reconned.
                 % the temp file only exists if setup has run.
-                tmp_header = read_header_of_CStmp_file(temp_file);
+                tmp_header = load_cstmp_hdr(temp_file);
                 if length(tmp_header) > 2
                     slices_to_process = find(~tmp_header);
                     if isfield(options,'keep_work')

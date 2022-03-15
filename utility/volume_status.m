@@ -216,7 +216,7 @@ setup_file = fullfile(volume_dir, [ volume_runno '_setup_variables.mat']);
 if exist(temp_file,'file') ...
         && exist(setup_file,'file')
     % Need to remember that we are going to add the headersize as the first bytes
-    tmp_header = read_header_of_CStmp_file(temp_file);
+    tmp_header = load_cstmp_hdr(temp_file);
     try
         a = who('-file',setup_file,'recon_file');
         if size(a)

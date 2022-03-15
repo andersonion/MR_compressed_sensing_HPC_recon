@@ -1,6 +1,6 @@
-function [full_header, slices_with_work, slices_remaining ] = read_header_of_CStmp_file( temp_file, varargin)
-% [full_header, slices_completed, slices_remaining ] = read_header_of_CStmp_file( temp_file )
-% [full_header, slices_completed, slices_remaining ] = read_header_of_CStmp_file( temp_file[[,retries][, header_size]?]?)
+function [full_header, slices_with_work, slices_remaining, fid] = load_cstmp_hdr( temp_file, varargin)
+% [full_header, slices_completed, slices_remaining ] = load_cstmp_hdr( temp_file )
+% [full_header, slices_completed, slices_remaining ] = load_cstmp_hdr( temp_file[[,retries][, header_size]?]?)
 % full_header = array N-compressed slices big
 % slices_with_work = count of non-zero elements of full header
 % slices_remaining = count of zero elements of full header
@@ -38,13 +38,21 @@ end
 
 if (header_size > 0 )
     full_header=fread(fid,header_size,'uint16')';
-    fclose(fid);
+    if nargout ~= 4
+        fclose(fid);
+    end
     slices_remaining = length(find(~full_header));
     slices_with_work = header_size - slices_remaining;
 elseif (header_size == 0 && retries > 0)
     fclose(fid);
     pause(30);
-    [full_header,slices_with_work,slices_remaining]=read_header_of_CStmp_file(temp_file,retries,header_size);
+    if nargout~=4
+        [full_header,slices_with_work,slices_remaining]= ...
+            load_cstmp_hdr(temp_file,retries,header_size);
+    else
+        [full_header,slices_with_work,slices_remaining, fid]= ...
+            load_cstmp_hdr(temp_file,retries,header_size);
+    end
 else
     fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);
     if isdeployed

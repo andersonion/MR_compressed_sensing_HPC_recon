@@ -174,7 +174,7 @@ header_size = 1+recon_dims(1);% 26 September 2017, BJA: 1st uint16 bytes are hea
 for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
     %% read temp_file header for completed work.
-    work_done=read_header_of_CStmp_file(setup_var.temp_file);
+    work_done=load_cstmp_hdr(setup_var.temp_file);
     work_done=work_done';
     %{
     % this could be done exactly once before looping foreach slice.
@@ -401,7 +401,7 @@ end
 %  slices in this job will appear to be reconned then; if any have failed,
 %  will explicitly fail in hopes of triggering backup jobs instead of
 %  another complete cycle of volume_manager, etc.
-tmp_header = read_header_of_CStmp_file(setup_var.temp_file);
+tmp_header = load_cstmp_hdr(setup_var.temp_file);
 apparent_iterations = tmp_header(slice_numbers);
 apparent_failures = slice_numbers(apparent_iterations<requested_iterations);
 num_af=length(apparent_failures);

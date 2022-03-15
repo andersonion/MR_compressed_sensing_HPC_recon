@@ -230,7 +230,7 @@ if temp_file_error
         log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
     end
 else
-    [tmp_header,slices_with_iterations,~] = read_header_of_CStmp_file(setup_var.temp_file);
+    [tmp_header,slices_with_iterations,~] = load_cstmp_hdr(setup_var.temp_file);
     unreconned_slices = length(find(~tmp_header));
     if (continue_recon_enabled && ~variable_iterations)
         unreconned_slices = length(find(tmp_header<options.Itnlim));
