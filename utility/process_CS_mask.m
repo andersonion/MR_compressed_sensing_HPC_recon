@@ -50,7 +50,7 @@ recon_dims = [original_dims(1) size(mask)];%size(data);
 
 %mask to grab center frequency
 phmask = zpad(hamming(hamming_window)*hamming(hamming_window)', ...
-    mask_size(1), mask_size(2));
+    size(mask,1), size(mask,2));
 %for low-order phase estimation and correction
 phmask = phmask/max(phmask(:));
 end
