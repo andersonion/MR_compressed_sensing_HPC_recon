@@ -332,6 +332,13 @@ else
                     end
                     local_fid= fullfile(recon_mat.scanner_patient_workdir,'fid');
                     if ~exist(local_fid,'file')
+                        error('untested after code update');
+                        pull_cmd=sprintf('puller_simple -oer -u %s %s %s/%s.fid %s.work',...
+                            options.scanner_user, recon_mat.scanner_name, recon_mat.scanner_patient,recon_mat.scanner_acquisition,runno);
+                        [s,sout] = system(pull_cmd);
+                        assert(s==0,sout);
+                        %%% the replacement of puller_glusterspaceCS_2 was
+                        %%% not tested yet.
                         puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.scanner_patient_workdir,3);
                     end
                     if ~exist(local_fid,'file') 
@@ -387,22 +394,22 @@ else
         if (starting_point <= 2 || ~islogical(options.CS_preview_data) )
             % Schedule setup
             %% Make variable file
-            mf = matfile(setup_variables,'Writable',true);
-            mf.recon_file = recon_file;
-            mf.volume_number=volume_number;
-            mf.volume_runno = volume_runno;
-            mf.work_subfolder = work_subfolder;
-            mf.volume_log_file = volume_log_file;
+            setup_var = matfile(setup_variables,'Writable',true);
+            setup_var.recon_file = recon_file;
+            setup_var.volume_number=volume_number;
+            setup_var.volume_runno = volume_runno;
+            setup_var.work_subfolder = work_subfolder;
+            setup_var.volume_log_file = volume_log_file;
             %{
             mf.procpar_file = procpar_file;
             mf.scale_file = scale_file;
             %}
-            mf.volume_fid = volume_fid;
-            mf.volume_workspace = volume_workspace;
-            mf.workdir = volume_workdir;
-            mf.temp_file = temp_file;
-            mf.images_dir =images_dir;
-            mf.headfile = hedfile_path;
+            setup_var.volume_fid = volume_fid;
+            setup_var.volume_workspace = volume_workspace;
+            setup_var.workdir = volume_workdir;
+            setup_var.temp_file = temp_file;
+            setup_var.images_dir =images_dir;
+            setup_var.headfile = hedfile_path;
             %{
             if exist('remote_workstation.name','var')
                 mf.remote_workstation.name = remote_workstation.name;
@@ -489,42 +496,36 @@ else
             % swr_slurm_options.job_name=[volume_runno '_CS_recon_' num2str(chunk_size) '_slice' plural '_per_job'];
             swr_slurm_options.job_name=[volume_runno '_CS_recon_NS' num2str(options.chunk_size)];
             swr_slurm_options.reservation = active_reservation;
+            slices_to_process = [];
             if exist(temp_file,'file')
                 %Find slices that need to be reconned.
-                % the temp file only exists if setup has run.
-                tmp_header = load_cstmp_hdr(temp_file);
-                if length(tmp_header) > 2
+                % the temp file only exists if setup has run(and cleanup
+                % has not)
+                [tmp_header, work_done, not_done] = load_cstmp_hdr(temp_file);
+                if ~options.keep_work
                     slices_to_process = find(~tmp_header);
-                    if isfield(options,'keep_work')
-                        if options.keep_work
-                            %% Currently iteration limit is not a part of the recon.mat variable group...will need to add it.
-                            slices_to_process = find(tmp_header<options.Itnlim);
-                        end
-                    end
-                    if isempty(slices_to_process)
-                        slices_to_process = 0;
-                    end
                 else
-                    slices_to_process =1:1:recon_mat.original_dims(1,1);
+                    slices_to_process = find(tmp_header<options.Itnlim);
                 end
-            else
-                slices_to_process = 1:1:recon_mat.original_dims(1,1);
             end
-            
-            if slices_to_process
+            if ~exist(temp_file,'file') || length(tmp_header) <= 2
+                % no temp file, or it failed to load
+                slices_to_process = 1:recon_mat.original_dims(1);
+            end
+            % if we have more than one element, or 1 element and its
+            % non-zero
+            if nnz(slices_to_process)
                 num_chunks = ceil(length(slices_to_process)/options.chunk_size);
                 log_msg =sprintf('Volume %s: Number of chunks (independent jobs): %i.\n',volume_runno,num_chunks);
                 yet_another_logger(log_msg,log_mode,log_file);
                 log_msg =sprintf('Volume %s: Number of slices to be reconstructed: %i.\n',volume_runno,nnz(~isnan(slices_to_process)));
                 yet_another_logger(log_msg,log_mode,log_file);
-                
                 % pad slices_to_process out to num_chunks*chunk_size if not
                 % even multiple.
                 slice_pack_padding=options.chunk_size-mod(numel(slices_to_process),options.chunk_size);
                 if slice_pack_padding~=options.chunk_size
                     slices_to_process(end+1:end+slice_pack_padding)=NaN;
                 end
-                
                 s3jobs=cell(1,num_chunks);
                 %slices to process would be better named chunks, or slabs.
                 slices_to_process = reshape(slices_to_process,[options.chunk_size num_chunks]);
@@ -534,8 +535,13 @@ else
                 zero_width = ceil(log10((recon_mat.dim_x+1)));
                 for ch_num=1:num_chunks
                     %parfor ch_num=1:num_chunks
+                    % extract this selection of slice indicies
                     sx=slices_to_process(:,ch_num);
+                    %{
+                    % NOTE: this algorithm never worked!
+                    % start a string with the first number
                     slice_string = sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(1)));
+                    % remove any nans we used to pad out the chunks
                     sx(isnan(sx))=[];
                     if length(sx)>3
                         no_con_test = sum(diff(diff(sx)));
@@ -548,7 +554,13 @@ else
                         elseif (ss==length(sx))
                             slice_string = [slice_string '_to_' sprintf(['' '%0' num2str(zero_width) '.' num2str(zero_width) 's'] ,num2str(sx(ss)))];
                         end
-                    end
+                    end;slice_string
+                    %}
+                    % force single_range output
+
+                    slice_ranges=range_condenser(sx,1);
+                    fmt=sprintf('%%0%ii_to_%%0%ii',zero_width,zero_width);
+                    slice_string=sprintf(fmt,slice_ranges{1}(1),slice_ranges{1}(end));
                     slicewise_recon_batch = fullfile(volume_workdir, 'sbatch', [ volume_runno '_slice' slice_string '_CS_recon.bash']);
                     swr_args= sprintf('%s %s %s', volume_workspace, slice_string,setup_variables);
                     swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
@@ -606,8 +618,10 @@ else
             '\t  fi;\n'...
             'fi'],at_success_flag, success_flag, hf_success_flag, ...
             local_archive_tag,sys_user(),remote_workstation.host_name,remote_workstation.name,volume_runno,write_archive_tag_success_cmd);
-        vol_mat = matfile(setup_variables,'Writable',true);
-        vol_mat.handle_archive_tag_cmd=handle_archive_tag_cmd;
+        if ~exist('setup_var','var')
+            setup_var = matfile(setup_variables,'Writable',true);
+        end
+        setup_var.handle_archive_tag_cmd=handle_archive_tag_cmd;
         %% STAGE4 Scheduling
         if (starting_point <= 4)
             %% Schedule via slurm and record jobid for dependency scheduling.

@@ -9,11 +9,11 @@ function [ c_running_jobs ] = deploy_procpar_handlers(setup_variables)
 setup_var=matfile(setup_variables);
 recon_mat=matfile(setup_var.recon_file);
 options=recon_mat.options;
+the_scanner=recon_mat.the_scanner;
 try 
     recon_type=recon_mat.recon_type;
 catch
-    recon_type = 'CS_v2';
-    warning('Default recon type: %s',recon_type);
+    error('recon_type required and not found! %s',setup_var.recon_file);
 end
 %%%%%%
 
@@ -116,16 +116,24 @@ end
 %% check current acq status
 % get procpar file if its missing, and we can.
 %pp_running_jobs='';
-[~, local_or_streaming_or_static]=find_input_fidCS(recon_mat.scanner,  ...
-    recon_mat.runno,  recon_mat.agilent_study,  recon_mat.agilent_series);
+%[~, local_or_streaming_or_static]=find_input_fidCS(recon_mat.scanner,  ...
+%    recon_mat.runno,  recon_mat.agilent_study,  recon_mat.agilent_series);
+[data_mode,fid_path]=get_data_mode(the_scanner,recon_mat.study_workdir,recon_mat.scanner_patient,recon_mat.scanner_acquisition);
+%{
 if ~exist(recon_mat.procpar_file,'file') ...
         && ( local_or_streaming_or_static ~= 2 ) % && ( (volume_number == n_volumes) || local_or_streaming_or_static ~= 2 )
     mode =2; % Only pull procpar file
     datapath=fullfile('/home/mrraw',recon_mat.agilent_study,[recon_mat.agilent_series '.fid']);
     puller_glusterspaceCS_2(recon_mat.runno,  datapath,  recon_mat.scanner,...
         recon_mat.agilent_study_workdir,  mode);
+%}
+procpar_file=fullfile(recon_mat.study_workdir,'procpar');
+if ~exist(procpar_file,'file') && ~strcmp(data_mode,'streaming')
+    pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s/%s.fid/procpar %s.work',...
+        options.scanner_user, recon_mat.scanner.name, scanner_patient,scanner_acquisition,recon_mat.runno);
+    [s,sout] = system(pull_cmd);
+    assert(s==0,sout);
 end
-
 %% set up procpar gatekeeper
 % uses singleton to hold the next job behind it.
 if (~exist(recon_mat.procpar_file,'file') || ~exist(setup_var.headfile,'file'))

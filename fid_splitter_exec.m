@@ -27,16 +27,7 @@ end
 
 % I <3 this variable construct.
 if sum(work_to_do)
-    %{
-    USED TO ALSO GET DATA :P thats yucky!
-    [input_fid, local_or_streaming_or_static]=find_input_fidCS(scanner,runno,study,agilent_series);
-    datapath=['/home/mrraw/' study '/' agilent_series '.fid'];
-    if ~exist(local_fid,'file')
-        mode = 3;
-        puller_glusterspaceCS_2(runno,datapath,scanner,study_workdir,mode);
-    end
-    %}
-    tic
+    l_start=tic();
     
     try
         fid = fopen(local_fid,'r','ieee-be');
@@ -60,15 +51,31 @@ if sum(work_to_do)
         quit force
     end
     
-    if strcmp(recon_mat.bitdepth,'int16');
-        %data= fread(fid,npoints*ntraces, 'int16');% full_fid
+    bytes_per_point=class_bytes(recon_mat.kspace_data_type);
+    %{
+    if strcmp(recon_mat.kspace_data_type,'int16');
         bytes_per_point = 2;
     else
-        %data = fread(fid,npoints*ntraces,'int32') ; % full_fid
         bytes_per_point = 4;
     end
+    %} 
     
-    hdr_60byte = fread(fid,30,'uint16');
+    %{
+recon_mat fields available
+    m.dim_x=acq_hdr.ray_length;
+    m.bytes_per_block=acq_hdr.bytes_per_block;
+    m.rays_per_block=acq_hdr.rays_per_block;
+    m.ray_blocks=acq_hdr.ray_blocks;
+    m.kspace_data_type=acq_hdr.data_type;
+    %}
+    warnint('untested');
+    the_scanner=recon_mat.the_scanner;
+    hdr_byte_count=the_scanner.header_bytes + the_scanner.block_header_bytes;
+    % hdr_60byte = fread(fid,30,'uint16');
+    %hdr_60byte = fread(fid,60,'uint8=>uint8');
+
+    hdr_bytes = fread(fid,hdr_byte_count,'uint8=>uint8');
+    
     %% read full file trying to be 100% data agnostic 
     % because all we want to do is transcribe the bytes from the input file into the output.
     % Suspect the trouble here is data blocks are not updated in size when
@@ -80,9 +87,12 @@ if sum(work_to_do)
     count=0;
     % forcing doubles becuase our header vars may not be, if they're not
     % doubles we get stupid bit errors. 
+    %{
     read_bytes=double(bytes_per_point) ...
         * double(recon_mat.npoints) ...
         * double(recon_mat.ntraces);
+    %}
+    read_bytes=recon_mat.bytes_per_block;
     data=zeros([read_bytes,1],'uint8');
     try_lim=10;
     while count<read_bytes && try_lim>0
@@ -94,7 +104,7 @@ if sum(work_to_do)
         end
         count=count+ncount;
         try_lim=try_lim-1;
-    end; 
+    end
     fclose(fid);
     if(try_lim<9)
         warning('Took %i tries to read full data',10-try_lim);
@@ -110,13 +120,13 @@ if sum(work_to_do)
     
     data = reshape(data,ldims);
     data = permute(data,[1 3 2]);
-    fid_load_time = toc;
+    fid_load_time = toc(l_start);
     
     log_msg =sprintf('Runno %s: fid loaded and reshaped successfully in %0.2f seconds.\n', recon_mat.runno,fid_load_time);
     yet_another_logger(log_msg,log_mode,recon_mat.log_file);
     
     for nn = 1:recon_mat.nechoes
-        tic
+        e_start=tic();
         vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.nechoes-1))) 'i' ],nn-1);
         volume_runno = sprintf('%s_m%s',recon_mat.runno,vol_string);
         c_work_dir = sprintf('%s/%s/work/',recon_mat.agilent_study_workdir,volume_runno);
@@ -124,7 +134,8 @@ if sum(work_to_do)
             warning('Creating directory (%s) to save split fid, this should have been done already.',c_work_dir);
             system(['mkdir -p ' c_work_dir ]);
         end
-        c_hdr = hdr_60byte;
+        % convert the 8-bit raw bytes to uint16
+        c_hdr = typecast(hdr_bytes,'uint16');
         c_hdr(19) = nn;
         c_fid = sprintf('%s%s.fid',c_work_dir,volume_runno);
         fid =fopen(c_fid,'w','ieee-be');
@@ -133,7 +144,7 @@ if sum(work_to_do)
 
         fwrite(fid,c_data(:),'uint8');
         
-        fid_load_time = toc;
+        fid_load_time = toc(e_start);
         log_msg =sprintf('Volume %s: fid loaded and reshaped successfully in %0.2f seconds.\n',volume_runno,fid_load_time);
         yet_another_logger(log_msg,log_mode,recon_mat.log_file);
         

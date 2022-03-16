@@ -1,4 +1,5 @@
 function puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
+error('obsolete function');
 % puller_glusterspaceCS_2(runno,datapath,scanner,workpath,mode,overwrite)
 % mode: 1 -> pull fid, 
 %       2 -> pull procpar, 

@@ -1,6 +1,6 @@
 function [full_header, slices_with_work, slices_remaining, t_id] = load_cstmp_hdr( temp_file, varargin)
-% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file )
-% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file[[,retries][, header_size]?]?)
+% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file,[file_mode])
+% [full_header, slices_completed, slices_remaining, file_handle ] = load_cstmp_hdr( temp_file[[,file_mode]?[,retries][, header_size]?]?)
 % 
 % full_header = array N-compressed slices big
 % slices_with_work = count of non-zero elements of full header
@@ -28,6 +28,16 @@ function [full_header, slices_with_work, slices_remaining, t_id] = load_cstmp_hd
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
 retries=0;
+
+% find any character args to act as file_mode for fopen
+for argn=1:numel(varargin)
+    val=varargin{argn};
+    if ischar(val)
+        file_mode=val;
+        varargin(argn)=[];
+        break;
+    end
+end
 argn=1;
 if numel(varargin)>=argn
     retries=varargin{argn};argn=argn+1;
@@ -35,8 +45,11 @@ end
 if numel(varargin)>=argn
     header_size=varargin{argn};argn=argn+1;
 end
+if ~exist('file_mode','var')
+    file_mode='r';
+end
 
-t_id=fopen(temp_file,'r');
+t_id=fopen(temp_file,file_mode);
 if ~exist('header_size','var')
       % In version 2 the first 2 bytes (first uint16 element) gives the length of the header.
     header_size = fread(t_id,1,'uint16');
@@ -54,10 +67,10 @@ elseif (header_size == 0 && retries > 0)
     pause(30);
     if nargout~=4
         [full_header,slices_with_work,slices_remaining]= ...
-            load_cstmp_hdr(temp_file,retries,header_size);
+            load_cstmp_hdr(temp_file,file_mode,retries,header_size);
     else
         [full_header,slices_with_work,slices_remaining, t_id]= ...
-            load_cstmp_hdr(temp_file,retries,header_size);
+            load_cstmp_hdr(temp_file,file_mode,retries,header_size);
     end
 else
     fprintf(1,'ERROR: tmp file claims to have a zero-length header! This is not possible. DYING...\n\tTroublesome tmp file: %s.\n',temp_file);

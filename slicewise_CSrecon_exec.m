@@ -326,21 +326,23 @@ for index=1:length(slice_numbers)
         im_to_write = zeros([2, numel(im_res)],'single');
         im_to_write(1,:)=single(real(im_res(:)));
         im_to_write(2,:)=single(imag(im_res(:)));
-        
         im_to_write = reshape(im_to_write,[2*numel(im_res), 1]);
-        
         image_to_write = typecast(im_to_write(:),'uint8');
         %}
-        
-        tic
-        
-        t_id=fopen(setup_var.temp_file,'r+');
-        header_length = fread(t_id,1,'uint16'); % Should be the same size as header_size
-        work_done = fread(t_id,header_length,'uint16');
         %% Write one slice of data, followed by header
+        tic
+        %{
+        t_id=fopen(setup_var.temp_file,'r+');
+        % Should be the same size as header_size
+        header_length = fread(t_id,1,'uint16');
+        work_done = fread(t_id,header_length,'uint16');
+        %}
+        [work_done,~,~,t_id]=load_cstmp_hdr(setup_var.temp_file,'r+');
         if (~work_done(slice_index) || ((continue_work) ...
                 && (work_done(slice_index) < requested_iterations)))
             s_vector_length = recon_dims(2)*recon_dims(3);
+            % we write out 2x 64-bit points for complex double precision
+            % that is 2*8
             data_offset=(2*8*s_vector_length*(slice_index-1));
             fseek(t_id,data_offset,0);
             % switched out these two lines for a one liner to reduce mem overhead.
@@ -371,6 +373,8 @@ for index=1:length(slice_numbers)
                     break
                 end
             end
+            % close our file_id immediatly before logging anything
+            fclose(t_id);
             if (num_written ~= 1) 
                 log_msg =sprintf('Slice %i: Reconstruction flag ("%i") WAS NOT written to header of %s, after %i tries.\n',...
                     slice_index,header_info,setup_var.temp_file,tt);
@@ -389,8 +393,9 @@ for index=1:length(slice_numbers)
             time_to_write_data=toc;
             log_msg =sprintf('Slice %i: Time to write data:  %0.2f seconds.\n',slice_index,time_to_write_data);
             yet_another_logger(log_msg,log_mode,log_file);
+        else
+            fclose(t_id);
         end
-        fclose(t_id);
     else
         log_msg =sprintf('Slice %i: Previously reconstructed; skipping.\n',slice_index);
         yet_another_logger(log_msg,log_mode,log_file);

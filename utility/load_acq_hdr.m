@@ -110,6 +110,7 @@ elseif strcmp(the_scanner.vendor,'mrsolutions')
     hdr.ray_length=double(S_hdr.Dimension(1));
     % a guess...
     % hdr.rays_per_block=double(S_hdr.Dimension(2));
+    error('incomplete');
 else
     error('unrecognized scanner_vendor:%s',the_scanner.vendor);
 end

@@ -369,36 +369,36 @@ if ~exist(complete_study_flag,'file')
         [s,sout]=system(mkdir_cmd);
         assert(s==0,sout);
     end
-    m = matfile(recon_file,'Writable',true);
+    recon_mat = matfile(recon_file,'Writable',true);
     % intentionally re-writing these params instead of avoiding it.
     % cannot directly access structs, so we have to pull headfile out.
     if matfile_missing_vars(recon_file,'headfile')
         headfile=struct;
     else
-        headfile=m.headfile;
+        headfile=recon_mat.headfile;
     end
-    m.runno = runno;
-    m.scanner_name = scanner_name;
+    recon_mat.runno = runno;
+    recon_mat.scanner_name = scanner_name;
     % TODO: generic for studdy/series but wee dont know how new sys will be
     % organized yet
-    m.scanner_patient = scanner_patient;
-    m.scanner_acquisition = scanner_acquisition;
+    recon_mat.scanner_patient = scanner_patient;
+    recon_mat.scanner_acquisition = scanner_acquisition;
     headfile.U_runno=runno;
     headfile.U_scanner=scanner_name;
     headfile=combine_struct(headfile,the_scanner.hf);
-    m.the_scanner=the_scanner;
+    recon_mat.the_scanner=the_scanner;
     headfile=combine_struct(headfile,the_workstation.hf);
-    m.the_workstation=the_workstation;
+    recon_mat.the_workstation=the_workstation;
     if exist('gui_info','var')
         gui_info=rmfield(gui_info,'comment');
         headfile=combine_struct(headfile,gui_info,'U_');
     end
     headfile.B_recon_type = recon_type;
     % now stuff it back in the mfile
-    m.headfile=headfile;
-    m.study_workdir = workdir;
-    m.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
-    m.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
+    recon_mat.headfile=headfile;
+    recon_mat.study_workdir = workdir;
+    recon_mat.scale_file = fullfile(workdir,[ runno '_4D_scaling_factor.float']);
+    recon_mat.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
         system(['touch ' log_file]);
@@ -418,7 +418,7 @@ if ~exist(complete_study_flag,'file')
     log_msg=sprintf('%sUser: %s\n',log_msg,user);
     log_msg=sprintf('%sExec Set: %s\n',log_msg,cs_exec_set);
     yet_another_logger(log_msg,log_mode,log_file);
-    m.log_file = log_file;
+    recon_mat.log_file = log_file;
     %% Test ssh connectivity using our perl program which has robust ssh handling.
     %{ 
     % but the scanner is probably fine and not where we'll have trouble
@@ -449,11 +449,11 @@ if ~exist(complete_study_flag,'file')
         % old rad_mat var was kspace_data_path, but it was for the local
         % file, we only use the local file when it exists, so i'm not
         % saving it separately
-        m.fid_path_remote=fid_path.remote;
+        recon_mat.fid_path_remote=fid_path.remote;
     end
     % fid_consistency gets a header of data and a few bytes too saving it in the fid_tag_file
     % we use that to get some scanner details
-    if ~the_scanner.fid_consistency(fid_path.current,m.fid_tag_file,0)
+    if ~the_scanner.fid_consistency(fid_path.current,recon_mat.fid_tag_file,0)
         % may want to skip fid consistency for local becuase we have the 
         % whole thing to work on ?
         % decided against that becuase if we're local we'd want to be
@@ -464,12 +464,12 @@ if ~exist(complete_study_flag,'file')
     end
     % returing S_hdr for now for convenience, in the future all important
     % bits will be filed under acq_hdr, and that will be removed.
-    [acq_hdr,S_hdr]=load_acq_hdr(the_scanner,m.fid_tag_file);
-    m.dim_x=acq_hdr.ray_length;
-    m.bytes_per_block=acq_hdr.bytes_per_block;
-    m.rays_per_block=acq_hdr.rays_per_block;
-    m.ray_blocks=acq_hdr.ray_blocks;
-    m.kspace_data_type=acq_hdr.data_type;
+    [acq_hdr,S_hdr]=load_acq_hdr(the_scanner,recon_mat.fid_tag_file);
+    recon_mat.dim_x=acq_hdr.ray_length;
+    recon_mat.bytes_per_block=acq_hdr.bytes_per_block;
+    recon_mat.rays_per_block=acq_hdr.rays_per_block;
+    recon_mat.ray_blocks=acq_hdr.ray_blocks;
+    recon_mat.kspace_data_type=acq_hdr.data_type;
     % load basic info from the header we scrapped during the
     % fid_consistency check. Why was this being done here? if seems this
     % should MOVE 
@@ -486,23 +486,24 @@ if ~exist(complete_study_flag,'file')
     %     for agilent)
     % 
     if exist('agilent_specific','var')
+        % OBSOLETE CODE will be removed soon once these are abstracted away
         varlist='npoints,nblocks,ntraces,bitdepth,bbytes,dim_x';
         missing=matfile_missing_vars(recon_file,varlist);
         if missing>0
-            [m.npoints,m.nblocks,m.ntraces,m.bitdepth,m.bbytes,~,~] = load_fid_hdr(m.fid_tag_file);
+            [recon_mat.npoints,recon_mat.nblocks,recon_mat.ntraces,recon_mat.bitdepth,recon_mat.bbytes,~,~] = load_fid_hdr(recon_mat.fid_tag_file);
             % formerly protected dim_x by rounding BUT THAT IS BAD!
             % If it is EVER fractional we want to throw errors!
-            dx = m.npoints/2;
+            dx = recon_mat.npoints/2;
             if floor(dx) ~= dx
                 log_msg=sprintf('ERROR pulling dim_x from fid hdr field npoints!\n');
                 yet_another_logger(log_msg,3,log_file,1);
                 if isdeployed; quit force; else; error(log_msg); end
             end
-            m.dim_x=dx;
+            recon_mat.dim_x=dx;
             vs=strsplit(varlist,',');
             for vn=1:numel(vs)
-                if isnumeric(m.(vs{vn})) % && ~ischar(m.(vs{vn}))
-                    m.(vs{vn})=double(m.(vs{vn}));
+                if isnumeric(recon_mat.(vs{vn})) % && ~ischar(m.(vs{vn}))
+                    recon_mat.(vs{vn})=double(recon_mat.(vs{vn}));
                 end
             end; clear vs vn dx missing;
         end
@@ -537,7 +538,7 @@ if ~exist(complete_study_flag,'file')
             warning('Legacy procpar file name detected!');
             procpar_file=procpar_file_legacy;
         end;clear procpar_file_legacy;
-        m.procpar_file = procpar_file;
+        recon_mat.procpar_file = procpar_file;
     end
     local_cs_table_path='test';warning('test hard set table');
     if ~strcmp(data_mode,'streaming') && isempty(local_cs_table_path) ...
@@ -557,9 +558,7 @@ if ~exist(complete_study_flag,'file')
                 pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s/%s.fid/procpar %s.work',...
                     options.scanner_user, the_scanner.name, scanner_patient,scanner_acquisition,runno);
                 [s,sout] = system(pull_cmd);
-                if s~=0
-                    error(sout);
-                end
+                assert(s==0,sout);
             end
             remote_table_path=procpar_get_petableCS(procpar_file);
         end
@@ -616,15 +615,15 @@ if ~exist(complete_study_flag,'file')
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
-        [m.dim_y,m.dim_z,m.n_sampled_lines,m.sampling_fraction,m.mask,m.CSpdf,m.phmask,m.recon_dims,...
-            m.original_mask,m.original_pdf,m.original_dims] = process_CS_mask(local_cs_table_path, m.dim_x, options.hamming_window);
-        m.nechoes = 1;
-        if m.ray_blocks == 1
+        [recon_mat.dim_y,recon_mat.dim_z,recon_mat.n_sampled_lines,recon_mat.sampling_fraction,recon_mat.mask,recon_mat.CSpdf,recon_mat.phmask,recon_mat.recon_dims,...
+            recon_mat.original_mask,recon_mat.original_pdf,recon_mat.original_dims] = process_CS_mask(local_cs_table_path, recon_mat.dim_x, options.hamming_window);
+        recon_mat.nechoes = 1;
+        if recon_mat.ray_blocks == 1
             % n_sampled_lines is precisely the count from the cs mask
-            m.nechoes = double(m.rays_per_block)/m.n_sampled_lines;
-            m.n_volumes = m.nechoes;
+            recon_mat.nechoes = double(recon_mat.rays_per_block)/recon_mat.n_sampled_lines;
+            recon_mat.n_volumes = recon_mat.nechoes;
         else
-            m.n_volumes = m.ray_blocks;
+            recon_mat.n_volumes = recon_mat.ray_blocks;
             % acq_hdr.ray_blocks_per_volume=1
             % acq_hdr.rays_per_volume=acq_hdr.rays_per_block;
         end
@@ -638,31 +637,31 @@ if ~exist(complete_study_flag,'file')
         % in the missing variable list elsewhere in this function.
         % dataBufferHeafile <- bh
         bh=struct;
-        original_dims=m.original_dims;
+        original_dims=recon_mat.original_dims;
         %% 
         bh.dim_X=original_dims(1);
         bh.dim_Y=original_dims(2);
         bh.dim_Z=original_dims(3);
-        bh.A_dti_vols=m.n_volumes;
+        bh.A_dti_vols=recon_mat.n_volumes;
         bh.A_channels = 1;
-        bh.A_echoes = m.nechoes;
+        bh.A_echoes = recon_mat.nechoes;
         
-        bh.CS_working_array=m.recon_dims;
-        bh.CS_sampling_fraction = m.sampling_fraction;
-        bh.CS_acceleration = 1/m.sampling_fraction;
+        bh.CS_working_array=recon_mat.recon_dims;
+        bh.CS_sampling_fraction = recon_mat.sampling_fraction;
+        bh.CS_acceleration = 1/recon_mat.sampling_fraction;
 
         %bh.U_runno = volume_runno;
-        headfile=combine_struct(bh,m.headfile);
-        m.headfile=headfile;
+        headfile=combine_struct(bh,recon_mat.headfile);
+        recon_mat.headfile=headfile;
         clear bh
     end
     %% Check all n_volumes for incomplete reconstruction
     %WARNING: this code relies on each entry in recon status being
     %filled in. This should be fine, but take care when refactoring.
-    recon_status=zeros(1,m.n_volumes);
-    vol_strings=cell(1,m.n_volumes);
-    for vn = 1:m.n_volumes
-        vol_string =sprintf(['%0' num2str(numel(num2str(m.n_volumes-1))) 'i' ],vn-1);
+    recon_status=zeros(1,recon_mat.n_volumes);
+    vol_strings=cell(1,recon_mat.n_volumes);
+    for vn = 1:recon_mat.n_volumes
+        vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.n_volumes-1))) 'i' ],vn-1);
         volume_runno = sprintf('%s_m%s',runno,vol_string);
         volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
             workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
@@ -686,12 +685,12 @@ if ~exist(complete_study_flag,'file')
     num_unreconned = length(unreconned_volumes); % For reporting purposes
     clear volume_flag vol_string vol_strings vn;
     %% Let the user know the status of thesave recon.
-    log_msg =sprintf('%i of %i volume(s) have fully reconstructed.\n',m.n_volumes-num_unreconned,m.n_volumes);
+    log_msg =sprintf('%i of %i volume(s) have fully reconstructed.\n',recon_mat.n_volumes-num_unreconned,recon_mat.n_volumes);
     yet_another_logger(log_msg,log_mode,log_file);
     %% Do work if needed, first by finding input fid(s).
     if (num_unreconned > 0)
         % insert options to matfile.
-        m.options = options;
+        recon_mat.options = options;
         running_jobs = '';
         % Setup individual volumes to be reconned, with the assumption that
         % its own .fid file exists
@@ -724,7 +723,7 @@ if ~exist(complete_study_flag,'file')
                 end
                 % becuase mgre fid splitter makes directories, we dont do this
                 % check for mgre
-                if(sum(mkdir_s)>0) &&  (m.nechoes == 1)
+                if(sum(mkdir_s)>0) &&  (recon_mat.nechoes == 1)
                     strjoin(dir_cell(mkdir_s~=0),'\n')
                     log_msg=sprintf('error with mkdir for %s\n will need to remove dir %s to run cleanly. ', ...
                         volume_runno,volume_dir);
@@ -801,6 +800,7 @@ end
 end
 
 function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
+errror('obsolete function');
     % a hacky patch around the trouble that the specid_to_recon_file
     % function is damned dirty.
     % one trouble is that databuffer is thrown around as a struct, and that
@@ -824,19 +824,20 @@ function [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file)
     gui_info_collect(databuffer,optstruct);
 end
 
-function m = specid_to_recon_file(scanner,runno,recon_file)
+function recon_mat = specid_to_recon_file(scanner,runno,recon_file)
+errror('obsolete function');
 warning('THIS FUNCTION IS VERY BAD');
 % holly horrors this function is bad form!
 % it combines several disjointed programming styles.
 % the name is also terrible!
 % Now I've made it worse by removing the core ugly into it's own function
-m = matfile(recon_file,'Writable',true);
+recon_mat = matfile(recon_file,'Writable',true);
 if ~isstruct(scanner)
     [databuffer,optstruct] = CS_GUI_mess(scanner,runno,recon_file);
 else
     databuffer=scanner;
     optstruct=runno;
 end
-m.databuffer = databuffer;
-m.optstruct = optstruct;
+recon_mat.databuffer = databuffer;
+recon_mat.optstruct = optstruct;
 end

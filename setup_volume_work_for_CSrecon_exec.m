@@ -1,12 +1,12 @@
-function setup_volume_work_for_CSrecon_exec(setup_variables,volume_number_string)
-%CS_RECON_CLUSTER_SETUP_WORK_EXEC An executable MATLAB script for setting
-%up each volume of CS reconstruction in order to avoid saturating the
-%master node (in the context of DTI, with many many volumes to recon.
+function setup_volume_work_for_CSrecon_exec(setup_variables)
+% SETUP_VOLUME_WORK_FOR_CSrecon_exec(setup_variables)
+% An executable MATLAB script for setting up each volume of CS 
+% reconstruction in order to avoid saturating the master node (in the 
+% context of DTI, with many many volumes to recon.
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
-%% Update of original version (implied _v1)
 if ~isdeployed
     % our mfilename command is failire here while runing live, not gonna bothter to track that down now.
     % run(fullfile(fileparts(mfilename('fullfile')),'compile_commands','compile__pathset.m'))
@@ -14,61 +14,18 @@ else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
 end
-make_tmp = 0;
 %%   Import Variables
-% load(setup_variables);
 setup_var=matfile(setup_variables);
 log_file=setup_var.volume_log_file;
 log_mode=1;
-%recon_file = variables.recon_file;
-%procpar_path = variables.procparpath;
-%outpath = variables.outpath;
-%scale_file = variables.scale_file;
-%target_machine = variables.target_machine;
-
-%{
-% DONT CODE DEFAULTS HERE !
-if ~exist('TVWeight','var')
-    TVWeight = 0.0012;
-end
-if ~exist('xfmWeight','var')
-    xfmWeight = 0.006;
-end
-if ~exist('Itnlim','var')
-    Itnlim = 98;
-end
-if ~exist('wavelet_dims','var')
-    wavelet_dims = [12 12]; % check this default
-end
-if ~exist('wavelet_type','var')
-    wavelet_type = 'Daubechies';
-end
-%}
 %% Load data
-% load(recon_file);
 recon_mat=matfile(setup_var.recon_file);
 options=recon_mat.options;
-% mask should already be processed -- one  of the very first things done!
-%if ~exist('procpar_path','file')
-%    procpar_path = ;
-%end
-%mask = skipint2skiptable(procpar_path); %sampling mask
-
-% BJ says: I've started writing volume_number to the options (already as
-% double); the following code allows for backwards compatibility
-%{
-if ~exist('volume_number','var')
-    volume_number=str2double(volume_number_string);
-end
-%}
-if ~exist('volume_number_string','var')
-    fprintf('Ignoring legacy var volume_number_string\n');
-end
 volume_number=setup_var.volume_number;
 volume_runno=setup_var.volume_runno;
 %% Immediately check to see if we still need to set up the work (a la volume manager)
 % [starting_point, log_msg] = check_status_of_CSrecon(setup_var.workdir,volume_runno);
-[starting_point, log_msg] = volume_status(setup_var.workdir,volume_runno);
+[starting_point, ~] = volume_status(setup_var.workdir,volume_runno);
 make_workspace = 0;
 make_tmp = 0;
 % recreating vol_mat variable
@@ -77,6 +34,8 @@ make_tmp = 0;
 % temp_file = [work_subfolder '/' volume_runno '.tmp'];
 % this was re-creating vol_mat.temp_file
 if (starting_point == 2)
+    missing_vars=matfile_missing_vars(setup_var.volume_workspace,{'imag_data','real_data'});
+    %{
     try
         varinfo=whos('-file',setup_var.volume_workspace);
     catch
@@ -86,9 +45,9 @@ if (starting_point == 2)
             || ~ismember('real_data',{varinfo.name})  )
         make_workspace = 1;
     end
-    if ~exist(setup_var.temp_file,'file')
-        make_tmp = 1;
-    end
+    %}
+    if ~missing_vars; make_workspace=1; end
+    if ~exist(setup_var.temp_file,'file'); make_tmp = 1; end
 elseif (starting_point < 2)
     error_flag = 1;
     log_msg =sprintf('Volume %s: Source fid not ready yet! Unable to run recon setup.\n',volume_runno);
@@ -127,8 +86,6 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         recon_mat.dim_x*2, recon_mat.kspace_data_type, ...
         fid_volume_number, ...
         recon_mat.original_dims,   only_non_zeros, process_precision  );
-
-
     if ndims(data)==3
         %% convert back to 2d data, most of the time we dont get 3d from loadfid cs
         data=reshape(data,[size(data,1),size(data,2)*size(data,3)]);
@@ -171,20 +128,19 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         yet_another_logger(log_msg,log_mode,log_file);
         return;
     end
-
     recon_mat_vars = who('-file', setup_var.recon_file);
     % ismember('shift_modifier', variableInfo) % returns false if not available
     %% Calculate group scaling from first b0 image
     %if ((~exist(scale_file,'file') || (options.roll_data && ~isfield(m,'shift_modifier'))) && (volume_number==1))
     if (volume_number==1) ...
             && (  ~exist(recon_mat.scale_file,'file') ... %|| ~isfield(m,'shift_modifier')  )
-            || ~ismember('shift_modifier',recon_mat_vars)  )
-        
+            || ~ismember('shift_modifier',recon_mat_vars)  )        
         [scaling, scaling_time,shift_modifier,first_corner_voxel] = calculate_CS_scaling( ...
             recon_mat.original_mask,  data, recon_mat.original_pdf, ...
             recon_mat.dim_x,  options.roll_data);
-        m = matfile(setup_var.recon_file,'Writable',true);
-        m.first_corner_voxel=first_corner_voxel;
+        %recon_mat=matfile(setup_var.recon_file,'Writable',true);
+        recon_mat.Properties.Writable = true;
+        recon_mat.first_corner_voxel=first_corner_voxel;
         % Write scaling factor to scale file
         fid = fopen(recon_mat.scale_file,'w');
         fwrite(fid,scaling,'float');
@@ -204,23 +160,22 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         %}
         log_msg =sprintf('Volume %s: Initial global scaling (%f) calculated in %0.2f seconds\n',volume_runno,scaling,scaling_time);
         yet_another_logger(log_msg,log_mode,log_file);
-        %m = matfile(recon_file,'Writable',true); %moved outside of code
-        %block
-        m.scaling = scaling;
-        m.shift_modifier=shift_modifier;
-        clear m;
+        recon_mat.scaling = scaling;
+        recon_mat.shift_modifier=shift_modifier;
+        recon_mat.Properties.Writable = false;
+        clear first_corner_voxel fid;
     else
         if ismember('scaling',recon_mat_vars)
            scaling=recon_mat.scaling;
         end
-        %if (options.roll_data)
         if ismember('shift_modifier',recon_mat_vars)
            shift_modifier=recon_mat.shift_modifier;
         end
+        %{
         if ismember('first_corner_voxel',recon_mat_vars)
            first_corner_voxel=recon_mat.first_corner_voxel;
         end
-        %end
+        %}
     end
     %% Prep data for reconstruction
     % Calculate per volume scaling the study scale has already been
@@ -337,13 +292,14 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
             phase_vector=phase_matrix(original_mask(:));
             
             data=circshift(data,round(shift_modifier(1)));
-            for xx=1:original_dims(1);
+            for xx=1:original_dims(1)
                 data(xx,:)=phase_vector'.*data(xx,:);
             end
             clear original_mask;
         end
         real_data = real(data);
         imag_data = imag(data);
+        % is there a reason the real/imag data re saved here first?
         savefast2(setup_var.volume_workspace,'real_data','imag_data');
         %{
         save(setup_var.volume_workspace,'aux_param','-append');
