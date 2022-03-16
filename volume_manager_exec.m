@@ -589,7 +589,7 @@ else
                         %starting_point=4;
                     end
                 end
-                if ~isempty(s3jobs)
+                if ~isempty(s3jobs) && ~options.live_run
                     stage_3_running_jobs=strjoin(s3jobs,':');
                     if strcmp(':',stage_3_running_jobs(1))
                         stage_3_running_jobs(1)=[];

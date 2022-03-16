@@ -230,8 +230,7 @@ if temp_file_error
         log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
     end
 else
-    [tmp_header,slices_with_iterations,~] = load_cstmp_hdr(setup_var.temp_file);
-    unreconned_slices = length(find(~tmp_header));
+    [tmp_header,slices_with_iterations,unreconned_slices,t_id] = load_cstmp_hdr(setup_var.temp_file);
     if (continue_recon_enabled && ~variable_iterations)
         unreconned_slices = length(find(tmp_header<options.Itnlim));
     end
@@ -244,6 +243,7 @@ else
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
 if error_flag==1
+    fclose(t_id);
     if isdeployed
         quit force;
     else
@@ -255,11 +255,12 @@ end
 log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',setup_var.volume_runno,setup_var.temp_file);
 yet_another_logger(log_msg,log_mode,log_file);
 tic
-fid=fopen(setup_var.temp_file,'r');
-%fseek(fid,header_size*64,-1);
-header_size = fread(fid,1,'uint16');
-fseek(fid,2*header_size,0);
-%data_in=fread(fid,inf,'*uint8');
+%{
+% inline open
+t_id=fopen(setup_var.temp_file,'r');
+header_size = fread(t_id,1,'uint16');
+fseek(t_id,2*header_size,0);
+%}
 
 % our magic number threshold to remove bright noise.
 % This is the percentage of data we scale to, instead of a simple scale to
@@ -319,7 +320,7 @@ for ss=1:recon_dims(1)
     % is more robust this way, as we were running into
     % issues otherwise (bigendian/littleendian or something
     % like that).
-    data_in = typecast(fread(fid,bytes_per_slice,'*uint8'),'double');
+    data_in = typecast(fread(t_id,bytes_per_slice,'*uint8'),'double');
     data_in = reshape(data_in, [recon_dims(2) recon_dims(3) 2]);
     % t is temp data, as in from the temporary file, truly, its our
     % final product of iterations to be written after the final
@@ -396,7 +397,7 @@ clear suggested_final_scale sc_wc fid_sc;
 read_time = toc;
 log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,read_time);
 yet_another_logger(log_msg,log_mode,log_file);
-fclose(fid);
+fclose(t_id);
 
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
 % applied.
@@ -506,15 +507,19 @@ write_archive_tag_nodev(setup_var.volume_runno,['/' target_machine 'space'],orig
 % while we take stats of our iterations, these are not currently variable
 % and may not be the information we're after.
 % line search iterations of the minimization are variable, and we dont report those out of the fnl code.
-%{
 % this was a nice idea, but its causing trouble. Disabled for now.
 databuffer=large_array;
 databuffer.addprop('headfile');
 databuffer.addprop('data');
-databuffer.headfile=struct;
-%}
-t_var=recon_mat.databuffer;
-databuffer.headfile=t_var.headfile; clear t_var;
+databuffer.headfile=recon_mat.headfile;
+
+
+
+db_inplace(mfilename,'REVISE')
+if exist('bollocks','var')
+    t_var=recon_mat.databuffer;
+    databuffer.headfile=t_var.headfile; clear t_var;
+end
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_mean = mean(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_min = min(tmp_header(:));
@@ -523,7 +528,6 @@ databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_std = std(tmp_
 % Have to add the volume_runno here because we are initially populated with
 % the base runno.
 databuffer.headfile.U_runno = setup_var.volume_runno;
-
 try
     first_corner_voxel=recon_mat.first_corner_voxel;
     if options.roll_data
@@ -604,8 +608,7 @@ databuffer.headfile.divisor=1/final_scale;% legacy just for confusion :D
 fprintf('\tMax value chosen for output scale: %0.14f\n',databuffer.headfile.group_max_atpct);
 
 %% Stuff all meta to headfile here
-% rad_mat_option_
-databuffer.headfile=combine_struct(databuffer.headfile,options,'CSv2_option_');
+databuffer.headfile=combine_struct(databuffer.headfile,options, [databuffer.headfile.B_recon_type 'option_']);
 
 %% save civm_raw
 databuffer.data = mag_data;clear mag_data; % mag_data clear probably unnecessary, this is just in case.

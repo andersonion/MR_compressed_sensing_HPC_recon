@@ -10,8 +10,9 @@ setup_var=matfile(setup_variables);
 recon_mat=matfile(setup_var.recon_file);
 options=recon_mat.options;
 the_scanner=recon_mat.the_scanner;
+headfile=recon_mat.headfile;
 try 
-    recon_type=recon_mat.recon_type;
+    recon_type=headfile.B_recon_type;
 catch
     error('recon_type required and not found! %s',setup_var.recon_file);
 end
@@ -130,7 +131,7 @@ if ~exist(recon_mat.procpar_file,'file') ...
 procpar_file=fullfile(recon_mat.study_workdir,'procpar');
 if ~exist(procpar_file,'file') && ~strcmp(data_mode,'streaming')
     pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s/%s.fid/procpar %s.work',...
-        options.scanner_user, recon_mat.scanner.name, scanner_patient,scanner_acquisition,recon_mat.runno);
+        options.scanner_user, the_scanner.name, scanner_patient,scanner_acquisition,recon_mat.runno);
     [s,sout] = system(pull_cmd);
     assert(s==0,sout);
 end

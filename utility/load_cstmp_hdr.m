@@ -10,6 +10,8 @@ function [full_header, slices_with_work, slices_remaining, t_id] = load_cstmp_hd
 %            if not specified it will be closed normally.
 % 
 % temp_file = path to a temp file
+% file_mode = what mode used in fopen, if we're going to return the file
+%           handle and write data we need to specify 'r+', default is 'r'
 % retries = how many attempts until we quit, 0 means 1 attempt with no
 %           delay on fail, 1 means if first try fails, wait 30 seconds and
 %           try again
