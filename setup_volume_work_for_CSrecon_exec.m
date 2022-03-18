@@ -24,8 +24,8 @@ options=recon_mat.options;
 volume_number=setup_var.volume_number;
 volume_runno=setup_var.volume_runno;
 %% Immediately check to see if we still need to set up the work (a la volume manager)
-% [starting_point, log_msg] = check_status_of_CSrecon(setup_var.workdir,volume_runno);
-[starting_point, ~] = volume_status(setup_var.workdir,volume_runno);
+% [starting_point, log_msg] = check_status_of_CSrecon(setup_var.volume_dir,volume_runno);
+[starting_point, ~] = volume_status(setup_var.volume_dir,volume_runno);
 make_workspace = 0;
 make_tmp = 0;
 % recreating vol_mat variable
@@ -46,7 +46,7 @@ if (starting_point == 2)
         make_workspace = 1;
     end
     %}
-    if ~missing_vars; make_workspace=1; end
+    if missing_vars; make_workspace=1; end
     if ~exist(setup_var.temp_file,'file'); make_tmp = 1; end
 elseif (starting_point < 2)
     error_flag = 1;
@@ -101,9 +101,9 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
     if options.CS_preview_data
         t_preview=tic;
         warning('Preview data wont do any recon at current.');
-        preview_stamp=fullfile(setup_var.workdir,'.preview.time');
+        preview_stamp=fullfile(setup_var.volume_dir,'.preview.time');
         system(sprintf('touch %s',preview_stamp));
-        preview_imgs=CS_preview_data(recon_mat.original_mask,data,fullfile(setup_var.workdir,volume_runno),options.CS_preview_data);
+        preview_imgs=CS_preview_data(recon_mat.original_mask,data,fullfile(setup_var.volume_dir,volume_runno),options.CS_preview_data);
         scp_cmds=cell(1,numel(preview_imgs)+1);
         for pn=1:numel(preview_imgs)
             scp_to_engine=sprintf('scp -p %s %s@%s.dhe.duke.edu:/%sspace/',...

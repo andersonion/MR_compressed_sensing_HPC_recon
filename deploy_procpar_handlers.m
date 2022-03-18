@@ -72,7 +72,7 @@ if ~exist('USE_OLD_REMOTE_CHECK_CODE','var')
     %}
     % local_cmd
     cmd_stack{end+1}=sprintf('scp -p "%s" "%s:/Volumes/%sspace/%s/%simages/" || exit 1;',...
-        setup_var.headfile,  ssh_dest,...
+        setup_var.headfile_path,  ssh_dest,...
         options.target_machine,  setup_var.volume_runno,  setup_var.volume_runno);
     cmd_stack{end+1}=setup_var.handle_archive_tag_cmd;
     cmd_stack{end+1}=sprintf('touch "$hfs" && rm "$hff"');
@@ -101,7 +101,7 @@ ship_prep_send_headfile = sprintf([ ...
     'scp -p %s %s@%s:/Volumes/%sspace/%s/%simages/ && hf_success=1'],...
     sys_user(),  target_host_name,  options.target_machine,  setup_var.volume_runno,  setup_var.volume_runno,...
     options.target_machine,  setup_var.volume_runno,  setup_var.volume_runno,...
-    setup_var.headfile,  sys_user(),  target_host_name,  options.target_machine, setup_var.volume_runno, setup_var.volume_runno);
+    setup_var.headfile_path,  sys_user(),  target_host_name,  options.target_machine, setup_var.volume_runno, setup_var.volume_runno);
 % if scp status return good, set hf success flag, else set fail
 write_hf_success_cmd = sprintf([...
     'if [[ $hf_success -eq 1 ]];\n'...
@@ -118,26 +118,34 @@ end
 % get procpar file if its missing, and we can.
 %pp_running_jobs='';
 %[~, local_or_streaming_or_static]=find_input_fidCS(recon_mat.scanner,  ...
-%    recon_mat.runno,  recon_mat.agilent_study,  recon_mat.agilent_series);
-[data_mode,fid_path]=get_data_mode(the_scanner,recon_mat.study_workdir,recon_mat.scanner_patient,recon_mat.scanner_acquisition);
+%    recon_mat.runno,  recon_mat.scanner_patient,  recon_mat.scanner_acquisition);
+
+scan_data_setup=recon_mat.scan_data_setup;
+[data_mode,fid_path]=get_data_mode(the_scanner,recon_mat.study_workdir,scan_data_setup.fid);
 %{
 if ~exist(recon_mat.procpar_file,'file') ...
         && ( local_or_streaming_or_static ~= 2 ) % && ( (volume_number == n_volumes) || local_or_streaming_or_static ~= 2 )
     mode =2; % Only pull procpar file
-    datapath=fullfile('/home/mrraw',recon_mat.agilent_study,[recon_mat.agilent_series '.fid']);
+    datapath=fullfile('/home/mrraw',recon_mat.scanner_patient,[recon_mat.scanner_acquisition '.fid']);
     puller_glusterspaceCS_2(recon_mat.runno,  datapath,  recon_mat.scanner,...
-        recon_mat.agilent_study_workdir,  mode);
+        recon_mat.study_workdir,  mode);
 %}
 procpar_file=fullfile(recon_mat.study_workdir,'procpar');
+procpar_file_legacy = fullfile(recon_mat.study_workdir,[recon_mat.runno '.procpar']);
+if exist(procpar_file_legacy,'file')
+    warning('Legacy procpar file name detected!');
+    procpar_file=procpar_file_legacy;
+end;clear procpar_file_legacy;
+
 if ~exist(procpar_file,'file') && ~strcmp(data_mode,'streaming')
-    pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s/%s.fid/procpar %s.work',...
-        options.scanner_user, the_scanner.name, scanner_patient,scanner_acquisition,recon_mat.runno);
+    pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
+        options.scanner_user, the_scanner.name, scan_data_setup.metadata, recon_mat.runno);
     [s,sout] = system(pull_cmd);
     assert(s==0,sout);
 end
 %% set up procpar gatekeeper
 % uses singleton to hold the next job behind it.
-if (~exist(recon_mat.procpar_file,'file') || ~exist(setup_var.headfile,'file'))
+if (~exist(procpar_file,'file') || ~exist(setup_var.headfile_path,'file'))
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
     gk_slurm_options.s=''; % shared; gatekeeper definitely needs to share resources.
@@ -148,9 +156,9 @@ if (~exist(recon_mat.procpar_file,'file') || ~exist(setup_var.headfile,'file'))
     %gk_slurm_options.reservation = active_reservation;
     % using a blank reservation to force no reservation for this job.
     gk_slurm_options.reservation = '';
-    procpar_gatekeeper_batch = fullfile(setup_var.workdir, 'sbatch', [ setup_var.volume_runno '_procpar_gatekeeper.bash' ]);
+    procpar_gatekeeper_batch = fullfile(setup_var.volume_dir, 'sbatch', [ setup_var.volume_runno '_procpar_gatekeeper.bash' ]);
     % setting 60 second interval and 3 minutes time limit.
-    procpar_gatekeeper_args= sprintf('%s %s 60 180',[recon_mat.procpar_file ':' setup_var.headfile],setup_var.volume_log_file);
+    procpar_gatekeeper_args= sprintf('%s %s 60 180',[recon_mat.procpar_file ':' setup_var.headfile_path],setup_var.volume_log_file);
     procpar_gatekeeper_cmd = sprintf('%s %s %s', cs_execs.procpar_gatekeeper, matlab_path,procpar_gatekeeper_args);
     if ~options.live_run
         batch_file = create_slurm_batch_files(procpar_gatekeeper_batch,procpar_gatekeeper_cmd,gk_slurm_options);
@@ -174,8 +182,8 @@ ppcu_slurm_options.job_name = [recon_mat.runno '_procpar_gatekeeper_and_processo
 %ppcu_slurm_options.reservation = active_reservation;
 % using a blank reservation to force no reservation for this job.
 ppcu_slurm_options.reservation = '';
-procpar_cleanup_batch = fullfile(setup_var.workdir,'sbatch', [setup_var.volume_runno '_procpar_cleanup.bash']);
-ppcu_args=sprintf('%s %s %s %s',setup_var.recon_file,  setup_var.headfile,  recon_mat.procpar_file,  recon_type);
+procpar_cleanup_batch = fullfile(setup_var.volume_dir,'sbatch', [setup_var.volume_runno '_procpar_cleanup.bash']);
+ppcu_args=sprintf('%s %s %s %s',setup_var.recon_file,  setup_var.headfile_path,  procpar_file);
 ppcu_cmd = sprintf('%s %s %s', cs_execs.procpar_cleanup,  matlab_path, ppcu_args);
 dep_string ='';
 %if pp_running_jobs
@@ -194,11 +202,10 @@ batch_file = create_slurm_batch_files(procpar_cleanup_batch,[ppcu_cmd shell_cmds
 if ~options.live_run
     c_running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
 else
-    eval(sprintf('process_headfile_CS %s',ppcu_args));
+    a=strsplit(strtrim(ppcu_args));
+    process_headfile_CS(a{:});clear a;
     [s,sout]=system(sprintf('bash %s',batch_file));
-    if s~=0
-        error(sout);
-    end
+    assert(s==0,sout);
     %{
     for cn=1:numel(shell_cmds)
         [s,sout]=ssh_call(shell_cmds{cn});

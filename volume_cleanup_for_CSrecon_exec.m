@@ -34,26 +34,15 @@ setup_var=matfile(setup_variables);
 wkspc_mat=matfile(setup_var.volume_workspace);
 recon_mat=matfile(setup_var.recon_file);
 options=recon_mat.options;
+% remote_workstation=recon_mat.remote_workstation;
+
 %recon_dims(1)=6;
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
 
-%{
-% % resolve volume_number
-if ~exist('volume_number','var')
-  % In the past volume_manager didnt record the volume number to our settings file.
-  % So we'd have to regenerate it using the runno as a proxy. 
-  % That has since been fixed, this code is left behind as for refernce.
-  warning('volume_number missing, using the guess code');
-  %vnt, volume number text
-  vt=regexpi(setup_var.volume_runno,'[^0-9]*_m([0-9]+$)','tokens');
-  if isempty(vt)
-    warning('volume_cleanup: guess of volume number unsucessful, setting to 1, best of luck!');
-    vt={'0'};
-  end
-  volume_number=1+str2double(vt{:});
-end
-%}
+default_archive_tag = fullfile(setup_var.images_dir,sprintf('READY_%s',setup_var.volume_runno));
+local_archive_tag_prefix = [ '_' options.target_machine];
+local_archive_tag = sprintf('%s%s',default_archive_tag,local_archive_tag_prefix);
 %% log details
 if ~exist('log_mode','var')
     log_mode = 1;
@@ -402,7 +391,7 @@ fclose(t_id);
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
 % applied.
 if write_qsm
-    qsm_folder = fullfile(setup_var.workdir,'qsm');
+    qsm_folder = fullfile(setup_var.volume_dir,'qsm');
     if ~exist(qsm_folder,'dir')
         system(['mkdir ' qsm_folder]);
     end
@@ -463,25 +452,23 @@ if ~isdeployed && strcmp(sys_user(),'THECODEDEV')
 end
 %}
 %% Save data
-if qsm_fermi_filter
-    if write_qsm
-        if ~exist(qsm_file,'file')
-            tic
-            if continue_recon_enabled
-                real_data = single(real(data_out));
-                imag_data = single(imag(data_out));
-            else
-                real_data = real(data_out);
-                imag_data = imag(data_out);
-            end
-            savefast2(qsm_file,'real_data','imag_data')
-            qsm_write_time = toc;
-            clear real_data imag_data
-            
-            log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,qsm_file, qsm_write_time);
-            yet_another_logger(log_msg,log_mode,log_file);
-            %save(qsm_file,'data_out','-v7.3');
+if qsm_fermi_filter && write_qsm
+    if ~exist(qsm_file,'file')
+        tic
+        if continue_recon_enabled
+            real_data = single(real(data_out));
+            imag_data = single(imag(data_out));
+        else
+            real_data = real(data_out);
+            imag_data = imag(data_out);
         end
+        savefast2(qsm_file,'real_data','imag_data')
+        qsm_write_time = toc;
+        clear real_data imag_data
+
+        log_msg =sprintf('Volume %s: Done writing raw complex data for QSM: %s; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,qsm_file, qsm_write_time);
+        yet_another_logger(log_msg,log_mode,log_file);
+        %save(qsm_file,'data_out','-v7.3');
     end
 end
 % Rename var in memory to avoid accidentally doing invalid operations on
@@ -608,17 +595,37 @@ databuffer.headfile.divisor=1/final_scale;% legacy just for confusion :D
 fprintf('\tMax value chosen for output scale: %0.14f\n',databuffer.headfile.group_max_atpct);
 
 %% Stuff all meta to headfile here
-databuffer.headfile=combine_struct(databuffer.headfile,options, [databuffer.headfile.B_recon_type 'option_']);
+% need to make the recon_type safe as a struct name, routinely want a
+% version point release in name, so we'll sub in the letter p for that
+reco_type=strrep(databuffer.headfile.B_recon_type,'.','p');
+databuffer.headfile=combine_struct(databuffer.headfile,options, [reco_type '_option_']);
+clear reco_type;
 
 %% save civm_raw
 databuffer.data = mag_data;clear mag_data; % mag_data clear probably unnecessary, this is just in case.
 if ~isfield(options,'unrecognized_fields')
     options.unrecognized_fields=struct;
 end
+%{
+write_civm_image SHOULD be doing its own mkdir
+if ~exist(setup_var.images_dir,'dir')
+    mkdir(setup_var.images_dir);
+end
+%}
 unrecog_cell={'planned_ok'};
 unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
 write_civm_image(databuffer,[{['write_civm_raw=' setup_var.images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
-if options.live_run
+if ~options.live_run
+    if ~exist(local_archive_tag,'file')
+        remote_workstation=recon_mat.remote_workstation;
+        if ~exist(default_archive_tag,'file')
+            write_archive_tag_nodev(setup_var.volume_runno,['/' remote_workstation.name 'space'], ...
+                recon_mat.dim_z,databuffer.headfile.U_code, ...
+                '.raw',databuffer.headfile.U_civmid,true,setup_var.images_dir);
+        end
+        system(sprintf('mv %s %s',default_archive_tag,local_archive_tag));
+    end
+else
     warning('Live run always keeps the work :p');
     options.keep_work=1;
 end
@@ -630,12 +637,12 @@ if ~options.keep_work && ~options.process_headfiles_only
     %
     % The problem with this setup is that the cleanup will never be run!
     % When streaming procpar's are completed independent of this function,
-    % and much later, so we're blind to them. 
+    % and much later, so we're blind to them.
     cleanup_ready=0;
-    if exist(setup_var.headfile,'file')
+    if exist(setup_var.headfile_path,'file')
         BytesPerKiB=2^10;
         hf_minKiB=20;
-        hfinfo=dir(setup_var.headfile);
+        hfinfo=dir(setup_var.headfile_path);
         if hfinfo.bytes>hf_minKiB*BytesPerKiB
             cleanup_ready=1;
         end

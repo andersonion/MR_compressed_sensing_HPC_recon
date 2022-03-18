@@ -1,25 +1,38 @@
-function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
-% streaming_CS_recon_main_exec(scanner,runno,scanner_patient,scanner_acquisition, options_cell_array )
-%  Initially created on 14 September 2017, BJ Anderson, CIVM
-% SUMMARY
-% Main code for compressed sensing reconstruction 
-%  written for:
-%  computing cluster running SLURM Version 2.5.7, 
-%  with data originating from Agilent MRI scanners running VnmrJ Version 4.0_A.
-%  or data from an MRSolutions console
+function streaming_recon_exec(scanner_name, runno, input_data, varargin )
+%function streaming_recon_exec(scanner, runno, input, options_cell_array)
 %
-%  The primary new feature of this version versus previous versions is the
-%  ability to stream multi-volume experiments so each independent volume
-%  can be reconstructed as soon as it's data has been acquired (previously,
-%  one had to wait until the entire scan finished before beginning
-%  reconstruction).  This is particularly useful for Diffusion Tensor
-%  Imaging (DTI) scans. Gradient-Recalled Echo (GRE) scans and their
-%  cousin Multiple echo GRE (MGRE) scans will be indifferent to this
-%  change, as they can only be reconstructed once the scan has completely
-%  finished.
+% scanner  - short name of scanner to get data input from
+% runno    - run number for output. Multi_volume output will have a suffix
+%            _m0-(N-1) for each volume
+% input    - string or cell array of the data name on scanner
+%            Can use * to guess any portion of the string except for
+%            director boundaries.
+%          - for agilent 20120101_01/ser01.fid
+%            with wild card 20120101*/ser01.fid
+%          - for mrsolutions data_file.mrd
 %
+% option   - for a list and explaination use 'help'.
+%
+% scanner_data for nested structures would be data1/data2
+% for our agilent scanners
+%   study/series01.fid
+%   study/series01
+% for our mrsolutions scanners
 % Copyright Duke University
 % Authors: James J Cook, G Allan Johnson
+
+
+% fileinput help for scanners we never made compression work on
+%          - for aspect  '004534', by convention asepect runnumbers are
+%          aspect id+6000
+%          - for bruker   {'patientid','scanid'} or 'patientid/scanid'
+%                (datanum is not supported yet?)
+%          - list file support? List in radish_scale_bunch format? via
+%          listmaker.
+
+
+% old function line before joining the scanner data fields
+%function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
 matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 recon_type = 'CS_v3.0';
 typical_pa=1.8;
@@ -31,45 +44,59 @@ else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
 end
-%% clean up what user said to us.
-% since we have some optional positional args, and legacy behavior,
-% lets try to sort those out kindly for users.
-if ~ischar(scanner_acquisition)
-    scanner_acquisition = num2str(scanner_acquisition);
-    if length(scanner_acquisition) < 2
-        scanner_acquisition = ['0' scanner_acquisition];
-    end
-    scanner_acquisition = ['ser' scanner_acquisition];
+if numel(varargin)==1 && iscell(varargin{1})
+    varargin=varargin{1};
 end
-% varargin 1 and 2 might be positional arguments.
-% check them for an equals sign, if its misssing check for loose
-% number(Itnlim), or string(CS_table).
-% Side effect of doing it this way, we'll now accept them in either order. 
-for pc=1:min(2,length(varargin))
-    if ~reg_match(varargin{pc},'=')
-        if reg_match(varargin{pc},'^[0-9]+$')
-            warning('Specifing iteration limit loosely is not recommended, use Itnlim=%i instead.',varargin{pc});
-            if numel(strfind(strjoin(varargin),'Itnlim'))==0
-                varargin{pc}=sprintf('Itnlim=%s',varargin{pc});
-            else
-                error('Found loose number(%s), but also specified Itnlim later, not sure what to do with it!',varargin{pc});
-                % pause(3);
-            end
-        elseif reg_match(varargin{pc},'^CS[0-9]+_[0-9]+x_.*$')
-            warning('Specifing CS table loosly on commandline is not recommended, use CS_table=%s instead.',varargin{pc});
-            % example CS_table 'CS256_8x_pa18_pb54' In theory, this regular expression allows
-            % out to infinity size and compression
-            if numel(strfind(strjoin(varargin),'CS_table'))==0
-                varargin{pc}=sprintf('CS_table=%s',varargin{pc});
-            else
-                error('Found CS_table (%s), but also specified later, not sure what to do with it!',varargin{pc});
-                % pause(3);
-            end
+% shutting off legacy inputs for now
+legacy_positional_args=0;
+if legacy_positional_args
+    % old arg setup, scanner_patient,scanner_acquisition, varargin
+    % patch from new to to old
+    db_inplace(mfilename,'untested');
+    scanner_patient=varargin{1};
+    scanner_series=varargin{2};
+    varargin{1:2}=[];
+    %% clean up what user said to us.
+    % since we have some optional positional args, and legacy behavior,
+    % lets try to sort those out kindly for users.
+    if ~ischar(scanner_acquisition)
+        scanner_acquisition = num2str(scanner_acquisition);
+        if length(scanner_acquisition) < 2
+            scanner_acquisition = ['0' scanner_acquisition];
         end
-    else
-        break; % as soon as we find = signs, we're in the auto opt portion.
+        scanner_acquisition = ['ser' scanner_acquisition];
     end
-end; clear pc;
+    % varargin 1 and 2 might be positional arguments.
+    % check them for an equals sign, if its misssing check for loose
+    % number(Itnlim), or string(CS_table).
+    % Side effect of doing it this way, we'll now accept them in either order.
+    for pc=1:min(2,length(varargin))
+        if ~reg_match(varargin{pc},'=')
+            if reg_match(varargin{pc},'^[0-9]+$')
+                warning('Specifing iteration limit loosely is not recommended, use Itnlim=%i instead.',varargin{pc});
+                if numel(strfind(strjoin(varargin),'Itnlim'))==0
+                    varargin{pc}=sprintf('Itnlim=%s',varargin{pc});
+                else
+                    error('Found loose number(%s), but also specified Itnlim later, not sure what to do with it!',varargin{pc});
+                    % pause(3);
+                end
+            elseif reg_match(varargin{pc},'^CS[0-9]+_[0-9]+x_.*$')
+                warning('Specifing CS table loosly on commandline is not recommended, use CS_table=%s instead.',varargin{pc});
+                % example CS_table 'CS256_8x_pa18_pb54' In theory, this regular expression allows
+                % out to infinity size and compression
+                if numel(strfind(strjoin(varargin),'CS_table'))==0
+                    varargin{pc}=sprintf('CS_table=%s',varargin{pc});
+                else
+                    error('Found CS_table (%s), but also specified later, not sure what to do with it!',varargin{pc});
+                    % pause(3);
+                end
+            end
+        else
+            break; % as soon as we find = signs, we're in the auto opt portion.
+        end
+    end; clear pc;
+
+end
 %% run the option digester
 types.standard_options={...
     'target_machine',       'which regular engine should we send data to for archival.' 
@@ -101,10 +128,11 @@ types.beta_options={...
 types.planned_options={...
     'selected_scale_volume',' default 0, which volume set''s the scale '
     'slicewise_norm',       ' normalize the initial image by slice max instead of volume max'
+    'slice_randomization',  ' randomize the slice procession'
     'convergence_threshold',''
-    'keep_work',           ''
+    'keep_work',            ''
     'email_addresses',      ''
-    'verbosity',             ''
+    'verbosity',            ''
     'scanner_user',         ' what user do we use to pull from scanner.'
     'live_run',             ' run the code live in matlab, igored when deployed.'
     };
@@ -270,6 +298,10 @@ complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 % scanner_constants = load_scanner_dependency(scanner_name);
 the_workstation=wks_settings();
 the_scanner=scanner(scanner_name);
+if strcmp(options.target_machine,'localhost')
+    options.skip_target_machine_check=1;
+end
+remote_workstation=wks_settings(options.target_machine);
 % validate normal commands are functional 
 %{
 %
@@ -296,16 +328,26 @@ end
 %% user configurable scanner user.
 % make sure each mention of user will be set proper
 % only partially implemented :D
-su='omega';
-if ~isempty(the_scanner.user)
-    su=the_scanner.user;
+legacy_scanners={'heike','kamy','onnes'};
+if any(strcmp(legacy_scanners,scanner_name))
+    su='omega';
+    if ~isempty(the_scanner.user)
+        su=the_scanner.user;
+    end
+    if options.scanner_user
+        su=options.scanner_user;
+    end
+    options.scanner_user=su;
+    the_scanner.user=su;
+    clear su;
+else
+    %{
+    % SHOULD LET THIS BE UP TO SSH ! 
+    if isempty(the_scanner.user)
+        the_scanner.user=sys_user();
+    end
+    %}
 end
-if options.scanner_user
-    su=options.scanner_user;
-end
-options.scanner_user=su;
-the_scanner.user=su;
-clear su;
 %% do main work and schedule remainder
 if ~exist(complete_study_flag,'file')
     % only work if a flag_file for complete recon missing
@@ -331,10 +373,7 @@ if ~exist(complete_study_flag,'file')
         args=sprintf('"%s"',args);
         %end
         gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
-        [s,sout]=system(gui_cmd);
-        if s~=0
-            error(sout);
-        end
+        [s,sout]=system(gui_cmd); assert(s==0,sout);
     end
    if exist(param_file_path,'file')
         gui_info=read_headfile(param_file_path,0);
@@ -361,13 +400,12 @@ if ~exist(complete_study_flag,'file')
     if options.debug_mode>=50 
         forced_wait=0.1;
     end
-    fprintf('Continuing in %i seconds ...\n',forced_wait);
+    fprintf('Continuing in %g seconds ...\n',forced_wait);
     pause(forced_wait); 
     %% setup working folder, initialization info to log file, and create recon.mat
     if ~exist(workdir,'dir')
         mkdir_cmd = sprintf('mkdir "%s"',workdir);
-        [s,sout]=system(mkdir_cmd);
-        assert(s==0,sout);
+        [s,sout]=system(mkdir_cmd); assert(s==0,sout);
     end
     recon_mat = matfile(recon_file,'Writable',true);
     % intentionally re-writing these params instead of avoiding it.
@@ -381,12 +419,25 @@ if ~exist(complete_study_flag,'file')
     recon_mat.scanner_name = scanner_name;
     % TODO: generic for studdy/series but wee dont know how new sys will be
     % organized yet
-    recon_mat.scanner_patient = scanner_patient;
-    recon_mat.scanner_acquisition = scanner_acquisition;
+    if strcmp(the_scanner.vendor,'agient')
+        db_inplace('skipping to allow for failures');
+        %{
+        t=strsplit(scanner_data,'/');
+        [scanner_patient,scanner_acquisition]=t{:};
+        recon_mat.scanner_patient = scanner_patient;
+        recon_mat.scanner_acquisition = scanner_acquisition;
+        recon_mat.scanner_data=t;
+        clear t;
+        %}
+    else 
+        %scanner_data={scanner_data};
+    end
+    recon_mat.scanner_data=input_data;
     headfile.U_runno=runno;
     headfile.U_scanner=scanner_name;
     headfile=combine_struct(headfile,the_scanner.hf);
     recon_mat.the_scanner=the_scanner;
+    recon_mat.remote_workstation=remote_workstation;
     headfile=combine_struct(headfile,the_workstation.hf);
     recon_mat.the_workstation=the_workstation;
     if exist('gui_info','var')
@@ -401,7 +452,7 @@ if ~exist(complete_study_flag,'file')
     recon_mat.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
-        system(['touch ' log_file]);
+        [s,sout]=system(['touch ' log_file]); assert(s==0,sout);
     end
     ts=fix(clock);
     t=datetime(ts(1:3));
@@ -413,8 +464,11 @@ if ~exist(complete_study_flag,'file')
     log_msg=sprintf('%s----------\n',log_msg);
     log_msg=sprintf('%sCompressed sensing reconstruction initialized on: %s at %s.\n',log_msg,start_date, start_time);
     log_msg=sprintf('%s----------\n',log_msg);
+    %{
     log_msg=sprintf('%sScanner study: %s\n',log_msg, scanner_patient);
     log_msg=sprintf('%sScanner series: %s\n',log_msg, scanner_acquisition);
+    %}
+    log_msg=sprintf('%sScanner data: %s\n',log_msg, input_data);
     log_msg=sprintf('%sUser: %s\n',log_msg,user);
     log_msg=sprintf('%sExec Set: %s\n',log_msg,cs_exec_set);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -440,16 +494,28 @@ if ~exist(complete_study_flag,'file')
         end
     end
     %% Second First things first: determine number of volumes to be reconned
-    % local_hdr = fullfile(workdir,[runno '_hdr.fid']);
-    % refactoring local_streaming_or_static 1,2,3 var into a word data_mode
-    % will use local, streaming, or remote
-    % data_mode='UNKNOWN';
-    [data_mode,fid_path]=get_data_mode(the_scanner,workdir,scanner_patient,scanner_acquisition);
-    if isfield(fid_path,'remote')
-        % old rad_mat var was kspace_data_path, but it was for the local
-        % file, we only use the local file when it exists, so i'm not
-        % saving it separately
-        recon_mat.fid_path_remote=fid_path.remote;
+    %%% TODO: enhance this section to TRY puller_simple FIRST
+    % IF it should fail, then we worry about are we
+    % local/streaming/static... Then we get specific in our data
+    % definitions.
+    % we probably still want to use data_definition_cleanup so we have the
+    % "main" thing to transfer with puller_simple.
+    scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+    recon_mat.scan_data_setup=scan_data_setup;
+    
+    [data_mode,fid_path]=get_data_mode(the_scanner,workdir,scan_data_setup.fid);
+    % old rad_mat var was kspace_data_path, but it was for the local
+    % file, we only use the local file when it exists, so i'm not
+    % saving it separately
+    if matfile_missing_vars(recon_file,'fid_path')
+        recon_mat.fid_path=fid_path;
+    else
+        % if we've already collected fid_path REFUSE to update remotes by
+        % reading back previous and only udpating current.
+        fid_path_prev=recon_mat.fid_path;
+        fid_path_prev.current=fid_path.current;
+        recon_mat.fid_path=fid_path;
+        clear fid_path_prev;
     end
     % fid_consistency gets a header of data and a few bytes too saving it in the fid_tag_file
     % we use that to get some scanner details
@@ -549,6 +615,9 @@ if ~exist(complete_study_flag,'file')
             % PROBLEM, agilent codes the petable, but so far, i dont see
             % how we'd slip that into our mrsolutions data!
             %%%
+            % WARNING THIS HASNT BEEN UPDATED SINCE scanner
+            % patient/acquisition were joined to scanner_data
+            % 
             if ~exist(procpar_file,'file')
                 % considering deactivating this so all recons will proceed through the same
                 % code path
@@ -711,11 +780,9 @@ if ~exist(complete_study_flag,'file')
             volume_number = unreconned_volumes(vs);
             volume_dir = fullfile(workdir,volume_runno);
             vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
-            work_subfolder = fullfile(volume_dir, 'work');
-            images_dir     = fullfile(volume_dir,[volume_runno 'images']);
             mkdir_s=zeros([1,4]);
-            dir_cell={volume_dir,vol_sbatch_dir,work_subfolder,images_dir};
-            if ~exist(images_dir,'dir')
+            dir_cell={volume_dir,vol_sbatch_dir};
+            if ~exist(vol_sbatch_dir,'dir')
                 %%% mkdir commands pulled into here from check status,
                 fprintf('Making voldir,sbatch,work,images,directories\n');
                 for dn=1:numel(dir_cell)
@@ -769,7 +836,8 @@ if ~exist(complete_study_flag,'file')
                     volume_runno,c_running_jobs);
                 yet_another_logger(log_msg,log_mode,log_file);
             elseif options.live_run
-                eval(sprintf('volume_manager_exec %s',vm_args));
+                a=strsplit(vm_args);
+                volume_manager_exec(a{:});clear a;
             end
         end
     end
@@ -784,8 +852,9 @@ if options.fid_archive && local_or_streaming_or_static==3
         poc='-eor';
         foc='-o';
     end
+    error('scanner_data udpate required');
     pull_cmd=sprintf('puller_simple -u %s %s %s %s/%s* %s.work;fid_archive %s %s %s', ...
-        options.scanner_user, poc,scanner_name,scanner_patient,scanner_acquisition,runno,foc,user,runno);
+        options.scanner_user, poc,scanner_name,input_data,runno,foc,user,runno);
     ssh_and_run=sprintf('ssh %s@%s "%s"',sys_user(),options.target_machine,pull_cmd);
     log_msg=sprintf('Preparing fid_archive.\n\tSending data to target_machine can take a while.\n');
     log_msg=sprintf('%susing command:\n\t%s\n',log_msg,ssh_and_run);

@@ -1,4 +1,4 @@
-function [ file_size_in_bytes] = get_remote_filesize( remote_path,remote_machine )
+function [ file_size_in_bytes] = get_remote_filesize(remote_path, remote_machine )
 %   Returns the size of a specified folder on a local or remote machine,
 %   If any errors are encountered, a 0 will be returned (let this not be
 %   confused with "success").

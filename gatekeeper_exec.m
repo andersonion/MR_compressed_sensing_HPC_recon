@@ -15,29 +15,28 @@ function out_code = gatekeeper_exec( local_file,remote_file,scanner,log_file,blo
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
-if ~isdeployed;
+if ~isdeployed
 
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
 end
+
+error('needs update');
 out_code = 1; % Default is failure.
 scanner_user='omega';
 most_recent_fid_cmd='ls -tr /home/mrraw/*/*.fid/fid | tail -n1';
 remote_most_recent_fid_cmd = sprintf('ssh %s@%s "%s"',scanner_user,scanner,most_recent_fid_cmd);
 status = 1;
 logged=0;
+log_mode = 1;
 [status,most_recent_fid] = system(remote_most_recent_fid_cmd);
 if status
     error_flag=1;
     log_msg=sprintf('Failure due to network connectivity issues; unsuccessful communication with %s.\n',scanner);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
     % error_due_to_network_issues
-    if isdeployed
-        quit force
-    else 
-        return
-    end
+    if isdeployed; quit force; else; error(log_msg); end
 end
 
 fid_check=0;
@@ -79,7 +78,6 @@ ready = 0;
 max_checks = ceil(time_limit/interval);
 effective_time_limit = ceil(max_checks*interval)/60;
 log_msg = sprintf('Gatekeeper will now check every %i seconds (up to %i minutes) for either local file ''%s'' to exist, or its corresponding data to be written on scanner %s.\n',interval,effective_time_limit,local_file,scanner);
-log_mode = 1;
 yet_another_logger(log_msg,log_mode,log_file);
 tic
 

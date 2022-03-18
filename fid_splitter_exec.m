@@ -18,7 +18,7 @@ work_to_do = ones(1,recon_mat.nechoes);
 for nn = 1:recon_mat.nechoes
     vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.nechoes-1))) 'i' ],nn-1);
     volume_runno = sprintf('%s_m%s',recon_mat.runno,vol_string);
-    c_work_dir = sprintf('%s/%s/work/',recon_mat.agilent_study_workdir,volume_runno);
+    c_work_dir = sprintf('%s/%s/work/',recon_mat.study_workdir,volume_runno);
     c_fid = sprintf('%s%s.fid',c_work_dir,volume_runno);
     if exist(c_fid,'file')
         work_to_do(nn) = 0;
@@ -68,7 +68,10 @@ recon_mat fields available
     m.ray_blocks=acq_hdr.ray_blocks;
     m.kspace_data_type=acq_hdr.data_type;
     %}
-    warnint('untested');
+    db_inplace(mfilename,'untested');
+    if isdeployed()
+        error('untested');quit force;
+    end
     the_scanner=recon_mat.the_scanner;
     hdr_byte_count=the_scanner.header_bytes + the_scanner.block_header_bytes;
     % hdr_60byte = fread(fid,30,'uint16');
@@ -129,7 +132,7 @@ recon_mat fields available
         e_start=tic();
         vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.nechoes-1))) 'i' ],nn-1);
         volume_runno = sprintf('%s_m%s',recon_mat.runno,vol_string);
-        c_work_dir = sprintf('%s/%s/work/',recon_mat.agilent_study_workdir,volume_runno);
+        c_work_dir = sprintf('%s/%s/work/',recon_mat.study_workdir,volume_runno);
         if ~exist(c_work_dir,'dir')
             warning('Creating directory (%s) to save split fid, this should have been done already.',c_work_dir);
             system(['mkdir -p ' c_work_dir ]);

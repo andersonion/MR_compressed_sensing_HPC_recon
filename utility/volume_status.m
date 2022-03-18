@@ -1,5 +1,5 @@
-function [ starting_point ,log_msg,vol_status,extended] = volume_status( ...
-    volume_dir,volume_runno,scanner_name,volume_number,agilent_study,agilent_series,bbytes )
+function [ starting_point ,log_msg, vol_status, extended] = volume_status( ...
+    volume_dir,volume_runno,the_scanner,volume_number,input_data,bbytes )
 % check status of an individual volume in the cs recon.
 %%% NOTEABLY bbytes can be omitted.
 %
@@ -37,10 +37,16 @@ stage_n=1;
 %% is this chunk of data ready on scanner
 status_setup(stage_n).code='Acquistion in progress on scanner.';
 status_setup(stage_n).pct=1;
-if exist('scanner_name','var') && exist('volume_number','var') && exist('agilent_study','var') && exist('agilent_series','var')
-    the_scanner=scanner(scanner_name);
+if exist('the_scanner','var') ...
+    && exist('volume_number','var') ...
+    && exist('input_data','var')
+    if ~isa(the_scanner,'scanner')
+        warning('passed name instad of scanner settings object, trying to load');
+        scanner_name=the_scanner;
+        the_scanner=scanner(scanner_name);
+    end
     if ~exist('bbytes','var'); bbytes=0; end
-    status_setup(stage_n).check=@() check_remote_fid(work_subfolder,volume_runno,the_scanner,agilent_study,agilent_series,volume_number,bbytes);
+    status_setup(stage_n).check=@() check_remote_fid(work_subfolder,volume_runno,the_scanner,input_data,volume_number,bbytes);
 else
     % cannot check on scanner without params, so we will consider this
     % status incomplete
@@ -123,10 +129,12 @@ end
 log_msg =sprintf('Starting point for volume %s: Stage %i. %s\n',volume_runno,starting_point,status_setup(starting_point+1).code);
 
 end
-
+%%%
+%%% individual stages check functions
+%%%
 function hf_status=is_headfile_complete(headfile)
+hf_status=0;
 if ~exist(headfile,'file')
-    hf_status=0;
     return;
 end
 BytesPerKiB=2^10;
@@ -241,7 +249,7 @@ if ~exist('recon_file','var') ...
         && exist('runno','var') && ~exist('agilent_study','var')
     recon_file = fullfile(volume_dir, '..',[ runno '_recon.mat']);
     rf=matfile(recon_file);
-    agilent_series=rf.agilent_series;
+    scanner_acquisition=rf.scanner_acquisition;
     agilent_study=rf.agilent_study;
     scanner_name=rf.scanner_name;
     bbytes=rf.bbytes;
@@ -280,11 +288,10 @@ else
 end
 end
 
-function scan_vol_status=check_remote_fid(work_subfolder,volume_runno,the_scanner,agilent_study,agilent_series,volume_number,bbytes)
-%if (exist('scanner','var') && exist('runno','var') && exist('agilent_study','var') && exist('agilent_series','var'))
+function scan_vol_status=check_remote_fid(work_subfolder,volume_runno,the_scanner,input_data,volume_number,bbytes)
 scan_vol_ready=0;
-%[fid_path.current, local_or_streaming_or_static]=find_fid_path.currentCS(the_scanner.name,runno,agilent_study,agilent_series);
-[data_mode,fid_path]=get_data_mode(the_scanner,work_subfolder,agilent_study,agilent_series);
+%[fid_path.current, local_or_streaming_or_static]=find_fid_path.currentCS(the_scanner.name,runno,agilent_study,scanner_acquisition);
+[data_mode,fid_path]=get_data_mode(the_scanner,work_subfolder,input_data);
 scan_vol_status.data_mode=data_mode;
 scan_vol_status.fid_path=fid_path;
 %if (local_or_streaming_or_static == 2)

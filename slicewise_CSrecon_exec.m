@@ -1,5 +1,5 @@
-function slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
-% slicewise_CSrecon_exec(matlab_workspace,slice_indices,setup_variables)
+function slicewise_CSrecon_exec(setup_variables,varargin)
+% slicewise_CSrecon_exec(setup_var.volume_workspace,slice_indices,setup_variables)
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
@@ -15,11 +15,12 @@ else
     C___=exec_startup();
 end
 
-%%%
-% This eliminates the nested structure of the incoming slice data, and also writes the each
-% slice as they finish instead of waiting until all are done.
-%%%
-slice_numbers=parse_slice_indices(slice_indices);clear slice_indices;
+%% Load common workspace params
+if exist(setup_variables,'file')
+    setup_var=matfile(setup_variables);
+    recon_mat=matfile(setup_var.recon_file);
+    options=recon_mat.options;
+end
 
 %% Make sure the workspace file exist
 % bleh, this whole construct is clumsy.
@@ -27,36 +28,41 @@ log_mode = 3;
 log_file ='';
 error_flag=0;
 legacy_params={'aux_param'};
-l_count=matfile_missing_vars(matlab_workspace,legacy_params);
+l_count=matfile_missing_vars(setup_var.volume_workspace,legacy_params);
 if l_count ~= numel(legacy_params)
     error_flag=1;
 end
 if error_flag==1
-    % log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',matlab_workspace);
-    log_msg =sprintf('Matlab workspace (''%s'') exists, but legacy parameter ''aux_param'' found. You need to clear work folder and restart recon. Dying now.\n',matlab_workspace);
+    % log_msg =sprintf('Matlab workspace (''%s'') does not exist. Dying now.\n',setup_var.volume_workspace);
+    log_msg =sprintf('Matlab workspace (''%s'') exists, but legacy parameter ''aux_param'' found. You need to clear work folder and restart recon. Dying now.\n',setup_var.volume_workspace);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
     % force a quit when deployed, else return broken
     if isdeployed; quit('force'); end
     return;
 end; clear error_flag legacy_params l_count
 
-%% Load common workspace params
-if exist('setup_variables','var')
-    if exist(setup_variables,'file')
-       % load(setup_variables);
-       setup_var=matfile(setup_variables);
-       recon_mat=matfile(setup_var.recon_file);
-       options=recon_mat.options;
-    end
-end
-
 if ~exist('options','var')
     error('Trouble loading configuration data, potential data corruption OR attempted restart of previous format work folder');
 end
+
+
+%%%
+% This eliminates the nested structure of the incoming slice data, and also writes the each
+% slice as they finish instead of waiting until all are done.
+%%%
+slice_numbers=zeros(options.chunk_size,1);
+insertion_point=1;
+for n=1:numel(varargin)
+    nums=parse_slice_indices(varargin{n});
+    nums(isnan(nums))=[];
+    slice_numbers(insertion_point:insertion_point+numel(nums)-1)=nums;
+    insertion_point=insertion_point+numel(nums);
+end; clear n nums insertion_point;
+
 tic
-mm = matfile(matlab_workspace,'Writable',false);
-%load(matlab_workspace,'aux_param');
-%aux_param=mm.aux_param;
+workspace_mat = matfile(setup_var.volume_workspace,'Writable',false);
+%load(setup_var.volume_workspace,'aux_param');
+%aux_param=workspace_mat.aux_param;
 % expected params
 %{
                mask: [2048x2048 logical]
@@ -75,8 +81,8 @@ mm = matfile(matlab_workspace,'Writable',false);
              phmask: [2048x2048 double]
           verbosity: 0
 %}
-%load(matlab_workspace,'param');
-%param=mm.param;
+%load(setup_var.volume_workspace,'param');
+%param=workspace_mat.param;
 %{
 fieldnames(test_m.param)
                   FT: []
@@ -173,6 +179,7 @@ header_size = 1+recon_dims(1);% 26 September 2017, BJA: 1st uint16 bytes are hea
 %% Reconstruct slice(s)
 for index=1:length(slice_numbers)
     slice_index=slice_numbers(index);
+    if slice_index==0 || isnan(slice_index); continue;end
     %% read temp_file header for completed work.
     work_done=load_cstmp_hdr(setup_var.temp_file);
     work_done=work_done';
@@ -221,8 +228,8 @@ for index=1:length(slice_numbers)
         load_start=tic;
         
         if (completed_iterations == 0) 
-            %slice_data = complex(double(mm.real_data(slice_index,:)),double(mm.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
-            slice_data = complex(mm.real_data(slice_index,:),mm.imag_data(slice_index,:));
+            %slice_data = complex(double(workspace_mat.real_data(slice_index,:)),double(workspace_mat.imag_data(slice_index,:)) );% 8 May 2017, BJ: creating sparse, zero-padded slice here instead of during setup
+            slice_data = complex(workspace_mat.real_data(slice_index,:),workspace_mat.imag_data(slice_index,:));
             param.data = zeros(size(recon_mat.mask),'like',slice_data); % Ibid
             %param.data = zeros([size(mask)],'like',slice_data);
             param.data(recon_mat.mask)=slice_data(:); % Ibid
@@ -241,7 +248,7 @@ for index=1:length(slice_numbers)
             % use the CS Mask to get the actual density instead of the 
             % the theoretical. We have sdc3_mat, we've used before.
             % https://github.com/ISMRM/mri_unbound
-            im_zfwdc = ifft2c(param.data./recon_mat.CSpdf)/mm.volume_scale;
+            im_zfwdc = ifft2c(param.data./recon_mat.CSpdf)/workspace_mat.volume_scale;
             ph = exp(1i*angle((ifft2c(param.data.*recon_mat.phmask))));
             param.FT = p2DFT(recon_mat.mask, recon_dims(2:3), ph, 2);
             res=XFM*im_zfwdc;
@@ -289,7 +296,7 @@ for index=1:length(slice_numbers)
             scaling = fread(fid_sc,inf,'*float');
             fclose(fid_sc);
             im_res = XFM'*res;
-            im_res = im_res*mm.volume_scale/sqrt(recon_dims(2)*recon_dims(3)); % --->> check this, sqrt of 2D plane elements required for proper scaling
+            im_res = im_res*workspace_mat.volume_scale/sqrt(recon_dims(2)*recon_dims(3)); % --->> check this, sqrt of 2D plane elements required for proper scaling
             %% Crop out extra k-space if non-square or non-power of 2
             %if sum(original_dims == recon_dims) ~= 3
             %    im_res = fftshift(fftn(fftshift(im_res)));

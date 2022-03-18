@@ -97,6 +97,8 @@ rays_per_volume
     % blargh
     % lets start with ultra minimum
 elseif strcmp(the_scanner.vendor,'mrsolutions')
+    % in theory load_mrd is cool enough to skip loading data if you didnt
+    % ask for it.
     S_hdr=load_mrd(data_file);
     %hdr.dims=dimstruct('xyzpt',hdr.Dimension);
     % header dimensions are constant in mrd fiels, but i suspect their
