@@ -55,7 +55,8 @@ if ~options.keep_work && ~options.process_headfiles_only
             log_msg =sprintf('Images have been successfully reconstructed; removing %s now...',setup_var.work_subfolder);
             yet_another_logger(log_msg,log_mode,log_file);
             rm_cmd=sprintf('rm -rf %s',setup_var.work_subfolder);
-            system(rm_cmd);
+            [s,sout]=system(rm_cmd);
+            assert(s==0,sout);
         else
             log_msg =sprintf('Work folder %s already appears to have been removed. No action will be taken.\n',setup_var.work_subfolder);
             yet_another_logger(log_msg,log_mode,log_file);
