@@ -74,17 +74,15 @@ rays_per_volume
     acq_st=S_hdr.file.acq_status;
     if acq_st.float32==1
         hdr.data_type='single';
-        hdr.bytes_per_point = 4;
     elseif acq_st.int32==1
-        hdr.bitdepth='int32';
-        hdr.bytes_per_point = 4;
+        hdr.data_type='int32';
     elseif ~isempty(acq_status)
-        hdr.bitdepth='int16';
-        hdr.bytes_per_point = 2;
+        hdr.data_type='int16';
     else
         %    hdr.bitdepth=[];
         %    hdr.bytes_per_point=[];
     end
+    hdr.bytes_per_point=class_bytes(hdr.data_type);
     hdr.bytes_per_block=S_hdr.file.bytes_per_block;
     %hdr.bytes_per_ray=S_hdr.file.bytes_per_trace;
     % agilent data is complex bit's appear incorrect. will try to infer
@@ -93,26 +91,45 @@ rays_per_volume
     if S_hdr.file.bytes_per_trace/S_hdr.file.bytes_per_element/hdr.ray_length==2
         hdr.data_is_complex=1;
     end
+    hdr.data_ready=S_hdr.block_one.status.hasData;
+
     % what about procpar and all that! that could be specified here too...
     % blargh
     % lets start with ultra minimum
 elseif strcmp(the_scanner.vendor,'mrsolutions')
     % in theory load_mrd is cool enough to skip loading data if you didnt
     % ask for it.
-    S_hdr=load_mrd(data_file);
+    % negative mode allows partial files to load as much header as they can
+    % and then quit
+    S_hdr=load_mrd(data_file,-1);
     %hdr.dims=dimstruct('xyzpt',hdr.Dimension);
     % header dimensions are constant in mrd fiels, but i suspect their
     % order is bs.
     % they are spatial 1, 2, slices, spatial 3, echos, experiments.
     % the expectation is that slices and spatial 3 will not both exist at
     % the same time
-    hdr.dims=dimstruct('xyszet',hdr.Dimension);
+    hdr.dims=dimstruct('xyszet',S_hdr.Dimension);
     hdr.data_is_complex=S_hdr.data_is_complex;
     hdr.data_type=S_hdr.data_type;
-    hdr.ray_length=double(S_hdr.Dimension(1));
+    hdr.bytes_per_point = class_bytes(hdr.data_type);
+    dims=double(S_hdr.Dimension);
+    if numel(dims)~=6 
+        error('unexpected dimension count');
+    end
+    hdr.ray_length=double(dims(1));
     % a guess...
-    % hdr.rays_per_block=double(S_hdr.Dimension(2));
-    error('incomplete');
+    hdr.rays_per_block=prod(dims(2:4));
+    %echos=dims(5); %echo
+    hdr.ray_blocks=prod(dims(5:6));
+    hdr.rays_acquired_in_total=prod(dims(2:end));
+    hdr.bytes_per_block = prod([ ...
+        hdr.bytes_per_point, 1+hdr.data_is_complex, ...
+        hdr.ray_length, hdr.rays_per_block, ...
+        ]);
+    
+    %%% todo, figure out how to test for ready
+    warning('load_acq_header incomplete for %s forcing ready!', the_scanner.vendor);
+    hdr.data_ready=1;
 else
     error('unrecognized scanner_vendor:%s',the_scanner.vendor);
 end

@@ -395,7 +395,13 @@ q = quantile(qq,thresh);
     % lower_min 
     lmin(1)=find((x_sum(1:first_3rd_idx(1))<coeff*x_min),1,'last');
     lmin(2)=find((y_sum(1:first_3rd_idx(2))<coeff*y_min),1,'last');
-    lmin(3)=find((z_sum(1:first_3rd_idx(3))<coeff*z_min),1,'last');
+    l_z=find((z_sum(1:first_3rd_idx(3))<coeff*z_min),1,'last');
+    if numel(l_z)~=0
+        lmin(3)=l_z;
+    else
+        % 2D data support, always expect the third dim to be left out.
+        lmin(3)=1;
+    end
     % in the last third of the data finds the fist point, which is coeff
     % times bigger than the minimum. upper min values are weird becuse
     % their value is not initially 1... volsize big,  

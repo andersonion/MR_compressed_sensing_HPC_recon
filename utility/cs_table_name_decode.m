@@ -32,6 +32,8 @@ end
 if ~exist('dim3','var')
     if isempty(regres{2})
         regres{2}=regres{1};
+    else
+        regres{2}(1)=[];
     end
     dim3=str2double(regres{2});
 end

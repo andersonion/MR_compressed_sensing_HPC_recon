@@ -372,7 +372,8 @@ else
                 batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
             else
-                eval(sprintf('setup_volume_work_for_CSrecon_exec %s',vsu_args));
+                a=strsplit(vsu_args);
+                setup_volume_work_for_CSrecon_exec(a{:});clear a;
             end
         end
         if options.CS_preview_data

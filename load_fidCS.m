@@ -39,14 +39,14 @@ end
 
 
 %find out how many bytes per point
-if strcmp(bitdepth,'int16');
+if strcmp(bitdepth,'int16')
     bytes_per_point=2;
 else
     bytes_per_point=4;
 end
 
 %preallocate complex array
-display('preallocating complex array');
+disp('preallocating complex array');
  %8 May 2017, BJA
 
 lil_dummy = zeros([1,1],data_type);
@@ -58,7 +58,7 @@ data_buffer=zeros((npoints/2)*ntraces,max_blocks,'like',lil_dummy);
 byteskip=60+max_blocks*npoints*ntraces*bytes_per_point*(cyclenum-1)+28*(cyclenum-1)*(max_blocks);
 fseek(fid,byteskip,'bof');
 
-display('reading blocks');
+disp('reading blocks');
 inx=1;%index pointer
 for b = 1:max_blocks    
     data = fread(fid,npoints*ntraces,[bitdepth '=>' data_type ]);
@@ -79,6 +79,7 @@ else
         %img= reshape(data_buffer,[voldims(1) ntraces]);
         data_buffer = reshape(data_buffer,[voldims(1) ntraces]);
     else
+        error('I DON''T KNOW WHAT THIS IS DOING');
         mypath = fileparts(fidpath);
         procparpath = dir([mypath '/*procpar*']);
         procparpath = fullfile(mypath,procparpath.name);
