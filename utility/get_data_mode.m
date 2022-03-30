@@ -13,12 +13,15 @@ fid_path.local=the_scanner.fid_file_local(workdir,varargin{:});
 if exist(fid_path.local,'file')
     data_mode='local';
     fid_path.current=fid_path.local;
+    f_info=dir(fid_path.local);
+    fid_path.size=f_info.bytes;
 else
     fid_path.remote=the_scanner.fid_file_remote(varargin{:});
     remote_size=the_scanner.get_remote_filesize(fid_path.remote);
     if remote_size~=0
         data_mode='remote';
         fid_path.current=fid_path.remote;
+        fid_path.size=remote_size;
     else
         data_mode='streaming';
         fid_path.inprogress=the_scanner.fid_file_inprogress();

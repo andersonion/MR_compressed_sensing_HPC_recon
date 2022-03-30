@@ -31,6 +31,7 @@ log_file=recon_mat.log_file;
 try
     volume_dir=fullfile(base_workdir,volume_runno);
 catch merr
+    numel(merr);
     volume_dir=fullfile(recon_mat.study_workdir,volume_runno);
 end
 if ~exist(volume_dir,'dir')
@@ -96,6 +97,7 @@ previous more annoyingly specific ugly funciton
 %}
 % new funtion
 scan_data_setup=recon_mat.scan_data_setup;
+% missing check for full fid here, need to enhance.
 [starting_point,log_msg,~,data_mode_check]=volume_status(volume_dir,...
     volume_runno, ...
     the_scanner,...
@@ -111,8 +113,8 @@ if isfield(data_mode_check,'data_mode')
     fid_path=data_mode_check.fid_path;
     clear data_mode_check;
 else
-    [data_mode,fid_path]=get_data_mode(the_scanner, recon_mat.study_workdir, ...
-        scan_data_setup.fid);
+    [data_mode,fid_path]=get_data_mode(the_scanner, ...
+        recon_mat.study_workdir, scan_data_setup.fid);
 end
 
 % we've already collected fid_path REFUSE to update remotes by
@@ -146,16 +148,16 @@ temp_file =      fullfile(work_subfolder,[ volume_runno '.tmp']);
 volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
 volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
 
-flag_hf_fail=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
-flag_hf_success=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
-flag_fail=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
+% flag_hf_fail=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
+% flag_hf_success=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
+% flag_fail=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
 flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
-flag_at_fail=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,remote_workstation.name));
-flag_at_success=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
+% flag_at_fail=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,remote_workstation.name));
+% flag_at_success=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
 
-original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
-local_archive_tag_prefix = [ '_' remote_workstation.name];
-local_archive_tag =   sprintf('%s%s',original_archive_tag,local_archive_tag_prefix);
+% original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
+% local_archive_tag_prefix = [ '_' remote_workstation.name];
+% local_archive_tag =   sprintf('%s%s',original_archive_tag,local_archive_tag_prefix);
 
 if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && volume_number ~=1  )
     %% starting point 0/1
@@ -361,7 +363,7 @@ else
             volume_setup_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
             vsu_args=sprintf('%s',setup_variables);
             vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
-            if  stage_1_running_jobs
+            if  ~isempty(stage_1_running_jobs)
                 dep_string = stage_1_running_jobs;
                 dep_type = 'afterok-or';
             else

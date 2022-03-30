@@ -370,7 +370,11 @@ thresh=BRIGHT_NOISE_THRESHOLD*max(cs_hist);
 if (a == length(hist_bins))
     a=a-1;
 end
-not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;
+if numel(a)>=1
+    not_really_data_quantile=(hist_bins(a)+hist_bins(a+1))/2;
+else 
+    not_really_data_quantile=1;
+end
 suggested_final_scale_file=fullfile(fileparts(recon_mat.scale_file),...
     sprintf('.%s_civm_raw_scale_CALCULATED_SLICEWISE.float',recon_mat.runno));
 suggested_final_scale=scale_target/not_really_data_quantile;
@@ -629,7 +633,7 @@ else
     warning('Live run always keeps the work :p');
     options.keep_work=1;
 end
-if ~options.keep_work && ~options.process_headfiles_only
+if ~options.keep_work && ~options.process_headfiles_only && ~options.live_fun
     % Lets adjust to keeping work until our final headfile is complete.
     % That is, its more than 20KiB big. 
     % 20 was chosen because typical procpars are 60KiB, and incomplete

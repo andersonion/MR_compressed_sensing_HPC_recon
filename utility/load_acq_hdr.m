@@ -102,17 +102,24 @@ elseif strcmp(the_scanner.vendor,'mrsolutions')
     % negative mode allows partial files to load as much header as they can
     % and then quit
     S_hdr=load_mrd(data_file,-1);
+    hdr.data_is_complex=S_hdr.data_is_complex;
+    hdr.data_type=S_hdr.data_type;
+    hdr.bytes_per_point = class_bytes(hdr.data_type);
     %hdr.dims=dimstruct('xyzpt',hdr.Dimension);
+    
     % header dimensions are constant in mrd fiels, but i suspect their
     % order is bs.
     % they are spatial 1, 2, slices, spatial 3, echos, experiments.
     % the expectation is that slices and spatial 3 will not both exist at
     % the same time
-    hdr.dims=dimstruct('xyszet',S_hdr.Dimension);
-    hdr.data_is_complex=S_hdr.data_is_complex;
-    hdr.data_type=S_hdr.data_type;
-    hdr.bytes_per_point = class_bytes(hdr.data_type);
-    dims=double(S_hdr.Dimension);
+    hdr.dim_3_is_slice=0;
+    S_hdr.Dimension=double(S_hdr.Dimension);
+    dims=S_hdr.Dimension;
+    if S_hdr.Dimension(3)~=1 && S_hdr.Dimension(4)==1
+        dims(4)=dims(3);
+        dims(3)=1;
+    end
+    hdr.dims=dimstruct('xyszet',dims);
     if numel(dims)~=6 
         error('unexpected dimension count');
     end

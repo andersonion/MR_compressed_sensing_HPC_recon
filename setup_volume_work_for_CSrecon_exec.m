@@ -21,6 +21,7 @@ log_mode=1;
 %% Load data
 recon_mat=matfile(setup_var.recon_file);
 options=recon_mat.options;
+the_scanner=recon_mat.the_scanner;
 volume_number=setup_var.volume_number;
 volume_runno=setup_var.volume_runno;
 %% Immediately check to see if we still need to set up the work (a la volume manager)
@@ -80,12 +81,19 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         fid_volume_number, ...
         recon_mat.original_dims,   only_non_zeros, process_precision  );
     %}
+    if strcmp(the_scanner.vendor,'mrsolutions')
+        db_inplace(mfilename,'uncertain formatting');
+        % didnt get this tested yet, had some troubles around getting
+        % trailing meta data, which might be a big deal
+        [hdr,data]=load_mrd(setup_var.volume_fid, process_precision);
+    elseif strcmp(the_scanner.vendor,'agilent')
     data = load_fidCS(setup_var.volume_fid, ...
         max_blocks, ...
         recon_mat.rays_per_block/recon_mat.nechoes, ...
         recon_mat.dim_x*2, recon_mat.kspace_data_type, ...
         fid_volume_number, ...
         recon_mat.original_dims,   only_non_zeros, process_precision  );
+    end
     if ndims(data)==3
         %% convert back to 2d data, most of the time we dont get 3d from loadfid cs
         data=reshape(data,[size(data,1),size(data,2)*size(data,3)]);

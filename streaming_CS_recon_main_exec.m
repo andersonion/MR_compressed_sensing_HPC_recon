@@ -329,17 +329,9 @@ end
 % make sure each mention of user will be set proper
 % only partially implemented :D
 legacy_scanners={'heike','kamy','onnes'};
+su='';
 if any(strcmp(legacy_scanners,scanner_name))
     su='omega';
-    if ~isempty(the_scanner.user)
-        su=the_scanner.user;
-    end
-    if options.scanner_user
-        su=options.scanner_user;
-    end
-    options.scanner_user=su;
-    the_scanner.user=su;
-    clear su;
 else
     %{
     % SHOULD LET THIS BE UP TO SSH ! 
@@ -347,6 +339,16 @@ else
         the_scanner.user=sys_user();
     end
     %}
+end
+if ~isempty(the_scanner.user)
+    su=the_scanner.user;
+end
+if options.scanner_user
+    su=options.scanner_user;
+end
+if ~isempty(su)
+    options.scanner_user=su;
+    the_scanner.user=su;
 end
 %% do main work and schedule remainder
 if ~exist(complete_study_flag,'file')
@@ -578,6 +580,17 @@ if ~exist(complete_study_flag,'file')
     % first we see if we've got one, otherwise we check if user specified
     % one
     tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
+    if options.debug_mode >=50 && strcmp(the_scanner.vendor,'mrsolutions') ...
+        && isempty(tables_in_workdir)
+        db_inplace(mfilename,'manual cs_table faking ');
+        % wkdir='D:\workstation\scratch\N00009.work';
+        md=[acq_hdr.dim_Y,acq_hdr.dim_Z];
+        m=ones(md);md=unique(md);
+        md=regexprep(num2str(md),'\s+','x');
+        tn=sprintf('stream_table_CS%s_1x_pa18_pb54.txt',md);
+        save_cs_stream_table(m,fullfile(workdir,tn));
+        tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
+    end
     local_cs_table_path='';
     if ~isempty(tables_in_workdir)
         if ischar(options.CS_table) && ~strcmp(options.CS_table,tables_in_workdir(1).name)

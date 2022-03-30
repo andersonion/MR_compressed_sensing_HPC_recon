@@ -48,6 +48,10 @@ fclose(fid);
 
 %% enforce exact size
 table_elements=prod(table_dims);
+if numel(skiptable)+10 < table_elements
+    error('TABLE UNDERSIZED! %s has %d of %d expected',...
+        table_target, numel(skiptable), table_elements)
+end
 while numel(skiptable) < table_elements
     % using a while is not necessary here, however if more than one 0 is
     % missing this will be extra spammy, which seems like a good thing.
@@ -55,7 +59,10 @@ while numel(skiptable) < table_elements
     skiptable(end+1)=0;
 end
 if numel(skiptable) ~= table_elements
-    warning('TABLE oversize! truncating! (You may have had trailing spaces converted to 0.)');
+    funct=@warning;
+    if numel(skiptable)-10 > table_elements
+        funct=@error; end
+    funct('TABLE oversize! truncating! (You may have had trailing spaces converted to 0.)');
     skiptable=skiptable(1:table_elements); % BJA - Trims off any zero padding
 end
 skiptable=reshape(skiptable, table_dims);

@@ -3,15 +3,17 @@ function convert_cs_table_to_stream(cs_table,stream_out)
 % loads previous version of cs table and converts it into the new stream of
 % text values
 
-if ~isempty(strfind(cs_table,'stream'))
+if reg_match(cs_table,'stream')
     warning('this appears to already be a stream table, quiting');
     return;
 end
 if ~exist('stream_out','var')
     [p,n,e]=fileparts(cs_table);
-    stream_out=fullfile(p,sprintf('stream_table_%s.txt',n));
+    stream_out=fullfile(p,sprintf('stream_%s.txt',n));
 end
 if exist(stream_out,'file')
+    [s,sout]=system(sprintf('touch -r %s %s', cs_table, stream_out));
+    assert(s==0,sout);
     warning('existing file, NOT OVERWRITING');
     return;
 end
@@ -27,3 +29,5 @@ if nnz(m2-mask)> 0
     delete(stream_out);
     error('cs table conversion failed');
 end
+[s,sout]=system(sprintf('touch -r %s %s', cs_table, stream_out));
+assert(s==0,sout);
