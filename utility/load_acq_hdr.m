@@ -91,7 +91,7 @@ rays_per_volume
     if S_hdr.file.bytes_per_trace/S_hdr.file.bytes_per_element/hdr.ray_length==2
         hdr.data_is_complex=1;
     end
-    hdr.data_ready=S_hdr.block_one.status.hasData;
+    hdr.data_ready=S_hdr.block.status.hasData;
 
     % what about procpar and all that! that could be specified here too...
     % blargh
