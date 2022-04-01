@@ -33,8 +33,11 @@ mrd_file='c:/smis/dev/Temp/se_test_13.mrd';
 mrd_file='c:/smis/dev/Temp/se_test_15.mrd';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
+mrd_file='d:/workstation/scratch/c/smis/dev/Temp/Temp.MRD'
+
 [~,mrd_name]=fileparts(mrd_file);
 %% fix different paths between sys and testbed
+% this only works if original was scanner path.
 assert(exist('mrd_file','var'),'please define mrd_file');
 if ~exist('cs_table','var')
     cs_table='';
@@ -81,7 +84,8 @@ mrd_data=t_data; clear t_data rim;
 mrd_number=mrd_number+1000;
 %}
 %% insert mrd data into fully sampled space, and show kspace
-if exist(cs_table,'file')
+if nnz(volume_dims)==2 
+    %exist(cs_table,'file')
     lil_dummy=complex(0,0);
     kspace_data=zeros(volume_dims,'like',lil_dummy);
     if ndims(mrd_data) > 2
