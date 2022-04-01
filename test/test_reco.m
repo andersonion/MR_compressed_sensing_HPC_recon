@@ -1,3 +1,5 @@
+% a helper to run simple ft on mrsolutions data
+% can use compressed sensing or not
 %% run startup
 f_path=which('load_mrd');
 if isempty(f_path)
@@ -33,6 +35,10 @@ mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
 [~,mrd_name]=fileparts(mrd_file);
 %% fix different paths between sys and testbed
+assert(exist('mrd_file','var'),'please define mrd_file');
+if ~exist('cs_table','var')
+    cs_table='';
+end
 smis_dir='d:/workstation/scratch/c/smis';
 if ~exist(cs_table,'file')
     cs_table=regexprep(cs_table,'^c','d');
@@ -51,14 +57,17 @@ if numel(reg_res) >= 1
 end
 clear reg_res; 
 %% load data and mask
-% [mask_size,pa,pb,cs_factor]=cs_table_name_decode(cs_table);
-idx_mask=load_cs_table(cs_table);
-% patch one data_file generated wrongly(really its the mask's fault having
-% 1 bonus point)
-if mrd_number==4;  idx_mask(end)=0;  end
-%
 [mrd_header,mrd_data]=load_mrd(mrd_file,'double');
-volume_dims=[mrd_header.Dimension(1),size(idx_mask)];
+volume_dims=size(mrd_data);volume_dims(volume_dims==1)=[];
+if nnz(volume_dims)==2 
+    % exist(cs_table,'file') 
+    % [mask_size,pa,pb,cs_factor]=cs_table_name_decode(cs_table);
+    idx_mask=load_cs_table(cs_table);
+    % patch one data_file generated wrongly(really its the mask's fault having
+    % 1 bonus point)
+    if mrd_number==4;  idx_mask(end)=0;  end
+    volume_dims=[mrd_header.Dimension(1),size(idx_mask)];
+end
 %{
 % load ruslan and convert to expected order
 % if centering use cen string
@@ -71,19 +80,37 @@ t_data=permute(rim,[3,1,2]);
 mrd_data=t_data; clear t_data rim;
 mrd_number=mrd_number+1000;
 %}
-%% insert mrd data into fully sampled space
-lil_dummy=complex(0,0);
-kspace_data=zeros(volume_dims,'like',lil_dummy);
-if ndims(mrd_data) > 2
-    % reshape if not simple ordering
-    mrd_data=reshape(mrd_data,[volume_dims(1),numel(mrd_data)/volume_dims(1)]);
+%% insert mrd data into fully sampled space, and show kspace
+if exist(cs_table,'file')
+    lil_dummy=complex(0,0);
+    kspace_data=zeros(volume_dims,'like',lil_dummy);
+    if ndims(mrd_data) > 2
+        % reshape if not simple ordering
+        mrd_data=reshape(mrd_data,[volume_dims(1),numel(mrd_data)/volume_dims(1)]);
+    end
+    kspace_data(:,idx_mask(:)==1)=mrd_data;
+    kspace_data=reshape(kspace_data,volume_dims);
+else
+    kspace_data=mrd_data;
 end
-kspace_data(:,idx_mask(:)==1)=mrd_data;
-kspace_data=reshape(kspace_data,volume_dims);
 % display fully sampled kspace
 disp_vol_center(kspace_data,1,200+mrd_number)
 %% get images space and display
-image_data=fftshift(fftn(fftshift(kspace_data)));
+% quick dirty guess
+% image_data=fftshift(fftn(fftshift(kspace_data)));
+% "correct" from rad_mat(for 3d)
+image_data=fftshift(fftshift(fftshift(...
+    ifft(ifft(ifft(...
+    fftshift(fftshift(fftshift(kspace_data,1),2),3)...
+    ,[],1),[],2),[],3)...
+    ,1),2),3);
+% magnitude and truncate max removing bright artifacts.
+image_data=abs(image_data);
+s_dat=sort(image_data(:));
+max=s_dat(round(numel(s_dat)*0.9995));
+image_data(image_data>=max)=max;
+% scale max to uint16
+image_data=image_data/max*(2^16-1);
 disp_vol_center(image_data,1,230+mrd_number);
 %% save a nifti someplace
-save_nii(make_nii(abs(image_data)),fullfile(pwd(),sprintf('%s.nii',mrd_name)));
+save_nii(make_nii(uint16(image_data)),fullfile(pwd(),sprintf('%s.nii',mrd_name)));

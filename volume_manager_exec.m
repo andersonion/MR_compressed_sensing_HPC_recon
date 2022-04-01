@@ -95,10 +95,18 @@ previous more annoyingly specific ugly funciton
     recon_mat.scanner_acquisition,...
     recon_mat.bytes_per_block);
 %}
+
 % new funtion
 scan_data_setup=recon_mat.scan_data_setup;
+fid_path=recon_mat.fid_path;
+status_dir=volume_dir;
+if strcmp(fid_path.current,fid_path.local)
+    % status_dir=fileparts(fid_path.current);
+end
+clear fid_path;
 % missing check for full fid here, need to enhance.
-[starting_point,log_msg,~,data_mode_check]=volume_status(volume_dir,...
+
+[starting_point,log_msg,~,data_mode_check]=volume_status(status_dir,...
     volume_runno, ...
     the_scanner,...
     volume_number,...
@@ -461,10 +469,12 @@ else
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
-                for ch_num=1:num_chunks
+                parfor ch_num=1:num_chunks
                     %parfor ch_num=1:num_chunks
                     % extract this selection of slice indicies
                     sx=slices_to_process(:,ch_num);
+                    if ~options.live_run
+                        %% scheduled slice work.
                     %{
                     % NOTE: this algorithm never worked!
                     % start a string with the first number
@@ -485,25 +495,24 @@ else
                     end;slice_string
                     %}
                     
-                    % force single_range output
-                    if ~options.slice_randomization
-                        slice_ranges=range_condenser(sx,1);
-                        fmt=sprintf('%%0%ii_to_%%0%ii',zero_width,zero_width);
-                        slice_string=sprintf(fmt,slice_ranges{1}(1),slice_ranges{1}(end));
-                    else 
-                        slice_string=sprintf('%i ',sx);
-                    end
-                    swr_args= sprintf('%s %s %s',setup_variables, slice_string);
-                    swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
-                    if  stage_2_running_jobs
-                        dep_string = stage_2_running_jobs;
-                        dep_type = 'afterok-or';
-                    else
-                        dep_string = '';
-                        dep_type = '';
-                    end
-                    c_running_jobs ='';
-                    if ~options.live_run
+                        % force single_range output
+                        if ~options.slice_randomization
+                            slice_ranges=range_condenser(sx,1);
+                            fmt=sprintf('%%0%ii_to_%%0%ii',zero_width,zero_width);
+                            slice_string=sprintf(fmt,slice_ranges{1}(1),slice_ranges{1}(end));
+                        else
+                            slice_string=sprintf('%i ',sx);
+                        end
+                        swr_args= sprintf('%s %s %s',setup_variables, slice_string);
+                        swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
+                        if  stage_2_running_jobs
+                            dep_string = stage_2_running_jobs;
+                            dep_type = 'afterok-or';
+                        else
+                            dep_string = '';
+                            dep_type = '';
+                        end
+                        c_running_jobs ='';
                         if options.slice_randomization
                             fmt=sprintf('set_%%0%ii_rand%i',zero_width,options.chunk_size);
                             slice_string=sprintf(fmt,ch_num);
@@ -519,11 +528,7 @@ else
                             disp(msg2)
                         end
                     else
-                        %eval(sprintf('slicewise_CSrecon_exec %s',swr_args));
-                        cell_args=strsplit(slice_string);
-                        slicewise_CSrecon_exec(setup_variables, cell_args{:});
-                        %slicewise_CSrecon_exec(swr_args)
-                        %starting_point=4;
+                        slicewise_CSrecon_exec(setup_variables, sx);
                     end
                 end
                 if ~isempty(s3jobs) && ~options.live_run
@@ -614,7 +619,7 @@ else
         if strcmp(the_scanner.vendor,'agilent')
             stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
         else
-            error('incomplete');
+            db_inplace(mfilename,'incomplete');
         end
         %else
         %% live run starting point advance handling

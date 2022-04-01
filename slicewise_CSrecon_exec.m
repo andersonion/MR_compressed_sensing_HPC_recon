@@ -47,9 +47,11 @@ end
 
 
 %%%
-% This eliminates the nested structure of the incoming slice data, and also writes the each
-% slice as they finish instead of waiting until all are done.
+% This eliminates the nested structure of the incoming slice data, and 
+% also writes each slice as they finish instead of waiting until all 
+% are done.
 %%%
+%{
 slice_numbers=zeros(options.chunk_size,1);
 insertion_point=1;
 for n=1:numel(varargin)
@@ -58,6 +60,9 @@ for n=1:numel(varargin)
     slice_numbers(insertion_point:insertion_point+numel(nums)-1)=nums;
     insertion_point=insertion_point+numel(nums);
 end; clear n nums insertion_point;
+%}
+% when cascading varargin, dont forget to {:} to expand
+slice_numbers=range_expander(varargin{:});
 
 tic
 workspace_mat = matfile(setup_var.volume_workspace,'Writable',false);
@@ -414,6 +419,13 @@ end
 %  will explicitly fail in hopes of triggering backup jobs instead of
 %  another complete cycle of volume_manager, etc.
 tmp_header = load_cstmp_hdr(setup_var.temp_file);
+idx_bad_nums=isnan(slice_numbers)|slice_numbers==0;
+if numel(find(idx_bad_nums))>0
+    warning('Some bad slice numbers given, ignoring');
+    disp(slice_numbers);
+    slice_numbers(idx_bad_nums)=[];
+end
+
 apparent_iterations = tmp_header(slice_numbers);
 apparent_failures = slice_numbers(apparent_iterations<requested_iterations);
 num_af=length(apparent_failures);
@@ -435,6 +447,7 @@ end
 return
 
 end
+
 function slice_numbers=parse_slice_indices(slice_indices)
 % slice numbers pulled down to its own function to remove temp vars from workspace easier. 
 slice_numbers=[];

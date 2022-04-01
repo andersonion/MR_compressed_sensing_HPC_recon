@@ -39,11 +39,15 @@ data='c:/smis/dev/Temp/se_test_const_phase.mrd';
 runno='TEST_data';
 
 
-%% set args
+%% set args 
+% normal iteration count
+iters='iteration_strategy=6x10';
+% test iteration count
+iters='iteration_strategy=1';
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
-    'iteration_strategy=1x1','chunk_size=5','target_machine=localhost',...
-    'keep_work','scanner_user=mrs'};
+    'chunk_size=5','target_machine=localhost',...
+    'keep_work','scanner_user=mrs',real_iters};
 if exist('cs_table','var')
     main_args{end+1}=sprintf('CS_table=%s',cs_table);
 end
