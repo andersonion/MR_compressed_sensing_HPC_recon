@@ -377,7 +377,7 @@ if ~exist(complete_study_flag,'file')
         gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
         [s,sout]=system(gui_cmd); assert(s==0,sout);
     end
-   if exist(param_file_path,'file')
+    if exist(param_file_path,'file')
         gui_info=read_headfile(param_file_path,0);
     end
     %% Give options feedback to user, with pause so they can cancel
@@ -533,6 +533,9 @@ if ~exist(complete_study_flag,'file')
     % returing S_hdr for now for convenience, in the future all important
     % bits will be filed under acq_hdr, and that will be removed.
     [acq_hdr,S_hdr]=load_acq_hdr(the_scanner,recon_mat.fid_tag_file);
+    % so we wont have to re-load the scanner info later, we'll stuff it
+    % into the master file.
+    recon_mat.scan_header=S_hdr;
     recon_mat.dim_x=acq_hdr.ray_length;
     recon_mat.bytes_per_block=acq_hdr.bytes_per_block;
     recon_mat.rays_per_block=acq_hdr.rays_per_block;
@@ -580,7 +583,7 @@ if ~exist(complete_study_flag,'file')
     % first we see if we've got one, otherwise we check if user specified
     % one
     tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
-    if options.debug_mode >=50 && strcmp(the_scanner.vendor,'mrsolutions') ...
+    if options.debug_mode >=150 && strcmp(the_scanner.vendor,'mrsolutions') ...
         && isempty(tables_in_workdir)
         db_inplace(mfilename,'manual cs_table faking ');
         % wkdir='D:\workstation\scratch\N00009.work';
@@ -593,7 +596,8 @@ if ~exist(complete_study_flag,'file')
     end
     local_cs_table_path='';
     if ~isempty(tables_in_workdir)
-        if ischar(options.CS_table) && ~strcmp(options.CS_table,tables_in_workdir(1).name)
+        [~,n,e]=fileparts(options.CS_table);TAB_N=[n,e];clear n e;
+        if ischar(options.CS_table) && ~strcmp(TAB_N,tables_in_workdir(1).name)
             % have user specified, lets error if they're different
             error('existing table in working folder doesnt match user specified table! \nuser:\t%s\nworkdir:\',...
                 options.CS_table, tables_in_workdir(1).name)
@@ -603,11 +607,6 @@ if ~exist(complete_study_flag,'file')
         options.CS_table=tables_in_workdir(1).name;
         local_cs_table_path=fullfile(workdir,options.CS_table);
         log_msg = sprintf('Using first CS_table found in work directory: ''%s''.\n',options.CS_table);
-    elseif options.CS_table
-        % user specified table 
-        local_cs_table_path=fullfile(workdir,options.CS_table);
-        log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
-        yet_another_logger(log_msg,log_mode,log_file);
     end
     % set local procpar location, and if possible fetch it now
     if exist('agilent_specific','var')
@@ -619,7 +618,7 @@ if ~exist(complete_study_flag,'file')
         end;clear procpar_file_legacy;
         recon_mat.procpar_file = procpar_file;
     end
-    local_cs_table_path='test';warning('test hard set table');
+    % local_cs_table_path='test';warning('test hard set table');
     if ~strcmp(data_mode,'streaming') && isempty(local_cs_table_path) ...
             && strcmp(the_scanner.vendor,'agilent')
         %%% local or static mode
@@ -653,7 +652,12 @@ if ~exist(complete_study_flag,'file')
         % dont know how the table will be connected to the data.
         %if strcmp(data_mode,'streaming')
         if ischar(options.CS_table)
-            local_cs_table_path=fullfile(workdir,options.CS_table);
+            log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
+            yet_another_logger(log_msg,log_mode,log_file);
+            if isempty(local_cs_table_path)
+                [~,n,e]=fileparts(options.CS_table);
+                local_cs_table_path=fullfile(workdir,[n e]); clear n e;
+            end
             remote_table_path=fullfile(the_scanner.skip_table_directory,options.CS_table);
         else % if islogical options.CS_table
             % streaming you had to tell the cs table, find_cs_table might work,
@@ -675,8 +679,16 @@ if ~exist(complete_study_flag,'file')
     end
     if ~exist(local_cs_table_path,'file')
         if exist('remote_table_path','var')
+            % convert a windows-path to linuxly becuase we always pull from
+            % linuxly
+            if reg_match(remote_table_path,'^[a-zA-Z]:')
+                % NO support for spaces :p
+                remote_table_path([1,2])=remote_table_path([2,1]);
+                remote_table_path(1)='/';
+                remote_table_path=strrep(remote_table_path,'\','/');
+            end
             % need to fix the ../ requirement!
-            pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ../../../../../../%s %s.work',...
+            pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
                 options.scanner_user, the_scanner.name, remote_table_path, runno);
             [s,sout] = system(pull_cmd);
             assert(s==0,sout);
@@ -748,7 +760,8 @@ if ~exist(complete_study_flag,'file')
         volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
             workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
         vol_strings{vn}=vol_string;
-        [~,~,pc]=volume_status(fullfile(workdir,volume_runno),volume_runno);
+        [stage_n,~,pc]=volume_status(fullfile(workdir,volume_runno),volume_runno);
+
         % [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
         if exist(volume_flag,'file') && pc >= 100
             recon_status(vn)=1;

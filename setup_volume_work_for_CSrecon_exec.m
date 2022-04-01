@@ -359,6 +359,9 @@ d2=2; % May need to swap these...
     %y_sum=zeros([1, size(current_mask,d1)]);
     %z_sum=zeros([1, size(current_mask,d2)]);
 %end
+%full kspace insert
+%kspace_data(:,current_mask(:)==1)=current_data
+% kspace_slice(current_mask(:)==1)=current_data(n,:);
 for n = 1:x_dim
     current_slice(current_mask(:))=current_data(n,:);
     % 8 May 2017, BJA: Don't need to waste computations on fftshift for scaling calculation
@@ -369,6 +372,7 @@ for n = 1:x_dim
         z_sums(:,n)=mean(temp_data,d1)';
         x_sum(n)=mean(temp_data(:));
     %end
+    current_slice=zeros([y_dim z_dim],'like',current_data);
 end
 
 q = quantile(qq,thresh);

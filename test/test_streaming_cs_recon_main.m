@@ -1,4 +1,5 @@
 % CS_table='CS480_8x_pa18_pb54';
+clear runno;
 %% existing heike data checking
 scanner_name='heike';s_l='N';
 patient='N220307_01';
@@ -31,18 +32,30 @@ acquisition='dev/MRD/1/8';data=acquisition;  dig=dig+2;
 acquisition='dev/MRD/1/39';data=acquisition;  dig=dig+2;
 % acquisition='dev/MRD/1/40';data=acquisition;  dig=dig+2;
 
+% compresed dataset
+clear acquisition;
+cs_table='other/stream_CS256_16x_pa18_pb73';
+data='c:/smis/dev/Temp/se_test_const_phase.mrd';
+runno='TEST_data';
+
+
 %% set args
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
     'iteration_strategy=1x1','chunk_size=5','target_machine=localhost',...
     'keep_work','scanner_user=mrs'};
+if exist('cs_table','var')
+    main_args{end+1}=sprintf('CS_table=%s',cs_table);
+end
 %% pick runno for either of us to test with
 if ~strcmp(getenv('USERNAME'),'jjc29')
     runno=sprintf('%s%05i',s_l,dig);
     streaming_CS_recon_main_exec('heike',runno,data,...
     main_args{:});
 else
-    runno=sprintf('%s%05i',s_l,dig+1);
+    if ~exist('runno','var')
+        runno=sprintf('%s%05i',s_l,dig+1);
+    end
     % somewhat recognizeable shape
     % dims=[256,128,16,5]  'c:/smis/DATA/3dmra.mrd '
     % dont know how to start looking at this epi data

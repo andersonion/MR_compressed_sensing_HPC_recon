@@ -53,4 +53,10 @@ phmask = zpad(hamming(min(hamming_window,size(mask,1)))*hamming(min(hamming_wind
     size(mask,1), size(mask,2));
 %for low-order phase estimation and correction
 phmask = phmask/max(phmask(:));
+% had to add these... not sure i like them. using unique to make sure
+% they're probably okay
+assert(numel(unique(mask(:)))==2,'mask load error');
+mask=logical(mask);
+assert(numel(unique(original_mask(:)))==2,'mask load error');
+original_mask=logical(original_mask);
 end

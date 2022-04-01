@@ -505,12 +505,13 @@ databuffer.addprop('data');
 databuffer.headfile=recon_mat.headfile;
 
 
-
+%{
 db_inplace(mfilename,'REVISE')
 if exist('bollocks','var')
     t_var=recon_mat.databuffer;
     databuffer.headfile=t_var.headfile; clear t_var;
 end
+%}
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_mean = mean(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_min = min(tmp_header(:));

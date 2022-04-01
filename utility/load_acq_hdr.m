@@ -151,6 +151,8 @@ hdr.n_volumes=prod(hdr.dims.Sub(nsd));
 %}
 % the capitol dims should ONLY be xyz, anything else has to remain in the
 % dim struct
+%{
+deactivating
 spatial_dims(spatial_dims=='P')=[];
 for dn=1:numel(spatial_dims)
     % dim char
@@ -163,4 +165,9 @@ for dn=1:numel(spatial_dims)
         hdr.(d_name)=dv;
     end
 end
+if strcmp(the_scanner.vendor,'mrsolutions')
+    hdr=rmfield(hdr,'dim_Y');
+    hdr=rmfield(hdr,'dim_Z');
+end
+%}
 end
