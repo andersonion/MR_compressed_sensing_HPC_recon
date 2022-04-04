@@ -33,7 +33,14 @@ mrd_file='c:/smis/dev/Temp/se_test_13.mrd';
 mrd_file='c:/smis/dev/Temp/se_test_15.mrd';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
-mrd_file='d:/workstation/scratch/c/smis/dev/Temp/Temp.MRD'
+% test mge
+% mrd_file='d:/workstation/scratch/c/smis/dev/Temp/Temp.MRD'
+
+% /d/workstation/scratch/dev/MRD/4
+% 79 - 88
+% 80,81 are big and failed
+% non-compressed
+% mrd_file='d:/workstation/scratch/dev/MRD/4/';
 
 [~,mrd_name]=fileparts(mrd_file);
 %% fix different paths between sys and testbed
@@ -70,6 +77,8 @@ if nnz(volume_dims)==2
     % 1 bonus point)
     if mrd_number==4;  idx_mask(end)=0;  end
     volume_dims=[mrd_header.Dimension(1),size(idx_mask)];
+else 
+    clear idx_mask;
 end
 %{
 % load ruslan and convert to expected order
@@ -77,14 +86,32 @@ end
 [rim,dim,ppr]=Get_mrd_3D5(mrd_file,'not','not');
 % simple 3d only, put data into simple order, readout, views, views2
 % this should be the "correct" thing to do, however it gives bad output
-t_data=permute(rim,[3,1,2]);
+if ndims(rim)==3
+    t_data=permute(rim,[3,1,2]);
 % this undoes the internal fun of Get_mrd_3D5, we'll not use it for now.
 %%t_data=permute(rim,[3,2,1]);
-mrd_data=t_data; clear t_data rim;
+elseif ndims(rim)==4
+    t_data=permute(rim,[[3,1,2]+1,1]);
+elseif ndims(rim)==2
+    t_data=permute(rim,[2,1]);
+end
+if exist('t_data','var')
+    mrd_data=t_data; clear t_data rim;
+end
+
 mrd_number=mrd_number+1000;
+
+
 %}
 %% insert mrd data into fully sampled space, and show kspace
-if nnz(volume_dims)==2 
+if exist('idx_mask','var')
+    % tried varietys of mask load order, but these all completely corrupted
+    % the image
+    idx_mask=idx_mask';
+    %idx_mask(:,:)=idx_mask(end:-1:1,end:-1:1);
+    %idx_mask(:,:)=idx_mask(:,end:-1:1);
+    idx_mask(:,:)=idx_mask(end:-1:1,:);
+    % nnz(volume_dims)==2 
     %exist(cs_table,'file')
     lil_dummy=complex(0,0);
     kspace_data=zeros(volume_dims,'like',lil_dummy);

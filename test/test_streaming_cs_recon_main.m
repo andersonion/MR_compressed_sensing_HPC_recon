@@ -38,16 +38,22 @@ cs_table='other/stream_CS256_16x_pa18_pb73';
 data='c:/smis/dev/Temp/se_test_const_phase.mrd';
 runno='TEST_data';
 
+% test mgre
+clear runno;
+acquisition='dev/MRD/4/89';data=acquisition;  dig=dig+2;
+
+
+
 
 %% set args 
 % normal iteration count
 iters='iteration_strategy=6x10';
 % test iteration count
-iters='iteration_strategy=1';
+iters='iteration_strategy=1x1';
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
     'chunk_size=5','target_machine=localhost',...
-    'keep_work','scanner_user=mrs',real_iters};
+    'keep_work','scanner_user=mrs',iters};
 if exist('cs_table','var')
     main_args{end+1}=sprintf('CS_table=%s',cs_table);
 end
