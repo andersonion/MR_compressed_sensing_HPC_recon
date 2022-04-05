@@ -1,46 +1,19 @@
-% CS_table='CS480_8x_pa18_pb54';
-clear runno;
-%% existing heike data checking
-scanner_name='heike';s_l='N';
-patient='N220307_01';
-acquisition='ser10';data=strjoin({patient,acquisition},'/');
-patient='N220304_01';
-acquisition='ser10';data=strjoin({patient,acquisition},'/');
-dig=2;
+%% do setup
+if strcmp(getenv('WORKSTATION_DATA'),'')
+    setenv('WORKSTATION_DATA','c:/workstation/data');
+end
+if strcmp(getenv('BIGGUS_DISKUS'),'')
+    getenv('BIGGUS_DISKUS','c:/workstation/scratch');
+end
+if strcmp(getenv('WORKSTATION_HOME'),'')
+    getenv('WORKSTATION_HOME','c:/workstation/code')
+end
+%% set file and runno
+cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
+mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
-%% existing kamy checking, may not be best dataset as its 1024x380x380
-scanner_name='kamy';s_l='S';
-% S211215_01/ser11.fid
-patient='S211215_01';
-acquisition='ser11.fid';data=strjoin({patient,acquisition},'/');
-acquisition='ser10';data=strjoin({patient,acquisition},'/');
-dig=2;
-
-
-%% new scanner data testing
-scanner_name='new9t';s_l='N';
-scanner_name='local9t';s_l='N';
-patient='';
-acquisition='3dmra';data=acquisition;
-acquisition='smfov';data=acquisition;
-dig=dig+2;
-
-%% real test of fast spin echo from new scanner
+%% adjust input for CS_recon 
 scanner_name='grumpy';s_l='N';
-%--no--! acquisition='8_000_0';data=acquisition; 
-acquisition='dev/MRD/1/8';data=acquisition;  dig=dig+2;
-acquisition='dev/MRD/1/39';data=acquisition;  dig=dig+2;
-% acquisition='dev/MRD/1/40';data=acquisition;  dig=dig+2;
-
-% compresed dataset
-clear acquisition;
-cs_table='other/stream_CS256_16x_pa18_pb73';
-data='c:/smis/dev/Temp/se_test_const_phase.mrd';
-runno='TEST_data';
-
-% test mgre
-clear runno;
-acquisition='dev/MRD/4/89';data=acquisition;  dig=dig+2;
 
 
 
@@ -49,7 +22,7 @@ acquisition='dev/MRD/4/89';data=acquisition;  dig=dig+2;
 % normal iteration count
 iters='iteration_strategy=6x10';
 % test iteration count
-iters='iteration_strategy=1x1';
+% iters='iteration_strategy=1x1';
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
     'chunk_size=5','target_machine=localhost',...

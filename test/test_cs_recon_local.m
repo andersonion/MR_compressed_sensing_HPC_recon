@@ -3,6 +3,8 @@
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
+% force linux slashes in path
+mrd_file=strrep(mrd_file,'\','/');
 %% fast vs good
 % good
 iters='iteration_strategy=6x10';
@@ -36,9 +38,29 @@ clear f_path;
 
 
 %% adjust input for CS_recon 
+% using time based runnos, but keeping a log in this directory so we can
+% resume if its found(and we're incomplete)
 scanner_name='grumpy';s_l='N';
 formatOut = 'yyyymmdd_hh';
 runno=sprintf('%s%s',s_l,datestr(now,formatOut));
+
+name_hash = mlreportgen.utils.hash(mrd_file);
+name_hash = sprintf('H%s',name_adj(name_hash,'clean',0));
+
+d=fileparts(mfilename('fullfile'));
+recon_log_file=fullfile(d,'reconlog.mat'); clear d;
+
+is_missing=matfile_missing_vars(recon_log_file,name_hash);
+if is_missing
+    recon_log=matfile(recon_log_file,'writable',true);
+    recon_log.(name_hash)={mrd_file,runno};
+else
+    fprintf('previous recon found, will continue\n');
+    recon_info=recon_log.(name_hash);
+    runno=recon_info{2};
+end
+clear recon_info is_missing;
+
 %[~,cs_table]=fileparts(cs_table);
 
 %% set args 

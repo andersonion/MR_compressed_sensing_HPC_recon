@@ -26,7 +26,9 @@ mrd_file=fullfile('d:','smis','dev','MRD','4','110',"110_000_0.mrd");
 mrd_file=fullfile('d:','smis','dev','MRD','4','109',"109_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','108',"108_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','107',"107_000_0.mrd"); 
-
+%%
+mrd_file='c:/smis/dev/Temp/Temp.MRD'
+mrd_file='c:/smis/dev/Temp/scout.MRD'
 
 %% fix different paths between sys and testbed
 [~,mrd_name]=fileparts(mrd_file);
