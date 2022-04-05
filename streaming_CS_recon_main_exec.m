@@ -39,7 +39,10 @@ typical_pa=1.8;
 typical_pb=5.4;
 if ~isdeployed
     %% Get all necessary code for reconstruction
-    % run(fullfile(fileparts(mfilename('fullfile')),'compile__pathset.m'))
+    f_path=which('FWT2_PO');
+    if isempty(f_path)
+        run(fullfile(fileparts(mfilename('fullfile')),'compile_commands','compile__pathset.m'));
+    end
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
@@ -374,8 +377,13 @@ if ~exist(complete_study_flag,'file')
         % of quotes.
         args=sprintf('"%s"',args);
         %end
-        gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
-        [s,sout]=system(gui_cmd); assert(s==0,sout);
+        gui_app=getenv('GUI_APP');
+        if ~strcmp(gui_app,'')
+            gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
+            [s,sout]=system(gui_cmd); assert(s==0,sout);
+        else
+            warning('GUI NOT SET archive info will not be saved');
+        end
     end
     if exist(param_file_path,'file')
         gui_info=read_headfile(param_file_path,0);
@@ -454,7 +462,9 @@ if ~exist(complete_study_flag,'file')
     recon_mat.fid_tag_file = fullfile(workdir, [ '.' runno '.fid_tag']);
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
-        [s,sout]=system(['touch ' log_file]); assert(s==0,sout);
+        [s,sout]=system(['touch ' log_file]); 
+        % why is this important? lets not bother?
+        %assert(s==0,sout);
     end
     ts=fix(clock);
     t=datetime(ts(1:3));
@@ -594,7 +604,7 @@ if ~exist(complete_study_flag,'file')
         save_cs_stream_table(m,fullfile(workdir,tn));
         tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
     end
-    local_cs_table_path='';
+    local_table_path='';
     if ~isempty(tables_in_workdir)
         [~,n,e]=fileparts(options.CS_table);TAB_N=[n,e];clear n e;
         if ischar(options.CS_table) && ~strcmp(TAB_N,tables_in_workdir(1).name)
@@ -605,7 +615,7 @@ if ~exist(complete_study_flag,'file')
             error('Multiple CS tables in work dir! %s',workdir);
         end
         options.CS_table=tables_in_workdir(1).name;
-        local_cs_table_path=fullfile(workdir,options.CS_table);
+        local_table_path=fullfile(workdir,options.CS_table);
         log_msg = sprintf('Using first CS_table found in work directory: ''%s''.\n',options.CS_table);
     end
     % set local procpar location, and if possible fetch it now
@@ -618,8 +628,8 @@ if ~exist(complete_study_flag,'file')
         end;clear procpar_file_legacy;
         recon_mat.procpar_file = procpar_file;
     end
-    % local_cs_table_path='test';warning('test hard set table');
-    if ~strcmp(data_mode,'streaming') && isempty(local_cs_table_path) ...
+    % local_table_path='test';warning('test hard set table');
+    if ~strcmp(data_mode,'streaming') && isempty(local_table_path) ...
             && strcmp(the_scanner.vendor,'agilent')
         %%% local or static mode
         if exist('agilent_specific','var')
@@ -645,7 +655,7 @@ if ~exist(complete_study_flag,'file')
         end
         [~,n,e]=fileparts(remote_table_path);
         options.CS_table=sprintf('%s%s',n,e);
-        local_cs_table_path=fullfile(workdir,options.CS_table);
+        local_table_path=fullfile(workdir,options.CS_table);
     else
         % formerly this was only for streaming, but it seems like we'd like
         % to use it more often, eg for our new mrsolutions console where we
@@ -654,22 +664,26 @@ if ~exist(complete_study_flag,'file')
         if ischar(options.CS_table)
             log_msg = sprintf('Per user specification, using CS_table ''%s''.\n',options.CS_table);
             yet_another_logger(log_msg,log_mode,log_file);
-            if isempty(local_cs_table_path)
+            if isempty(local_table_path)
                 [~,n,e]=fileparts(options.CS_table);
-                local_cs_table_path=fullfile(workdir,[n e]); clear n e;
+                local_table_path=fullfile(workdir,[n e]); clear n e;
             end
-            remote_table_path=fullfile(the_scanner.skip_table_directory,options.CS_table);
+            if ~path_is_absolute(options.CS_table)
+                remote_table_path=fullfile(the_scanner.skip_table_directory,options.CS_table);
+            else
+                remote_table_path=options.CS_table;
+            end
         else % if islogical options.CS_table
             % streaming you had to tell the cs table, find_cs_table might work,
             % but its not well tested
             %remote_table_path=find_cs_table(the_scanner,m.ntraces,typical_pa,typical_pb);
             remote_table_path=find_cs_table(the_scanner,acq_hdr.dims.Sub('P'),typical_pa,typical_pb);
             [~,n,e]=fileparts(remote_table_path);
-            if ~reg_match(remote_table_path(1),'^/.*')
+            if ~path_is_absolute(remote_table_path(1))
                 remote_table_path=fullfile(the_scanner.skip_table_directory,remote_table_path);
             end
             options.CS_table=sprintf('%s%s',n,e);
-            local_cs_table_path=fullfile(workdir,options.CS_table);
+            local_table_path=fullfile(workdir,options.CS_table);
             % we have either found a cs table in work folder, or we have a procpar,
             % and pulled the location from there, if it is not in the work dir we
             % need to fetch it now....
@@ -677,28 +691,31 @@ if ~exist(complete_study_flag,'file')
             % scanner_skip_table_directory
         end
     end
-    if ~exist(local_cs_table_path,'file')
+    if ~exist(local_table_path,'file')
         if exist('remote_table_path','var')
             % convert a windows-path to linuxly becuase we always pull from
             % linuxly
-            if reg_match(remote_table_path,'^[a-zA-Z]:')
+            if path_is_windows(remote_table_path) && ~exist(remote_table_path,'file')
                 % NO support for spaces :p
                 remote_table_path([1,2])=remote_table_path([2,1]);
                 remote_table_path(1)='/';
                 remote_table_path=strrep(remote_table_path,'\','/');
             end
-            % need to fix the ../ requirement!
-            pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
-                options.scanner_user, the_scanner.name, remote_table_path, runno);
-            [s,sout] = system(pull_cmd);
+            if ~exist(remote_table_path,'file')
+                table_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
+                    options.scanner_user, the_scanner.name, remote_table_path, runno);
+            else
+                table_fetch=sprintf('cp -p %s %s',remote_table_path,local_table_path);
+            end
+            [s,sout] = system(table_fetch);
             assert(s==0,sout);
         else
-            error('need CS table to proceed, must have table resolve logic fault! local path set, but remote is not local(%s)',local_cs_table_path)
+            error('need CS table to proceed, must have table resolve logic fault! local path set, but remote is not local(%s)',local_table_path)
         end
     end
     %% process skiptable/mask set up common part of headfile output
     cache_folder=fullfile(getenv('WORKSTATION_DATA'),'petableCS');
-    [table_integrity,last_path]=cache_file(cache_folder,local_cs_table_path);
+    [table_integrity,last_path]=cache_file(cache_folder,local_table_path);
     if ~table_integrity
         warning('CS table was updated! Old file was preserved as %s',last_path);
         pause(3);
@@ -710,7 +727,7 @@ if ~exist(complete_study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [recon_mat.dim_y,recon_mat.dim_z,recon_mat.n_sampled_lines,recon_mat.sampling_fraction,recon_mat.mask,recon_mat.CSpdf,recon_mat.phmask,recon_mat.recon_dims,...
-            recon_mat.original_mask,recon_mat.original_pdf,recon_mat.original_dims] = process_CS_mask(local_cs_table_path, recon_mat.dim_x, options.hamming_window);
+            recon_mat.original_mask,recon_mat.original_pdf,recon_mat.original_dims] = process_CS_mask(local_table_path, recon_mat.dim_x, options.hamming_window);
         recon_mat.nechoes = 1;
         if recon_mat.ray_blocks == 1
             % n_sampled_lines is precisely the count from the cs mask
