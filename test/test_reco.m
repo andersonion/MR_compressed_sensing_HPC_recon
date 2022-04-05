@@ -10,27 +10,7 @@ if isempty(f_path)
 end
 clear f_path;
 %% set files
-%cs_table='c:/workstation/data/petableCS_stream/stream_CS256_8x_pa18_pb54';
-%mrd_file='c:/smis/dev/Temp/se_test.mrd';
-
-%cs_table='c:/workstation/data/petableCS_stream/stream_CS256_8x_pa18_pb54';
-%mrd_file='c:/smis/dev/Temp/se_test_1.mrd';
-%mrd_file='c:/smis/dev/Temp/se_test_2.mrd';
-%mrd_file='c:/smis/dev/Temp/se_test_3.mrd';
-% test 4 requires editing the CS_table removing the final point, 
-% solved automatically by stealing the number out
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
-%mrd_file='c:/smis/dev/Temp/se_test_4.mrd';
-%mrd_file='c:/smis/dev/Temp/se_test_5.mrd';
-%mrd_file='c:/smis/dev/Temp/se_test_6.mrd';
-
-% starting with test 10 we had some diffusion gradients on
-mrd_file='c:/smis/dev/Temp/se_test_10.mrd';
-% broken mrd_file='c:/smis/dev/Temp/se_test_11.mrd';
-mrd_file='c:/smis/dev/Temp/se_test_12.mrd';
-mrd_file='c:/smis/dev/Temp/se_test_13.mrd';
-%mrd_file='c:/smis/dev/Temp/se_test_14.mrd';
-mrd_file='c:/smis/dev/Temp/se_test_15.mrd';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
 % test mge
@@ -41,9 +21,15 @@ mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 % 80,81 are big and failed
 % non-compressed
 % mrd_file='d:/workstation/scratch/dev/MRD/4/';
+% "failed" scans, actually it is their recon which fails
+mrd_file=fullfile('d:','smis','dev','MRD','4','110',"110_000_0.mrd"); 
+mrd_file=fullfile('d:','smis','dev','MRD','4','109',"109_000_0.mrd"); 
+mrd_file=fullfile('d:','smis','dev','MRD','4','108',"108_000_0.mrd"); 
+mrd_file=fullfile('d:','smis','dev','MRD','4','107',"107_000_0.mrd"); 
 
-[~,mrd_name]=fileparts(mrd_file);
+
 %% fix different paths between sys and testbed
+[~,mrd_name]=fileparts(mrd_file);
 % this only works if original was scanner path.
 assert(exist('mrd_file','var'),'please define mrd_file');
 if ~exist('cs_table','var')
@@ -107,10 +93,10 @@ mrd_number=mrd_number+1000;
 if exist('idx_mask','var')
     % tried varietys of mask load order, but these all completely corrupted
     % the image
-    idx_mask=idx_mask';
-    %idx_mask(:,:)=idx_mask(end:-1:1,end:-1:1);
-    %idx_mask(:,:)=idx_mask(:,end:-1:1);
-    idx_mask(:,:)=idx_mask(end:-1:1,:);
+    % idx_mask=idx_mask';
+    % idx_mask(:,:)=idx_mask(end:-1:1,end:-1:1);
+    % idx_mask(:,:)=idx_mask(:,end:-1:1);
+    % idx_mask(:,:)=idx_mask(end:-1:1,:);
     % nnz(volume_dims)==2 
     %exist(cs_table,'file')
     lil_dummy=complex(0,0);
