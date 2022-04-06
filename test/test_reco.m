@@ -1,14 +1,5 @@
 % a helper to run simple ft on mrsolutions data
 % can use compressed sensing or not
-%% run startup
-f_path=which('load_mrd');
-if isempty(f_path)
-    current_dir=pwd;
-    cd c:/workstation/code/shared/pipeline_utilities
-    startup
-    cd(current_dir);
-end
-clear f_path;
 %% set files
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
@@ -26,10 +17,19 @@ mrd_file=fullfile('d:','smis','dev','MRD','4','110',"110_000_0.mrd");
 mrd_file=fullfile('d:','smis','dev','MRD','4','109',"109_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','108',"108_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','107',"107_000_0.mrd"); 
-%%
+
 mrd_file='c:/smis/dev/Temp/Temp.MRD'
 mrd_file='c:/smis/dev/Temp/scout.MRD'
 
+%% run startup
+f_path=which('load_mrd');
+if isempty(f_path)
+    current_dir=pwd;
+    cd c:/workstation/code/shared/pipeline_utilities
+    startup
+    cd(current_dir);
+end
+clear f_path;
 %% fix different paths between sys and testbed
 [~,mrd_name]=fileparts(mrd_file);
 % this only works if original was scanner path.

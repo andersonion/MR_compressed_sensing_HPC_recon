@@ -1,5 +1,5 @@
 
-%% set file and runno
+%% set input file 
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
 
@@ -64,7 +64,7 @@ clear recon_info is_missing;
 %[~,cs_table]=fileparts(cs_table);
 
 %% set args 
-% normal iteration count
+
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
     'chunk_size=5','target_machine=localhost',...
@@ -72,6 +72,7 @@ main_args={'planned_ok', 'live_run','debug_mode=50',...
 if exist('cs_table','var')
     main_args{end+1}=sprintf('CS_table=%s',cs_table);
 end
-%% pick runno for either of us to test with
+%% run cs recon
+fprintf('Data will be saved as civm_raw to %s/%s\n',getenv('BIGGUS_DISKUS'),runno);
 streaming_CS_recon_main_exec(scanner_name,runno,mrd_file,...
     main_args{:});
