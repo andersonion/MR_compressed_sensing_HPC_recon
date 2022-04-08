@@ -18,9 +18,15 @@ mrd_file=fullfile('d:','smis','dev','MRD','4','109',"109_000_0.mrd");
 mrd_file=fullfile('d:','smis','dev','MRD','4','108',"108_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','107',"107_000_0.mrd"); 
 
-mrd_file='c:/smis/dev/Temp/Temp.MRD'
-mrd_file='c:/smis/dev/Temp/scout.MRD'
+% mrd_file='c:/smis/dev/Temp/Temp.MRD'
+% mrd_file='c:/smis/dev/Temp/scout.MRD'
 
+% one echo te15 gre test to mach N57710
+% sur load snr ~28
+mrd_file=fullfile('d:','smis','dev','MRD','9','180','180_000_0.mrd');
+
+
+use_fermi_filter=0;
 %% run startup
 f_path=which('load_mrd');
 if isempty(f_path)
@@ -28,23 +34,19 @@ if isempty(f_path)
     cd c:/workstation/code/shared/pipeline_utilities
     startup
     cd(current_dir);
+    clear current_dir;
+    f_path=which('load_mrd');
 end
+addpath(fullfile(fileparts(f_path),'test'));
 clear f_path;
 %% fix different paths between sys and testbed
-[~,mrd_name]=fileparts(mrd_file);
-% this only works if original was scanner path.
 assert(exist('mrd_file','var'),'please define mrd_file');
 if ~exist('cs_table','var')
     cs_table='';
 end
-smis_dir='d:/workstation/scratch/c/smis';
-if ~exist(cs_table,'file')
-    cs_table=regexprep(cs_table,'^c','d');
-end
-if ~exist(mrd_file,'file')
-    mrd_file=regexprep(mrd_file,'^c:/smis',smis_dir);
-end
-clear smis_dir;
+[~,mrd_name]=fileparts(mrd_file);
+mrd_file=test_path_flipper_data(mrd_file);
+cs_table=test_path_flipper_cs_table(cs_table);
 %% get number from test files
 mrd_number=0;
 reg_res=regexp(mrd_name,'[^0-9]*([0-9]+)$','tokens');
@@ -118,6 +120,9 @@ disp_vol_center(kspace_data,1,200+mrd_number)
 % quick dirty guess
 % image_data=fftshift(fftn(fftshift(kspace_data)));
 % "correct" from rad_mat(for 3d)
+if use_fermi_filter
+    kspace_data=fermi_filter_isodim2_memfix(kspace_data);
+end
 image_data=fftshift(fftshift(fftshift(...
     ifft(ifft(ifft(...
     fftshift(fftshift(fftshift(kspace_data,1),2),3)...
@@ -125,11 +130,30 @@ image_data=fftshift(fftshift(fftshift(...
     ,1),2),3);
 % magnitude and truncate max removing bright artifacts.
 image_data=abs(image_data);
+
+%{
+scale code scraped out of rad_mat for comparison.
+% Not visible in this snippit:
+%  histo_percent=99.95
+%  scale_max=2^16-1
+
+img_s=sort(abs(data_buffer.data(:)));
+% calibrated max value effectively, will over range these values on save.
+data_buffer.headfile.group_max_atpct=img_s(round(numel(img_s)*opt_s.histo_percent/100));
+data_buffer.headfile.divisor=data_buffer.headfile.group_max_atpct/opt_s.scale_max;
+%}
+
+%
 s_dat=sort(image_data(:));
-max=s_dat(round(numel(s_dat)*0.9995));
-image_data(image_data>=max)=max;
+img_max=s_dat(round(numel(s_dat)*0.9995));
+div=img_max/(2^16-1);
+% image_data(image_data>=max)=max;
 % scale max to uint16
-image_data=image_data/max*(2^16-1);
+image_data=image_data/div;
+
 disp_vol_center(image_data,1,230+mrd_number);
 %% save a nifti someplace
-save_nii(make_nii(uint16(image_data)),fullfile(pwd(),sprintf('%s.nii',mrd_name)));
+f='';
+if use_fermi_filter
+    f='_filtered';end
+save_nii(make_nii(uint16(image_data)),fullfile(pwd(),sprintf('%s%s.nii',mrd_name,f)));

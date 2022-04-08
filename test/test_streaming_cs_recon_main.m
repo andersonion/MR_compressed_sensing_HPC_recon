@@ -11,7 +11,7 @@ end
 %% set file and runno
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
-
+runno='Test_data';
 %% adjust input for CS_recon 
 scanner_name='grumpy';s_l='N';
 
