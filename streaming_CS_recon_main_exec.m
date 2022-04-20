@@ -398,11 +398,17 @@ if ~exist(complete_study_flag,'file')
         struct_disp(gui_info);
     end
     % wait until user affirms they like parameters as seen.
-    while isempty( ...
+    while ~reg_match(...
+            input(sprintf('Enter (Y)es to continue\n'),'s'), ...
+            '^((y(es)?)|(c(ont(inue)?)?)[\s]*)$' ) 
+        %{
+        isempty( ...
             regexpi(input( ...
             sprintf('Enter (Y)es to continue\n'),'s'), ...
             '^((y(es)?)|(c(ont(inue)?)?)[\s]*)$','once') ...
             )
+        %}
+        pause(0.25);
     end
     %being a snot and leaving this pause even after the user says yes, 
     % in case they're extra hasty :P 
@@ -697,9 +703,12 @@ if ~exist(complete_study_flag,'file')
             % linuxly
             if path_is_windows(remote_table_path) && ~exist(remote_table_path,'file')
                 % NO support for spaces :p
+                remote_table_path=path_convert_platform(remote_table_path,'linux');
+                %{
                 remote_table_path([1,2])=remote_table_path([2,1]);
                 remote_table_path(1)='/';
                 remote_table_path=strrep(remote_table_path,'\','/');
+                %}
             end
             if ~exist(remote_table_path,'file')
                 table_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
