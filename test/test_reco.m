@@ -3,6 +3,7 @@
 %% set files
 cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
 mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
+output='uint16';
 
 % test mge
 % mrd_file='d:/workstation/scratch/c/smis/dev/Temp/Temp.MRD'
@@ -18,9 +19,48 @@ mrd_file=fullfile('d:','smis','dev','MRD','4','109',"109_000_0.mrd");
 mrd_file=fullfile('d:','smis','dev','MRD','4','108',"108_000_0.mrd"); 
 mrd_file=fullfile('d:','smis','dev','MRD','4','107',"107_000_0.mrd"); 
 
-mrd_file='c:/smis/dev/Temp/Temp.MRD'
 mrd_file='c:/smis/dev/Temp/scout.MRD'
+mrd_file='c:/smis/dev/Temp/Temp.MRD'
 
+% CSFID grants garbage
+% mrd_file=fullfile('d:','smis','dev','MRD','9','188','188_000_0.mrd'); 
+% mrd_file=fullfile('d:','smis','dev','MRD','9','189','189_000_0.mrd'); 
+
+% mrd_file="C:\smis\dev\Temp\test_scout.MRD"
+% fov ratio 2, this looks normal, but doesnt fill the view well
+mrd_file=fullfile('d:','smis','dev','MRD','9','206','206_000_0.mrd');
+% fov ratio 1, this looks squashed!
+mrd_file=fullfile('d:','smis','dev','MRD','9','207','207_000_0.mrd'); 
+mrd_file='c:/smis/dev/Temp/Temp.MRD'
+mrd_file='c:/smis/dev/Temp/init_gre2_nongated_long.mrd';
+
+mrd_file=fullfile('d:','smis','dev','MRD','9','216','216_000_0.mrd');
+
+% "quick" fse tests, using echo time of 9-12, increasing bandwidth if
+% needed, keeping tr ~22
+% fse test 200um
+% fov-ratio wrong, was left at 1
+% mrd_file=fullfile('d:','smis','dev','MRD','9','219','219_000_0.mrd');
+mrd_file=fullfile('d:','smis','dev','MRD','9','222','222_000_0.mrd');
+% fse test 100um
+% fov-ratio wrong, was left at 1
+% mrd_file=fullfile('d:','smis','dev','MRD','9','220','220_000_0.mrd');
+%mrd_file=fullfile('d:','smis','dev','MRD','9','223','223_000_0.mrd');
+% fse test  50um
+%mrd_file=fullfile('d:','smis','dev','MRD','9','224','224_000_0.mrd');
+% reduce bandwidth from 100KHz and adjust te/tr accordingly
+%mrd_file=fullfile('d:','smis','dev','MRD','9','225','225_000_0.mrd');
+mrd_file='c:/smis/dev/Temp/Temp.MRD'
+
+%% resistor test data 
+%{
+% make sure to to not scale output
+output='default';
+% hot
+mrd_file=fullfile('d:','smis','dev','MRD','9','213','213_000_0.mrd');
+% cold
+mrd_file=fullfile('d:','smis','dev','MRD','9','214','214_000_0.mrd');
+%}
 %% run startup
 f_path=which('load_mrd');
 if isempty(f_path)
@@ -53,83 +93,11 @@ if numel(reg_res) >= 1
     mrd_number=str2double(reg_res{1});
     assert(~isnan(mrd_number),'mrd number fail');
 end
-clear reg_res; 
-%% load data and mask
-[mrd_header,mrd_data]=load_mrd(mrd_file,'double');
-volume_dims=size(mrd_data);volume_dims(volume_dims==1)=[];
-if nnz(volume_dims)==2 
-    % exist(cs_table,'file') 
-    % [mask_size,pa,pb,cs_factor]=cs_table_name_decode(cs_table);
-    idx_mask=load_cs_table(cs_table);
-    % patch one data_file generated wrongly(really its the mask's fault having
-    % 1 bonus point)
-    if mrd_number==4;  idx_mask(end)=0;  end
-    volume_dims=[mrd_header.Dimension(1),size(idx_mask)];
-else 
-    clear idx_mask;
-end
-%{
-% load ruslan and convert to expected order
-% if centering use cen string
-[rim,dim,ppr]=Get_mrd_3D5(mrd_file,'not','not');
-% simple 3d only, put data into simple order, readout, views, views2
-% this should be the "correct" thing to do, however it gives bad output
-if ndims(rim)==3
-    t_data=permute(rim,[3,1,2]);
-% this undoes the internal fun of Get_mrd_3D5, we'll not use it for now.
-%%t_data=permute(rim,[3,2,1]);
-elseif ndims(rim)==4
-    t_data=permute(rim,[[3,1,2]+1,1]);
-elseif ndims(rim)==2
-    t_data=permute(rim,[2,1]);
-end
-if exist('t_data','var')
-    mrd_data=t_data; clear t_data rim;
-end
-
-mrd_number=mrd_number+1000;
-
-
-%}
-%% insert mrd data into fully sampled space, and show kspace
-if exist('idx_mask','var')
-    % tried varietys of mask load order, but these all completely corrupted
-    % the image
-    % idx_mask=idx_mask';
-    % idx_mask(:,:)=idx_mask(end:-1:1,end:-1:1);
-    % idx_mask(:,:)=idx_mask(:,end:-1:1);
-    % idx_mask(:,:)=idx_mask(end:-1:1,:);
-    % nnz(volume_dims)==2 
-    %exist(cs_table,'file')
-    lil_dummy=complex(0,0);
-    kspace_data=zeros(volume_dims,'like',lil_dummy);
-    if ndims(mrd_data) > 2
-        % reshape if not simple ordering
-        mrd_data=reshape(mrd_data,[volume_dims(1),numel(mrd_data)/volume_dims(1)]);
-    end
-    kspace_data(:,idx_mask(:)==1)=mrd_data;
-    kspace_data=reshape(kspace_data,volume_dims);
-else
-    kspace_data=mrd_data;
-end
-% display fully sampled kspace
-disp_vol_center(kspace_data,1,200+mrd_number)
-%% get images space and display
-% quick dirty guess
-% image_data=fftshift(fftn(fftshift(kspace_data)));
-% "correct" from rad_mat(for 3d)
-image_data=fftshift(fftshift(fftshift(...
-    ifft(ifft(ifft(...
-    fftshift(fftshift(fftshift(kspace_data,1),2),3)...
-    ,[],1),[],2),[],3)...
-    ,1),2),3);
-% magnitude and truncate max removing bright artifacts.
-image_data=abs(image_data);
-s_dat=sort(image_data(:));
-max=s_dat(round(numel(s_dat)*0.9995));
-image_data(image_data>=max)=max;
-% scale max to uint16
-image_data=image_data/max*(2^16-1);
-disp_vol_center(image_data,1,230+mrd_number);
+clear reg_res;
+[image_data,mrd_header,kspace_data,mrd_data]=recon_quick(mrd_file,cs_table);
 %% save a nifti someplace
-save_nii(make_nii(uint16(image_data)),fullfile(pwd(),sprintf('%s.nii',mrd_name)));
+if strcmp(output,'uint16')
+    save_nii(make_nii(uint16(image_data)),fullfile(pwd(),sprintf('%s.nii',mrd_name)));
+else
+    save_nii(make_nii(image_data),fullfile(pwd(),sprintf('%s.nii',mrd_name)));
+end
