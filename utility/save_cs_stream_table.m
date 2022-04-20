@@ -15,8 +15,8 @@ end
 pts=find(mask);
 [d1,d2]=ind2sub(size(mask),pts);
 % convert to +/- value
-d1=d1-round(size(mask,1)/2);
-d2=d2-round(size(mask,2)/2);
+d1=d1-floor(size(mask,1)/2)-1;
+d2=d2-floor(size(mask,2)/2)-1;
 % reshape into stream
 pt_data=reshape([d1';d2'],[numel(d1)+numel(d2),1]);
 % cast appropriately
