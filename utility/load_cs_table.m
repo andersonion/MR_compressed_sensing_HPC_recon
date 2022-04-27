@@ -36,9 +36,14 @@ else
     end
     pt_data=cell2mat(pt_data);
     pt_data=reshape(pt_data,[2,numel(pt_data)/2]);
-    pt_data(1,:)=pt_data(1,:)+ceil(table_dims(1)/2) + 1;
-    pt_data(2,:)=pt_data(2,:)+ceil(table_dims(2)/2) + 1;
-    pts_t=sub2ind(table_dims,pt_data(1,:),pt_data(2,:));
+    pt_data(1,:)=pt_data(1,:)+round(table_dims(1)/2); %+ d1p;
+    pt_data(2,:)=pt_data(2,:)+round(table_dims(2)/2); %+ d2p;
+    try
+        pts_t=sub2ind(table_dims,pt_data(1,:),pt_data(2,:));
+    catch
+        warning('table load failed. Retrying with index offset = 1');
+        pts_t=sub2ind(table_dims,pt_data(1,:)+1,pt_data(2,:)+1);
+    end
     %pts_t=sub2ind(table_dims,pt_data(1:2:end),pt_data(2:2:end));
     skiptable=zeros(table_dims);
     skiptable(pts_t)=1;
