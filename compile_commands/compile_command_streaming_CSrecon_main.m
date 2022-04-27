@@ -10,8 +10,8 @@ include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m
     };%optional, but required if using exec_env_var, can be empty.
 %}
 include_files={
-    '/cm/shared/apps/MATLAB/R2015b/toolbox/signal/signal/hamming.m' 
-    '/cm/shared/apps/MATLAB/R2015b/toolbox/images/images/padarray.m'
+    'hamming.m' 
+    'padarray.m'
     };
 function_name='streaming_CS_recon_main_exec.m';
 compile_dir=compile_command__allpurpose(function_name,include_files);%,exec_env_var);

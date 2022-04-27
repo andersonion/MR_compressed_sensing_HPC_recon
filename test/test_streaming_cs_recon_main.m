@@ -31,7 +31,7 @@ if exist('cs_table','var')
     main_args{end+1}=sprintf('CS_table=%s',cs_table);
 end
 %% pick runno for either of us to test with
-if ~strcmp(getenv('USERNAME'),'jjc29')
+if ~strcmp(getenv('USERNAME'),'jjc29') && ~strcmp(getenv('USER'),'jjc29')
     runno=sprintf('%s%05i',s_l,dig);
     streaming_CS_recon_main_exec('heike',runno,data,...
     main_args{:});

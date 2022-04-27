@@ -60,7 +60,8 @@ active_reservation=get_reservation(options.CS_reservation);
 cs_queue=CS_env_queue();
 %% Executables support
 % set an env var to get latest dev code, or will defacto run stable.
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+% matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+matlab_path=recon_mat.matlab_path;
 cs_execs=CS_env_execs();
 %%
 if ischar(volume_number)
@@ -440,7 +441,8 @@ else
             end
             if ~exist(temp_file,'file') || length(tmp_header) <= 2
                 % no temp file, or it failed to load
-                slices_to_process = 1:recon_mat.original_dims(1);
+                recon_dims=1:recon_mat.original_dims;
+                slices_to_process = recon_dims(1);
             end
             % if we have more than one element, or 1 element and its
             % non-zero
@@ -571,8 +573,9 @@ else
         %% STAGE5 Scheduling
         % send data to remote workstation and write completion flags
         if (starting_point <= 5)
-            if ~options.keep_work
-                warning('TODO finish shipper update');
+            warning('TODO finish shipper update');
+            if ~options.keep_work && 0
+                
                 shipper_cmds=cs_recon_volume_transfer_commands();
                 shipper_slurm_options=struct;
                 shipper_slurm_options.v=''; % verbose

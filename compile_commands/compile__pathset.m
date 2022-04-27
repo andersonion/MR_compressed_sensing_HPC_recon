@@ -9,6 +9,8 @@ addpath(fullfile(pdir,'sparseMRI_v0.2/utils'));
 addpath(fullfile(pdir,'utility'));
 % common_utils had to be added for cs_recon main
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils']);
+addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/mrsolutions']);
+addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/agilent']);
 % had to add fermi filter dir to get cleanup to work
 addpath([getenv('WORKSTATION_HOME') '/recon/mat_recon_pipe/filter/fermi/']);
 addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);

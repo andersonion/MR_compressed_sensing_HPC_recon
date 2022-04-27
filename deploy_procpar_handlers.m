@@ -27,7 +27,8 @@ hf_success_flag= fullfile(setup_var.images_dir,...
 
 target_host_name=sprintf('%s.dhe.duke.edu',options.target_machine);
 
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+% matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+matlab_path = recon_mat.matlab_path;
 cs_queue=CS_env_queue();
 %% exec path setting
 % set an env var to get latest dev code, or will defacto run stable.

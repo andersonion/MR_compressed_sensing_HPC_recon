@@ -33,7 +33,8 @@ function streaming_recon_exec(scanner_name, runno, input_data, varargin )
 
 % old function line before joining the scanner data fields
 %function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+% matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+matlab_path=getenv('MATLAB_2021b_PATH');
 recon_type = 'CS_v3.0';
 typical_pa=1.8;
 typical_pb=5.4;
@@ -424,6 +425,7 @@ if ~exist(complete_study_flag,'file')
         [s,sout]=system(mkdir_cmd); assert(s==0,sout);
     end
     recon_mat = matfile(recon_file,'Writable',true);
+    recon_mat.matlab_path = matlab_path;
     % intentionally re-writing these params instead of avoiding it.
     % cannot directly access structs, so we have to pull headfile out.
     if matfile_missing_vars(recon_file,'headfile')
@@ -492,13 +494,15 @@ if ~exist(complete_study_flag,'file')
     yet_another_logger(log_msg,log_mode,log_file);
     recon_mat.log_file = log_file;
     %% Test ssh connectivity using our perl program which has robust ssh handling.
-    %{ 
-    % but the scanner is probably fine and not where we'll have trouble
-    % anyway
+    %{
     puller_test=sprintf('puller_simple -o -f file %s ../../../../home/vnmr1/vnmrsys/tablib/%s %s/%s',...
-        scanner,options.CS_table,workdir,options.CS_table);
-    [s,sout]=system(puller_test);
+        the_scanner.name,options.CS_table,workdir,options.CS_table);
     %}
+    puller_test=sprintf('puller_simple -u %s -o -f file %s /home/%s/.bashrc %s_%s_connection_check',...
+        options.scanner_user, the_scanner.name, options.scanner_user, the_scanner.name, options.scanner_user);
+    [s,sout]=system(puller_test,'-echo');
+    assert(s==0,'Failed to contact scanner, %s',sout);
+    
     if ~options.skip_target_machine_check
         puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
             sys_user(),options.target_machine,options.target_machine,sys_user());
