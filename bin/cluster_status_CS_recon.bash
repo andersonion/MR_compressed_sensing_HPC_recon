@@ -19,7 +19,7 @@ done
 # df -Pk /var
 #Filesystem     1024-blocks     Used Available Capacity Mounted on
 #/dev/md3          31425544 23707960   7717584      76% /var
-mount_points="/ /var/ /tmp/ /civmnas4/cof/"
+mount_points="/ /var/ /tmp/ $BIGGUS_DISKUS"
 for mount in $mount_points; do
     if [ $debugging -gt 0 ]; then echo check $mount;fi;
     read FS TotalKiB UsedKiB AvailKiB PctUsed mount <<< $( df -Pk $mount |tail -n 1 )
