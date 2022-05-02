@@ -77,10 +77,14 @@ if s==0 % unix status check
         % of how we use ls to get the directory. 
         vd=rundata{ri}(1:end-1);
         [~,vr]=fileparts(vd);
+        %  [ starting_point ,log_msg, vol_status, extended] = volume_status( ...
+        %    volume_dir,volume_runno,the_scanner,volume_number,input_data,bbytes )
         if ~check_scanner
-            [~,lm,pc]=check_status_of_CSrecon(vd,vr);
+            % [~,lm,pc]=check_status_of_CSrecon(vd,vr);
+            [~,lm,pc]=volume_status(vd,vr);
         else
-            [~,lm,pc]=check_status_of_CSrecon(vd,vr,[],base_runno);
+            %[~,lm,pc]=check_status_of_CSrecon(vd,vr,[],base_runno);
+            [~,lm,pc]=volume_status(vd,vr,[],base_runno);
         end
         %  (volume_dir,volume_runno,scanner,base_runno,study,agilent_series,bbytes )
         fprintf('%05.2f%% - %s',pc,lm);
