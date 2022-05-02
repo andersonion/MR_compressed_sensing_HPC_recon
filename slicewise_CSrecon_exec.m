@@ -1,5 +1,5 @@
 function slicewise_CSrecon_exec(setup_variables,varargin)
-% slicewise_CSrecon_exec(setup_var.volume_workspace,slice_indices,setup_variables)
+% slicewise_CSrecon_exec(setup_variables,slice_indices)
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
@@ -115,7 +115,7 @@ else
 end
 log_file = setup_var.volume_log_file;
 
-log_msg =sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
+log_msg = sprintf('Time to load common workspace: %0.2f seconds.\n',time_to_load_common_workspace);
 yet_another_logger(log_msg,log_mode,log_file)
 
 %% Setup common variables
@@ -292,7 +292,7 @@ for index=1:length(slice_numbers)
         end
         
         log_msg =sprintf('Slice %i: Time to reconstruct data (With %i iteration blocks):  %0.2f seconds. \n',slice_index,n,time_to_recon);
-        yet_another_logger(log_msg,log_mode,log_file);
+        yet_another_logger(log_msg,log_mode,sprintf('%s,%s',log_file,recon_mat.log_file));
         if ~isdeployed && strcmp(getenv('USER'),'rja20')
             
             %% Plotting today BJ?
@@ -435,7 +435,7 @@ if  (num_af > 0)
     %tubes in Lost.
     for ff = 1:num_af
         log_msg =sprintf('Slice %i: attempted reconstruction appears to have failed; THROWING FAILURE FLAG.\n',apparent_failures(ff));
-        yet_another_logger(log_msg,log_mode,log_file);
+        yet_another_logger(log_msg,log_mode,sprintf('%s,%s',log_file,recon_mat.log_file));
     end
     if isdeployed
         quit force
