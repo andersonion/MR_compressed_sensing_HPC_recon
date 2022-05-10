@@ -286,24 +286,25 @@ end
 end
 
 function fid_transfer_status=check_local_fid(varargin)
+choices={};
 if nargin >= 2
-    error('incomplete thought');
-    work_subfolder=vargin{1};
+    work_subfolder=varargin{1};
     volume_runno=varargin{2};
-    input_data=varargin{3};
+    % the defacto val is being pased in now so instead of rebuilding, we'll use
+    % the passed in val
+    choices=[choices  fullfile(work_subfolder,[volume_runno,'.fid']) ];
+
+    if nargin >=3
+        input_data=varargin{3};
+    end
 elseif nargin==1
     input_data=varargin{1};
-end
-choices={};
+    end
 if exist('input_data','var')
     %[~,n,e]=fileparts(input_data);
     %choices=[choices fullfile(work_subfolder,[n e ])];
     choices=[choices input_data];
 end
-% the defacto val is being pased in now so instead of rebuilding, we'll use
-% the passed in val
-% choices=[choices  fullfile(work_subfolder,[volume_runno,'.fid']) ];
-
 for fidname=choices
     volume_fid=fidname{1};
     fid_info=dir(volume_fid);

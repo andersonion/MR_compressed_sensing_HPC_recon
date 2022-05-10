@@ -532,7 +532,7 @@ if ~exist(complete_study_flag,'file')
     if reg_match(input_data,'volume_index.txt') 
         if ~exist(input_data,'file')
             index_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
-                options.scanner_user, the_scanner.name, input_data, runno);
+                options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), runno);
         else
             index_fetch=sprintf('cp -p %s %s ',  input_data, workdir);
         end
@@ -657,11 +657,12 @@ if ~exist(complete_study_flag,'file')
     end
     local_table_path='';
     if ~isempty(tables_in_workdir)
+        options.CS_table=path_convert_platform(options.CS_table,'linux');
         [~,n,e]=fileparts(options.CS_table);TAB_N=[n,e];clear n e;
         if ischar(options.CS_table) && ~strcmp(TAB_N,tables_in_workdir(1).name)
             % have user specified, lets error if they're different
             error('existing table in working folder doesnt match user specified table! \nuser:\t%s\nworkdir:\',...
-                options.CS_table, tables_in_workdir(1).name)
+                TAB_N, tables_in_workdir(1).name)
         elseif numel(tables_in_workdir)>1
             error('Multiple CS tables in work dir! %s',workdir);
         end
@@ -698,7 +699,7 @@ if ~exist(complete_study_flag,'file')
                 % mode =2; % Only pull procpar file
                 % puller_glusterspaceCS_2(runno,datapath,scanner_name,workdir,mode);
                 pull_cmd=sprintf('puller_simple -oer -f file -u %s %s %s/%s.fid/procpar %s.work',...
-                    options.scanner_user, the_scanner.name, scanner_patient,scanner_acquisition,runno);
+                    options.scanner_user, the_scanner.name, scanner_patient, scanner_acquisition, runno);
                 [s,sout] = system(pull_cmd);
                 assert(s==0,sout);
             end

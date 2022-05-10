@@ -11,6 +11,7 @@ addpath(fullfile(pdir,'utility'));
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils']);
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/mrsolutions']);
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/agilent']);
+% addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/classy']);
 % had to add fermi filter dir to get cleanup to work
 addpath([getenv('WORKSTATION_HOME') '/recon/mat_recon_pipe/filter/fermi/']);
 addpath([getenv('WORKSTATION_HOME') '/recon/WavelabMex']);
