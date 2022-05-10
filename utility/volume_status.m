@@ -56,7 +56,14 @@ stage_n=stage_n+1;
 %% have we pulled this chunk of data to this ppsystem
 status_setup(stage_n).code='Extract fid.';
 status_setup(stage_n).pct=4;
-status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno);
+if ~exist('input_data','var')
+    status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno);
+elseif exist('the_scanner','var')
+    status_setup(stage_n).check=@() check_local_fid(the_scanner.fid_file_local(work_subfolder,input_data));
+else
+    % bogus condition, just a placeholder
+    status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno,input_data);
+end
 stage_n=stage_n+1;
 %% has the workspace.mat and tmp file been created
 status_setup(stage_n).code='Run volume setup. (create workspace.mat and .tmp files)';
@@ -278,13 +285,34 @@ else
 end
 end
 
-function fid_transfer_status=check_local_fid(work_subfolder,volume_runno)
-volume_fid=fullfile(work_subfolder,[volume_runno,'.fid']);
-fid_info=dir(volume_fid);
-if ~exist(volume_fid,'file') || ~isempty(fid_info) && fid_info.bytes<=60
-    fid_transfer_status=0;
-else
-    fid_transfer_status=1;
+function fid_transfer_status=check_local_fid(varargin)
+if nargin >= 2
+    error('incomplete thought');
+    work_subfolder=vargin{1};
+    volume_runno=varargin{2};
+    input_data=varargin{3};
+elseif nargin==1
+    input_data=varargin{1};
+end
+choices={};
+if exist('input_data','var')
+    %[~,n,e]=fileparts(input_data);
+    %choices=[choices fullfile(work_subfolder,[n e ])];
+    choices=[choices input_data];
+end
+% the defacto val is being pased in now so instead of rebuilding, we'll use
+% the passed in val
+% choices=[choices  fullfile(work_subfolder,[volume_runno,'.fid']) ];
+
+for fidname=choices
+    volume_fid=fidname{1};
+    fid_info=dir(volume_fid);
+    if ~exist(volume_fid,'file') || ~isempty(fid_info) && fid_info.bytes<=60
+        fid_transfer_status=0;
+    else
+        fid_transfer_status=1;
+        break;
+    end
 end
 end
 
@@ -325,9 +353,32 @@ end
 
 
 function resolved_tag=wildcard_tag_finder(tag_pattern)
+
+resolved_tag='__FIND_FLAG_ERROR';
+
+[p,n,e]=fileparts(tag_pattern);
+%found=regexpdir(p,[n,e]);
+found=wildcardsearch(p,[n e]);
+
+if ~numel(found)
+    return; end
+
+newest=dir(found{1});
+res(1)=newest;
+for n=2:numel(found)
+    res(n)=dir(C{1});
+    res(n).date
+    if  res(n).date < newest.date
+        newest=res(n);
+    end    
+end
+resolved_tag=fullfile(p,newest.name);
+%{
+% older terminal based lookup
 [s,tag_pattern]=system(sprintf('ls -t %s|head -n2|tail -n1',tag_pattern));
 if s ~= 0
     tag_pattern='__FIND_FLAG_ERROR';
 end
 resolved_tag=strtrim(tag_pattern);
+%}
 end

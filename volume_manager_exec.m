@@ -67,9 +67,6 @@ cs_execs=CS_env_execs();
 if ischar(volume_number)
     volume_number=str2double(volume_number);
 end
-if strcmp('/',volume_dir(end))
-    volume_dir=[volume_dir '/'];
-end
 
 %% Preflight checks
 % Determining where we need to start doing work, setting up folders as
@@ -99,6 +96,8 @@ previous more annoyingly specific ugly funciton
 
 % new funtion
 scan_data_setup=recon_mat.scan_data_setup;
+% this would be the full one file fid if we have it. This idea is NOT 
+% % currently implemented.
 fid_path=recon_mat.fid_path;
 status_dir=volume_dir;
 if strcmp(fid_path.current,fid_path.local)
@@ -107,12 +106,42 @@ end
 clear fid_path;
 % missing check for full fid here, need to enhance.
 
-[starting_point,log_msg,~,data_mode_check]=volume_status(status_dir,...
+% multi-input mode, pluck out the relevant fid to work with, after the
+% other details are sorted out status_fid var should be adjusted to be
+% normal/correct name
+status_fid=scan_data_setup.fid;
+multi_volume_fid=true;
+if numel(status_fid)>1
+    multi_volume_fid=false;
+    status_fid=status_fid{volume_number};
+end
+
+setup_variables= fullfile(volume_dir,   [ volume_runno '_setup_variables.mat']);
+images_dir =     fullfile(volume_dir,   [ volume_runno 'images']);
+headfile_path =  fullfile(images_dir,   [ volume_runno '.headfile']);
+work_subfolder = fullfile(volume_dir, 'work');
+temp_file =      fullfile(work_subfolder,[ volume_runno '.tmp']);
+
+[starting_point, log_msg, ~, data_mode_check] ...
+    = volume_status(status_dir,...
     volume_runno, ...
     the_scanner,...
     volume_number,...
-    scan_data_setup.fid, ...
+    status_fid, ...
     recon_mat.bytes_per_block);
+yet_another_logger(log_msg,log_mode,log_file);
+% Initialize a log file if it doesn't exist yet.
+volume_log_file =fullfile(volume_dir, [volume_runno '_recon.log']);
+if ~exist(volume_log_file,'file')
+    [s,sout]=system(['touch ' volume_log_file]); assert(s==0,sout);
+end
+
+if ~islogical(options.CS_preview_data)
+    if starting_point>2
+        warning('CS_preview_data artificially reducing start point to 2');
+        starting_point=2;
+    end
+end
 
 if isfield(data_mode_check,'data_mode')
     % volume status which we call really early has to do this
@@ -123,38 +152,28 @@ if isfield(data_mode_check,'data_mode')
     clear data_mode_check;
 else
     [data_mode,fid_path]=get_data_mode(the_scanner, ...
-        recon_mat.study_workdir, scan_data_setup.fid);
+        work_subfolder, status_fid);
 end
 
-% we've already collected fid_path REFUSE to update remotes by
-% reading back previous and only udpating current.
-fid_path_prev=recon_mat.fid_path;
-fid_path_prev.current=fid_path.current;
-recon_mat.Properties.Writable = true;
-recon_mat.fid_path=fid_path;
-recon_mat.Properties.Writable = false;
-clear fid_path_prev;
-
-if ~islogical(options.CS_preview_data)
-    if starting_point>2
-        warning('CS_preview_data artificially reducing start point to 2');
-        starting_point=2;
-    end
-end
-yet_another_logger(log_msg,log_mode,log_file);
-% Initialize a log file if it doesn't exist yet.
-volume_log_file =fullfile(volume_dir, [volume_runno '_recon.log']);
-if ~exist(volume_log_file,'file')
-    [s,sout]=system(['touch ' volume_log_file]); assert(s==0,sout);
+if multi_volume_fid
+    % we've already collected fid_path REFUSE to update remotes by
+    % reading back previous and only udpating current. This is only good for
+    % single file fids with many volumes, in 1 vol per fid mode we will not
+    % update the recon_mat fid_path. It should be stuck as the first fid.
+    fid_path_prev=recon_mat.fid_path;
+    fid_path_prev.current=fid_path.current;
+    recon_mat.Properties.Writable = true;
+    recon_mat.fid_path=fid_path_prev;
+    recon_mat.Properties.Writable = false;
+    clear fid_path_prev;
 end
 
-setup_variables= fullfile(volume_dir,   [ volume_runno '_setup_variables.mat']);
-images_dir =     fullfile(volume_dir,   [ volume_runno 'images']);
-headfile_path =   fullfile(images_dir,[ volume_runno '.headfile']);
 
-work_subfolder = fullfile(volume_dir, 'work');
-temp_file =      fullfile(work_subfolder,[ volume_runno '.tmp']);
-volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
+if exist('fid_path','var') && ~multi_volume_fid
+    volume_fid=fid_path.local;
+else
+    volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
+end
 volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
 
 % flag_hf_fail=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
@@ -246,70 +265,82 @@ else
             % That is becuase we're making sure the fid is what we expect,
             % and that is a reasonable fingerprint.
             % Checking other volumes would require getting their data bits
-            % first, and that is not likely to fail independently.
-            %{
-            if (local_or_streaming_or_static == 1)
-                fid_consistency = write_or_compare_fid_tag(fid_path.current,recon_mat.fid_tag_file,1);
-            else
-                scanner_user='omega';
-                fid_consistency = write_or_compare_fid_tag(fid_path.current,recon_mat.fid_tag_file,1,recon_mat.scanner_name,scanner_user);
+            % first, and that is not likely to fail independently FOR
+            % SINGLE FILE ACQUISITIONS. Multi-file acquisitions could
+            % totally fail independently, and we've adjusted accordingly.
+            if ~exist(work_subfolder,'dir')
+                % decided to let shis vol manager create its own work folder
+                % warning('  Creating work subfolder to fetch fid, this shouldn''t happen here. This only occurs in exotic testing or recovery conditions.');
+                mkdir(work_subfolder);
             end
-            %}
-            if the_scanner.fid_consistency(fid_path.current,recon_mat.fid_tag_file)
-                % Getting subvolume should be the job of volume setup.
-                % TODO: Move get vol code into setup!
-                if ~exist(work_subfolder,'dir')
-                    % decided to let shis vol manager create its own work folder
-                    % warning('  Creating work subfolder to fetch fid, this shouldn''t happen here. This only occurs in exotic testing or recovery conditions.');
-                    mkdir(work_subfolder);
-                end
-                if recon_mat.nechoes == 1
-                    % for multi-block fids(diffusion)
-                    %if (local_or_streaming_or_static == 1)
-                    %{
-                    if strcmp(data_mode,'local')
-                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
-                    else
-                        get_subvolume_from_fid(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block,recon_mat.scanner_name,the_scanner.user);
-                    end
-                    %}
-                    the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
-                elseif recon_mat.nechoes > 1 && volume_number == 1
-                    % for 1 block fids, mgre, and single vol, in theory we
-                    % can only operate when static, further we should only
-                    % enter this code block if already static.
-                    %
-                    % This is coded to only trigger for multi-echo,
-                    % Hopefully single vol will be handled correctly in necho 1 block above.
-                    %
-                    % schedule local gatekeeper on volume fid
-                    % for volume 1 fetch fetch data, run the fid
-                    % splitter.
-                    error('needs update');
-                    % due to how ugly puller_glusterpsaceCS_2 is we have to define yet another temply var.
-                    % hopefully we can swap the proper terminal puller code
+            vol_tag=fullfile(work_subfolder,sprintf('.%s.fid_tag',volume_runno));
+            f_tag=recon_mat.fid_tag_file;
+            if ~multi_volume_fid
+                f_tag=vol_tag;
+            end
+            if ~the_scanner.fid_consistency(fid_path.current,f_tag,multi_volume_fid)
+                % Take care, "cleverly" re-using multi_volume_fid flag as
+                % "fid_required" because when we're multi-volume we must
+                % have it.
+                log_mode = 1;
+                error_flag = 1;
+                log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,fid_path.current);
+                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',...
+                    log_msg,fid_path.current,recon_mat.fid_tag_file,volume_number,recon_mat.scanner_name,the_scanner.user);
+                log_msg = sprintf('%sCRITICAL ERROR data_mode=%i\n',log_msg,data_mode);
+                yet_another_logger(log_msg,log_mode,log_file,error_flag);
+                if isdeployed; quit force; else error(log_msg); end
+            end
+            % Getting subvolume should be the job of volume setup.
+            % TODO: Move get vol code into setup!
+            if recon_mat.nechoes == 1 && multi_volume_fid
+                % for multi-block fids(diffusion)
+                the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
+            else %if ~multi_volume_fid || ( recon_mat.nechoes > 1 && volume_number == 1 )
+                % for 1 block fids, mgre, and single vol, in theory we
+                % can only operate when static, further we should only
+                % enter this code block if already static.
+                %
+                % This is coded to only trigger for multi-echo,
+                % Hopefully single vol will be handled correctly in necho 1 block above.
+                %
+                % schedule local gatekeeper on volume fid
+                % for volume 1 fetch fetch data, run the fid
+                % splitter.
+                db_inplace(mfilename,'needs update');
+                % due to how ugly puller_glusterpsaceCS_2 is we have to define yet another temply var.
+                % hopefully we can swap the proper terminal puller code
+                %{
                     if ~exist('datapath','var')
                         datapath=['/home/mrraw/' recon_mat.scanner_patient '/' recon_mat.scanner_acquisition '.fid'];
                     end
                     local_fid= fullfile(recon_mat.study_workdir,'fid');
-                    if ~exist(local_fid,'file')
-                        error('untested after code update');
-                        pull_cmd=sprintf('puller_simple -oer -u %s %s %s/%s.fid %s.work',...
-                            options.scanner_user, recon_mat.scanner_name, recon_mat.scanner_patient,recon_mat.scanner_acquisition,runno);
-                        [s,sout] = system(pull_cmd);
-                        assert(s==0,sout);
-                        %%% the replacement of puller_glusterspaceCS_2 was
-                        %%% not tested yet.
-                        puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.study_workdir,3);
-                    end
-                    if ~exist(local_fid,'file') 
-                        % It is assumed that the target of puller is the local_fid
-                        error_flag = 1;
-                        log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
-                            scanner,[datapath '/fid']);
-                        yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                        if isdeployed; quit force; else; error(log_msg); end
-                    end
+                %}
+                % if ~exist(local_fid,'file')
+                if ~exist(fid_path.local,'file')
+                    % puller is linuxish only, so we gotta make sure we
+                    % give it linish paths. 
+                    pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
+                        options.scanner_user, recon_mat.scanner_name, ... 
+                        path_convert_platform(fid_path.remote,'lin'), ...
+                        path_convert_platform(work_subfolder,'lin'));
+                    [s,sout] = system(pull_cmd);
+                    assert(s==0,sout);
+                    %%% the replacement of puller_glusterspaceCS_2 was
+                    %%% not tested yet.
+                    %error('untested after code update');
+                    %puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.study_workdir,3);
+                end
+                if ~exist(fid_path.local,'file')
+                    % It is assumed that the target of puller is the local_fid
+                    error_flag = 1;
+                    log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
+                        scanner,[datapath '/fid']);
+                    yet_another_logger(log_msg,log_mode,log_file,error_flag);
+                    if isdeployed; quit force; else; error(log_msg); end
+                end
+                if multi_volume_fid && recon_mat.nechoes > 1 && volume_number == 1
+                    error('INCOMPLETE UPDATE');
                     % Run splitter
                     fs_slurm_options=struct;
                     fs_slurm_options.v=''; % verbose
@@ -328,18 +359,9 @@ else
                     else
                         eval(sprintf('fid_splitter_exec %s',fs_args));
                     end
-                % else
-                    % error('Trouble with nechoes detect switch tell dev they''re sloppy');
                 end
-            else
-                log_mode = 1;
-                error_flag = 1;
-                log_msg = sprintf('Fid consistency failure at volume %s! source fid for (%s) is not the same source fid as the first volume''s fid.\n',volume_runno,fid_path.current);
-                log_msg = sprintf('%sCan manual check with "write_or_compare_fid_tag(''%s'',''%s'',%i,''%s'',''%s'')"\n',...
-                    log_msg,fid_path.current,recon_mat.fid_tag_file,volume_number,recon_mat.scanner_name,the_scanner.user);
-                log_msg = sprintf('%sCRITICAL ERROR data_mode=%i\n',log_msg,data_mode);
-                yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                if isdeployed; quit force; else error(log_msg); end
+                % else
+                % error('Trouble with nechoes detect switch tell dev they''re sloppy');
             end
         end
         %% STAGE2 Scheduling

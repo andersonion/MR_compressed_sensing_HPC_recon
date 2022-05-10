@@ -522,10 +522,46 @@ if ~exist(complete_study_flag,'file')
     % definitions.
     % we probably still want to use data_definition_cleanup so we have the
     % "main" thing to transfer with puller_simple.
+
+    % if we're a volume_index scan, and we dont exist locally, we need to get the
+    % volume index immediately.This has a SIGNIFICANT order of operations
+    % challenge. We need to clean up the data definition, AND get the scan
+    % mode. But with a volume_index file, we may have an existing local
+    % file which is not data, generating confusion, and complicating the
+    % order of things.
+    if reg_match(input_data,'volume_index.txt') 
+        if ~exist(input_data,'file')
+            index_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
+                options.scanner_user, the_scanner.name, input_data, runno);
+        else
+            index_fetch=sprintf('cp -p %s %s ',  input_data, workdir);
+        end
+        local_index=fullfile(workdir,'volume_index.txt');
+        if ~exist(local_index,'file')
+            [s,sout] = system(index_fetch);
+            assert(s==0,sout);
+        end
+    end
+    % cleans up user input to solidly hold REMOTE file locations
     scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+    % becuase i dont want to make data_definition_cleanup complicated, we
+    % load volume index externally, maybe we can load it and pass it as
+    % input data? and that would be more reasonable?
+    if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
+        local_index=load_index_file(local_index);
+        if ~path_is_absolute(local_index.fid{1})
+            % local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid)
+            local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid, 'UniformOutput', false);
+        end
+        scan_data_setup.fid=local_index.fid;
+    end
     recon_mat.scan_data_setup=scan_data_setup;
-    
+
+    % given a "fid" file path which is remote OR local, figure out the
+    % current status, and return the local, remote and/or streaming file
+    % paths
     [data_mode,fid_path]=get_data_mode(the_scanner,workdir,scan_data_setup.fid);
+
     % old rad_mat var was kspace_data_path, but it was for the local
     % file, we only use the local file when it exists, so i'm not
     % saving it separately
@@ -536,7 +572,7 @@ if ~exist(complete_study_flag,'file')
         % reading back previous and only udpating current.
         fid_path_prev=recon_mat.fid_path;
         fid_path_prev.current=fid_path.current;
-        recon_mat.fid_path=fid_path;
+        recon_mat.fid_path=fid_path_prev;
         clear fid_path_prev;
     end
     % fid_consistency gets a header of data and a few bytes too saving it in the fid_tag_file
@@ -559,7 +595,12 @@ if ~exist(complete_study_flag,'file')
     recon_mat.dim_x=acq_hdr.ray_length;
     recon_mat.bytes_per_block=acq_hdr.bytes_per_block;
     recon_mat.rays_per_block=acq_hdr.rays_per_block;
-    recon_mat.ray_blocks=acq_hdr.ray_blocks;
+    % check for multi-input files vs multi-volume in one file
+    if prod(acq_hdr.dims.Sub('et')) > 1
+        recon_mat.ray_blocks=acq_hdr.ray_blocks;
+    elseif numel(scan_data_setup.fid) > 1
+        recon_mat.ray_blocks = numel(scan_data_setup.fid);
+    end
     recon_mat.kspace_data_type=acq_hdr.data_type;
     % load basic info from the header we scrapped during the
     % fid_consistency check. Why was this being done here? if seems this
