@@ -8,14 +8,16 @@ end
 if strcmp(getenv('WORKSTATION_HOME'),'')
     getenv('WORKSTATION_HOME','c:/workstation/code')
 end
-%% set file and runno
-cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
-mrd_file='c:/smis/dev/Temp/se_test_const_phase.mrd';
-runno='Test_data';
 %% adjust input for CS_recon 
 scanner_name='grumpy';s_l='N';
-
-
+%% set file and runno
+cs_table='c:/workstation/data/petableCS_stream/other/stream_CS256_16x_pa18_pb73';
+data='c:/smis/dev/Temp/se_test_const_phase.mrd';
+runno='Test_data';
+%% set single_vol test
+cs_table='C:\workstation\data\petableCS_stream\stream_CS256_8x_pa18_pb54';
+runno='N00011t';
+data='d:\smis\scan_20220511T102446.mrd';
 
 
 %% set args 
