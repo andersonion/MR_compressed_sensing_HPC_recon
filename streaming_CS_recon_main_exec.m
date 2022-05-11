@@ -598,8 +598,10 @@ if ~exist(complete_study_flag,'file')
     % check for multi-input files vs multi-volume in one file
     if prod(acq_hdr.dims.Sub('et')) > 1
         recon_mat.ray_blocks=acq_hdr.ray_blocks;
-    elseif numel(scan_data_setup.fid) > 1
+    elseif iscell(scan_data_setup.fid) && numel(scan_data_setup.fid) > 1
         recon_mat.ray_blocks = numel(scan_data_setup.fid);
+    else
+        recon_mat.ray_blocks = 1;
     end
     recon_mat.kspace_data_type=acq_hdr.data_type;
     % load basic info from the header we scrapped during the
@@ -656,8 +658,8 @@ if ~exist(complete_study_flag,'file')
         tables_in_workdir=dir([workdir '/*CS*_*x*_*']);
     end
     local_table_path='';
+    options.CS_table=path_convert_platform(options.CS_table,'linux');
     if ~isempty(tables_in_workdir)
-        options.CS_table=path_convert_platform(options.CS_table,'linux');
         [~,n,e]=fileparts(options.CS_table);TAB_N=[n,e];clear n e;
         if ischar(options.CS_table) && ~strcmp(TAB_N,tables_in_workdir(1).name)
             % have user specified, lets error if they're different

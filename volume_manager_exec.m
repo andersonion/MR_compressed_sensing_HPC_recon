@@ -110,9 +110,9 @@ clear fid_path;
 % other details are sorted out status_fid var should be adjusted to be
 % normal/correct name
 status_fid=scan_data_setup.fid;
-multi_volume_fid=true;
-if numel(status_fid)>1
-    multi_volume_fid=false;
+single_data_file=true;
+if iscell(status_fid) && numel(status_fid)>1
+    single_data_file=false;
     status_fid=status_fid{volume_number};
 end
 
@@ -155,10 +155,10 @@ else
         work_subfolder, status_fid);
 end
 
-if multi_volume_fid
+if single_data_file
     % we've already collected fid_path REFUSE to update remotes by
     % reading back previous and only udpating current. This is only good for
-    % single file fids with many volumes, in 1 vol per fid mode we will not
+    % single file fids with 1-N volumes, in 1 vol per fid mode we will not
     % update the recon_mat fid_path. It should be stuck as the first fid.
     fid_path_prev=recon_mat.fid_path;
     fid_path_prev.current=fid_path.current;
@@ -169,7 +169,7 @@ if multi_volume_fid
 end
 
 
-if exist('fid_path','var') && ~multi_volume_fid
+if exist('fid_path','var') && ~single_data_file
     volume_fid=fid_path.local;
 else
     volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
@@ -275,10 +275,10 @@ else
             end
             vol_tag=fullfile(work_subfolder,sprintf('.%s.fid_tag',volume_runno));
             f_tag=recon_mat.fid_tag_file;
-            if ~multi_volume_fid
+            if ~single_data_file
                 f_tag=vol_tag;
             end
-            if ~the_scanner.fid_consistency(fid_path.current,f_tag,multi_volume_fid)
+            if ~the_scanner.fid_consistency(fid_path.current,f_tag,single_data_file)
                 % Take care, "cleverly" re-using multi_volume_fid flag as
                 % "fid_required" because when we're multi-volume we must
                 % have it.
@@ -293,7 +293,7 @@ else
             end
             % Getting subvolume should be the job of volume setup.
             % TODO: Move get vol code into setup!
-            if recon_mat.nechoes == 1 && multi_volume_fid
+            if recon_mat.nechoes == 1 && single_data_file
                 % for multi-block fids(diffusion)
                 the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
             else %if ~multi_volume_fid || ( recon_mat.nechoes > 1 && volume_number == 1 )
@@ -339,7 +339,7 @@ else
                     yet_another_logger(log_msg,log_mode,log_file,error_flag);
                     if isdeployed; quit force; else; error(log_msg); end
                 end
-                if multi_volume_fid && recon_mat.nechoes > 1 && volume_number == 1
+                if single_data_file && recon_mat.nechoes > 1 && volume_number == 1
                     error('INCOMPLETE UPDATE');
                     % Run splitter
                     fs_slurm_options=struct;
