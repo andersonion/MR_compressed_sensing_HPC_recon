@@ -25,10 +25,13 @@ K = sum(pdf(:));
 minIntr = 1e99;
 minIntrVec = zeros(size(pdf));
 
+rand_limit=10000;
+
 for n=1:iter
 	tmp = zeros(size(pdf));
-	while abs(sum(tmp(:)) - K) > tol
+	while abs(sum(tmp(:)) - K) > tol && 0<rand_limit
 		tmp = rand(size(pdf))<pdf;
+        rand_limit=rand_limit-1;
 	end
 	
 	TMP = ifft2(tmp./pdf);
