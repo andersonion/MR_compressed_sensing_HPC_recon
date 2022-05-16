@@ -1,4 +1,4 @@
-function save_cs_stream_table(mask,out_file,size_check_fail)
+function out_file = save_cs_stream_table(mask,out_file,size_check_fail)
 % function SAVE_CS_STREAM_TABLE(mask,out_file)
 % saves a 2D cs table as a text file of co-ordinate pairs
 % each line is a single part of the co ordinate pair
