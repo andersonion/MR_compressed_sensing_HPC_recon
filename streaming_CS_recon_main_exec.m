@@ -173,7 +173,8 @@ elseif ~isdeployed && ~options.live_run
     pause(3);
 end
 % james normally attaches this to the "debug_mode" option, 
-% with increasing values of debugging generating more and more outtput.
+% with increasing values of debugging generating more and more output.
+% at debug of 50 things which were errors start to become warnings.
 options.verbose=1;
 if options.debug_mode<10
     options.verbose=0;
@@ -784,7 +785,7 @@ if ~exist(complete_study_flag,'file')
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
         [recon_mat.dim_y,recon_mat.dim_z,recon_mat.n_sampled_lines,recon_mat.sampling_fraction,recon_mat.mask,recon_mat.CSpdf,recon_mat.phmask,recon_mat.recon_dims,...
-            recon_mat.original_mask,recon_mat.original_pdf,recon_mat.original_dims] = process_CS_mask(local_table_path, recon_mat.dim_x, options.hamming_window);
+            recon_mat.original_mask,recon_mat.original_pdf,recon_mat.original_dims] = process_CS_mask(local_table_path, recon_mat.dim_x, options.hamming_window, options.debug_mode);
         recon_mat.nechoes = 1;
         if recon_mat.ray_blocks == 1
             % n_sampled_lines is precisely the count from the cs mask

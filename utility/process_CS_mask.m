@@ -1,6 +1,6 @@
 function [dim_2, dim_3, n_sampled_lines, sampling_fraction, mask, ...
     CSpdf, phmask, recon_dims, original_mask, original_pdf, original_dims]= ...
-    process_CS_mask(cs_table, dim_x, hamming_window)
+    process_CS_mask(cs_table, dim_x, hamming_window, debug_mode)
 % function process_CS_mask 
 fprintf('process_CS_mask ... this can take a minute.\n');
 %{
@@ -25,7 +25,7 @@ sampling_fraction = 1/cs_factor;
 % original input to genPDF.
 
 % Generate sampling PDF (this is NOT the sampling mask)
-[CSpdf,~] = genPDF_wn_v2(size(mask),pa,sampling_fraction,pb,false);
+[CSpdf,~] = genPDF_wn_v2(size(mask),pa,sampling_fraction,pb,'debug_mode',debug_mode);
 original_mask = mask;
 original_pdf = CSpdf;
 

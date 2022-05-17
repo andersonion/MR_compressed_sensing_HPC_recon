@@ -1,4 +1,6 @@
-function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, disp)
+function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, varargin)
+
+% INACCURATE HELP WHICH WAS NOT UPDATED
 %[pdf,val] = genPDF_wn_v2(imSize,p,sample_fraction [,distType,radius,disp])
 %
 %	generates a pdf for a 1d or 2d random sampling pattern
@@ -22,6 +24,21 @@ function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, disp)
 %
 %	(c) Michael Lustig 2007
 % imSize=[256 256]; p=14; sample_points=0.125; distType=2; radius=0; disp=1; 
+disp=false;
+if numel(varargin)
+    isodd=mod(numel(varargin),2);
+    if isodd
+        if isnumeric(varargin{1})
+            disp=varargin{1};
+            varargin(1)=[];
+        end
+    end
+    for va=1:2:numel(varargin)
+        if strcmp(varargin{va},'debug_mode')
+            debug_mode=varargin{va+1};
+        end
+    end
+end
 %{
 val = 0.5;
 if length(imSize)==1
@@ -87,7 +104,9 @@ f=f/max(f(:));
 % figure;imshow(f,[]); figure;plot(1:sx,f1)
 f_sum=sum(f(:));
 if floor(f_sum) > sample_points
-	error('infeasible without undersampling dc, change pa or pb');
+    msg_function=@error;
+    if debug_mode>=50; msg_function=@warning; end
+    msg_function('infeasible without undersampling dc, change pa or pb');
 end
 
 % It appears the bisection loop could be replaced with one line, solving
@@ -140,6 +159,7 @@ if N ~= sample_points
     maxval=(sample_points+1-f_sum)/(used_points-truncated_pts);
     [pdf,val]=bisect_pdf_loop(sample_points,f,minval,maxval);
 end
+
 
 if disp
 	figure,
