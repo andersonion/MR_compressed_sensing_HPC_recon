@@ -1,4 +1,8 @@
 function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, varargin)
+% [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb)
+% [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, [display_bool,'debug_mode',debug_value])
+
+
 
 % INACCURATE HELP WHICH WAS NOT UPDATED
 %[pdf,val] = genPDF_wn_v2(imSize,p,sample_fraction [,distType,radius,disp])
