@@ -11,9 +11,9 @@ function [ starting_point ,log_msg, vol_status, extended] = volume_status( ...
 % 1 : Extract fid.
 % 2 : Run volume setup. (create workspace.mat and .tmp files)
 % 3 : Schedule slice jobs.
-% 4 : Run volume cleanup.
+% 4 : Run volume Finishing tasks.
 % 5 : Send volume to workstation and write recon_completed flag.
-% 6 : All work done; do nothing.
+% 6 : All work done; (do cleanup tasks, but dont re-try on fail) do nothing.
 %
 % Required inputs:
 %   workdir (volume_subfolder, so '../volume_runno NOT '../volume_runno/work/')
@@ -39,7 +39,7 @@ status_setup(stage_n).code='Acquistion in progress on scanner.';
 status_setup(stage_n).pct=1;
 if exist('the_scanner','var') ...
     && exist('volume_number','var') ...
-    && exist('input_data','var')
+    && exist('input_data','var') && ~isempty(input_data)
     if ~isa(the_scanner,'scanner')
         warning('passed name instad of scanner settings object, trying to load');
         scanner_name=the_scanner;
@@ -299,12 +299,13 @@ if nargin >= 2
     end
 elseif nargin==1
     input_data=varargin{1};
-    end
+end
 if exist('input_data','var')
     %[~,n,e]=fileparts(input_data);
     %choices=[choices fullfile(work_subfolder,[n e ])];
     choices=[choices input_data];
 end
+fid_transfer_status=0;
 for fidname=choices
     volume_fid=fidname{1};
     fid_info=dir(volume_fid);

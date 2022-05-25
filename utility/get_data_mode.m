@@ -2,7 +2,7 @@ function [data_mode, fid_path, fid_path_remote, fid_path_inprogress] = ...
     get_data_mode(the_scanner,workdir,varargin)
 % function [data_mode, fid_path_struct] = GET_DATA_MODE(the_scanner,workdir,scanner_fid)
 % returns data_mode, a string of local, static, or streaming,
-% also gives a structof the different paths back, local, remote,
+% also gives a struct of the different paths back, local, remote,
 % inprogress, and current which is which is a copy of one of
 % local|remote|inprogress.
 % 
@@ -37,14 +37,20 @@ else
     % check last remote file?
     fid_path.remote=the_scanner.fid_file_remote(varargin{1});
     remote_size=the_scanner.get_remote_filesize(varargin{end});
-    if remote_size~=0
+    if remote_size > 0
         data_mode='remote';
         fid_path.current=fid_path.remote;
         fid_path.size=remote_size;
     else
         data_mode='streaming';
         fid_path.inprogress=the_scanner.fid_file_inprogress();
-        fid_path.current=fid_path.inprogress;
+        if numel(varargin)>1
+            % on multi-input AND not complete, we will probably need any
+            % fid as remote early on.
+            fid_path.current=fid_path.remote;
+        else
+            fid_path.current=fid_path.inprogress;
+        end
     end
 end
 if nargout>=3

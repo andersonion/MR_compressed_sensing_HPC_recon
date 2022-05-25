@@ -21,20 +21,44 @@ runno='N20220506_01';
 % rel-mode
 % data='N20220506_01\_p1_diffusion_a46b5\volume_index.txt';
 % full_mode, switch to our fav mrraw?
-data='d:\smis\N20220506_01\_p1_diffusion_a46b5\volume_index.txt';
+%data='d:\smis\N20220506_01\_p1_diffusion_a46b5\volume_index.txt';
+
+runno='N60003t';
+data='d:/smis/N20220518_00/_00_ISO46_5b0/volume_index.txt';
 
 
+%runno='N60004t';
+%data='d:/smis/N20220519_00/_01_ISO46_5b0/volume_index.txt';
 
+runno='ortho_diffusion_fs';
+[s,sout]=system('declare -x BIGGUS_DISKUS=/privateShares/jjc29');
+runno='ortho_diffusion_fs_1i';
+cs_table='C:\workstation\data\petableCS_stream\stream_CS256_1x_pa1_pb1';
+data='/d/smis/N20220520_01/_01_ortho/volume_index.txt';
 
 %% set args 
 % normal iteration count
 iters='iteration_strategy=6x10';
 % test iteration count
-% iters='iteration_strategy=1x1';
+iters='iteration_strategy=1x1';
+% do 1 vol only
 main_args={'planned_ok', 'live_run','debug_mode=50',...
     'skip_target_machine_check','last_volume=1',...
     'chunk_size=5','target_machine=localhost',...
     'keep_work','scanner_user=mrs',iters};
+% do last of test volumes WHICH IS NOT COMPLETE
+main_args={'planned_ok', 'live_run','debug_mode=50',...
+    'skip_target_machine_check','first_volume=2',...
+    'chunk_size=5','target_machine=localhost',...
+    'keep_work','scanner_user=mrs',iters};
+
+% do all vols
+%{
+main_args={'planned_ok', 'live_run','debug_mode=50',...
+    'skip_target_machine_check',...
+    'chunk_size=5','target_machine=localhost',...
+    'keep_work','scanner_user=mrs',iters};
+%}
 if exist('cs_table','var')
     main_args{end+1}=sprintf('CS_table=%s',cs_table);
 end

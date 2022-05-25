@@ -18,6 +18,15 @@ C___=exec_startup();
 recon_mat=matfile(recon_file);
 % have to unpack structs from the matlab file 
 options=recon_mat.options;
+if isdeployed && options.live_run
+    options.live_run=0;
+% CANT write to recon file! if we do, we'll break our friends!
+% We're going to let this one stay BECUASE live mode shouldnt be set!
+% That probably indicates some kind of programmer error in testing
+    recon_mat.Properties.Writable=true;
+    recon_mat.options=options;
+    recon_mat.Properties.Writable=false;
+end
 % headfile=recon_mat.headfile;
 % unpack workstation_settings too
 the_scanner=recon_mat.the_scanner;
@@ -95,6 +104,9 @@ previous more annoyingly specific ugly funciton
 %}
 
 % new funtion
+% if reg_match(recon_mat.scanner_data,'volume_index.txt')
+% GET FRESH VOLUME INDEX?
+% end
 scan_data_setup=recon_mat.scan_data_setup;
 % this would be the full one file fid if we have it. This idea is NOT 
 % % currently implemented.
@@ -114,6 +126,14 @@ single_data_file=true;
 if iscell(status_fid) && numel(status_fid)>1
     single_data_file=false;
     status_fid=status_fid{volume_number};
+    if isempty(status_fid)
+        scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,recon_mat.study_workdir,recon_mat.options);
+        status_fid=scan_data_setup.fid{volume_number};
+% CANT write to recon file! if we do, we'll break our friends!        
+%        recon_mat.Properties.Writable=true;
+%        recon_mat.scan_data_setup=scan_data_setup;
+%        recon_mat.Properties.Writable=false;
+    end
 end
 
 setup_variables= fullfile(volume_dir,   [ volume_runno '_setup_variables.mat']);
@@ -162,9 +182,10 @@ if single_data_file
     % update the recon_mat fid_path. It should be stuck as the first fid.
     fid_path_prev=recon_mat.fid_path;
     fid_path_prev.current=fid_path.current;
-    recon_mat.Properties.Writable = true;
-    recon_mat.fid_path=fid_path_prev;
-    recon_mat.Properties.Writable = false;
+% CANT write to recon file! if we do, we'll break our friends!    
+%    recon_mat.Properties.Writable = true;
+%    recon_mat.fid_path=fid_path_prev;
+%    recon_mat.Properties.Writable = false;
     clear fid_path_prev;
 end
 
@@ -187,8 +208,30 @@ flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESS
 % local_archive_tag_prefix = [ '_' remote_workstation.name];
 % local_archive_tag =   sprintf('%s%s',original_archive_tag,local_archive_tag_prefix);
 
+%% define volume manager setup for use if we're not ready or to check once all jobs are done.
+% normal version after work
+vm_slurm_options=struct;
+vm_slurm_options.v=''; % verbose
+vm_slurm_options.s=''; % shared; volume manager needs to share resources.
+vm_slurm_options.mem=2048; % memory requested; vm only needs a miniscule amount.
+%--In theory only! For yz-array sizes > 2048^2, loading the
+% data of phmask, CSmask, etc can push the memory of 512 MB
+vm_slurm_options.p=cs_queue.full_volume; % For now, will use gatekeeper queue for volume manager as well
+vm_slurm_options.job_name = [volume_runno '_volume_manager'];
+%vm_slurm_options.reservation = active_reservation;
+% using a blank reservation to force no reservation for this job.
+vm_slurm_options.reservation = '';
+volume_manager_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_manager.bash']);
+vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.study_workdir);
+vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
+
 if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && volume_number ~=1  )
     %% starting point 0/1
+    % since we're not ready, ensure at least a 5 minute gap before we try
+    % again.
+    vm_slurm_options.begin  = 'now+5minutes';
+    running_jobs='';
+%{
     % FID not ready yet, schedule gatekeeper for us.
     gk_slurm_options=struct;
     gk_slurm_options.v=''; % verbose
@@ -212,7 +255,8 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
         running_jobs = dispatch_slurm_jobs(batch_file,'','','singleton');
     else
         running_jobs='';
-        eval(sprintf('gatekeeper_exec %s',gatekeeper_args));
+        a=strsplit(gatekeeper_args);
+        gatekeeper_exec(a{:});clear a;
     end
     vm_slurm_options=struct;
     vm_slurm_options.v=''; % verbose
@@ -226,6 +270,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     volume_manager_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_manager.bash']);
     vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.study_workdir);
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
+%}
     if ~options.live_run
         batch_file = create_slurm_batch_files(volume_manager_batch, ...
             vm_cmd,vm_slurm_options);
@@ -235,11 +280,21 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
         end
         c_running_jobs = dispatch_slurm_jobs(batch_file,'',...
             running_jobs,or_dependency);
+        % should smartly combing running_jobs and c_running_jobs
+        if isempty(running_jobs)
+            running_jobs=c_running_jobs;
+        else
+            running_jobs=strjoin({running_jobs,c_running_jobs},':');
+        end
     else
-        eval(sprintf('volume_manager_exec %s',vm_args));
+        warning('long pause waiting for scan completion');
+        pause(30 * 60);
+        a=strsplit(vm_args);
+        volume_manager_exec(a{:});clear a;
     end
     log_mode = 1;
-    log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n',volume_runno,running_jobs);
+    log_msg =sprintf('Fid data for volume %s not available yet; initializing gatekeeper (SLURM jobid(s): %s).\n', ...
+        volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
     if ~options.live_run
         quit force
@@ -326,10 +381,6 @@ else
                         path_convert_platform(work_subfolder,'lin'));
                     [s,sout] = system(pull_cmd);
                     assert(s==0,sout);
-                    %%% the replacement of puller_glusterspaceCS_2 was
-                    %%% not tested yet.
-                    %error('untested after code update');
-                    %puller_glusterspaceCS_2(recon_mat.runno,datapath,recon_mat.scanner_name,recon_mat.study_workdir,3);
                 end
                 if ~exist(fid_path.local,'file')
                     % It is assumed that the target of puller is the local_fid
@@ -357,7 +408,8 @@ else
                         %fid_splitter_running_jobs
                         stage_1_running_jobs = dispatch_slurm_jobs(batch_file,'');
                     else
-                        eval(sprintf('fid_splitter_exec %s',fs_args));
+                        a=strsplit(fs_args);
+                        fid_splitter_exec(a{:});clear a;
                     end
                 end
                 % else
@@ -654,6 +706,9 @@ else
             starting_point=6;
         end
         %end
+
+
+
     end
     
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
@@ -736,10 +791,36 @@ else
             % could add dbstack check to prevent infinite recursion and
             % stack overflow like behavior.
             % maybe max out at 50? 
-            eval(sprintf('volume_manager_exec %s',vm_args));
+            a=strsplit(vm_args);
+            volume_manager_exec(a{:});clear a;
             pause(1);
         end
     end
+    %% meta data check
+    % try metadata fetch, but dont concern ourselves if we fail.
+    % includes multi-input, will not replace existing files. 
+    % volume_index has its own special fetch elsewhere becuase of that.
+    for i_m=1:numel(scan_data_setup.metadata)
+        meta_file=scan_data_setup.metadata{i_m};
+        m_dir=recon_mat.study_workdir;
+        if ~single_data_file && reg_match(meta_file,'<FID_NAME>')
+            % per-fid meta data goes into volume_dir, others are stored at
+            % main level.
+            m_dir=volume_dir;
+        end
+        [~,temp_n,~]=fileparts(fid_path.local);
+        meta_file=strrep(meta_file,'<FID_NAME>',temp_n);
+        meta_file=path_convert_platform(meta_file,'lin');
+        % [~,meta_name,meta_ext]=fileparts(meta_file);
+        pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
+                        options.scanner_user, recon_mat.scanner_name, ... 
+                        meta_file, ...
+                        path_convert_platform(m_dir,'lin') );
+                        %fullfile(path_convert_platform(m_dir,'lin'),[meta_name,meta_ext])  ); 
+        [s,sout] = system(pull_cmd);
+        if s~=0; fprintf('%s\n',sout); end
+    end
+
     if starting_point == 6
         volume_clean(setup_variables);
     end

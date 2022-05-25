@@ -1,4 +1,10 @@
 function out_code = gatekeeper_exec( local_file,remote_file,scanner,log_file,block_number,bbytes,interval,time_limit)
+% ON reflection, this code is redundant with volume manager in at least
+% some cases. 
+% 
+% Volume manager by definition has to check if it can proceed.
+% Finish that thought.
+
 % function out_code = gatekeeper_exec(local_file, remote_file, scanner, log_file, block_number, bbytes, interval, time_limit)
 % Mainly for checking to see if the needed data has been written to the
 % fid, but can be used for procpars and other remote files.

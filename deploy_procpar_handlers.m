@@ -80,6 +80,7 @@ if ~exist('USE_OLD_REMOTE_CHECK_CODE','var')
     shell_cmds=cmd_stack;
     clear compound_cmd cmd_stack ssh_dest;
 else
+    %%
 %WARNING: Cant really neaten these commands up the way they're written
 %because newlines interfear with ssh run. EXcept Maybe THeY DOnT BeCaUSE
 %wE'Re RUNninG iN SbATch!

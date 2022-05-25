@@ -10,6 +10,7 @@ function streaming_recon_exec(scanner_name, runno, input_data, varargin )
 %          - for agilent 20120101_01/ser01.fid
 %            with wild card 20120101*/ser01.fid
 %          - for mrsolutions data_file.mrd
+%          -           or volume_index.txt
 %
 % option   - for a list and explaination use 'help'.
 %
@@ -524,6 +525,7 @@ if ~exist(complete_study_flag,'file')
     % we probably still want to use data_definition_cleanup so we have the
     % "main" thing to transfer with puller_simple.
 
+    %{
     % if we're a volume_index scan, and we dont exist locally, we need to get the
     % volume index immediately.This has a SIGNIFICANT order of operations
     % challenge. We need to clean up the data definition, AND get the scan
@@ -532,16 +534,20 @@ if ~exist(complete_study_flag,'file')
     % order of things.
     if reg_match(input_data,'volume_index.txt') 
         if ~exist(input_data,'file')
-            index_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s.work',...
+            index_fetch=sprintf('puller_simple -r -f file -u %s %s %s %s.work',...
                 options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), runno);
         else
             index_fetch=sprintf('cp -p %s %s ',  input_data, workdir);
         end
         local_index=fullfile(workdir,'volume_index.txt');
-        if ~exist(local_index,'file')
-            [s,sout] = system(index_fetch);
-            assert(s==0,sout);
-        end
+        %if ~exist(local_index,'file')
+        % we always grab the index because it is how we know how much data
+        % will be done. It is supposed to be prepopulated with numbers on
+        % the scanner, and after each scan is done the data file is filled
+        % in
+        [s,sout] = system(index_fetch);
+        assert(s==0,sout);
+        %end
     end
     % cleans up user input to solidly hold REMOTE file locations
     scan_data_setup=the_scanner.data_definition_cleanup(input_data);
@@ -552,9 +558,17 @@ if ~exist(complete_study_flag,'file')
         local_index=load_index_file(local_index);
         if ~path_is_absolute(local_index.fid{1})
             % local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid)
-            local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid, 'UniformOutput', false);
+            idx_ready = cellfun(@(c) ~isempty(c),local_index.fid);
+            full_paths = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid, 'UniformOutput', false);
+            local_index.fid(idx_ready) = full_paths(idx_ready);
         end
         scan_data_setup.fid=local_index.fid;
+    end
+    %}
+    if ~reg_match(input_data,'volume_index.txt') 
+        scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+    else
+        scan_data_setup=refresh_volume_index(input_data,the_scanner,workdir,options);
     end
     recon_mat.scan_data_setup=scan_data_setup;
 
@@ -578,7 +592,11 @@ if ~exist(complete_study_flag,'file')
     end
     % fid_consistency gets a header of data and a few bytes too saving it in the fid_tag_file
     % we use that to get some scanner details
-    if ~the_scanner.fid_consistency(fid_path.current,recon_mat.fid_tag_file,0)
+    test_fid=fid_path.current;
+    if reg_match(test_fid,'NO_FILE')
+        test_fid=fid_path.remote;
+    end
+    if ~the_scanner.fid_consistency(test_fid, recon_mat.fid_tag_file,0)
         % may want to skip fid consistency for local becuase we have the 
         % whole thing to work on ?
         % decided against that becuase if we're local we'd want to be

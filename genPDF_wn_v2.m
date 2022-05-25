@@ -29,6 +29,7 @@ function [pdf, val] = genPDF_wn_v2(imSize, pa, sample_fraction, pb, varargin)
 %	(c) Michael Lustig 2007
 % imSize=[256 256]; p=14; sample_points=0.125; distType=2; radius=0; disp=1; 
 disp=false;
+debug_mode=false;
 if numel(varargin)
     isodd=mod(numel(varargin),2);
     if isodd
