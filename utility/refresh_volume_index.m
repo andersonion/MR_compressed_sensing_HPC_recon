@@ -7,7 +7,7 @@ min_index_age=5;
 if ~exist(input_data,'file')
     % todo: time-bin this fetch command to only grab if current is older
     % than 5 minutes
-    index_fetch=sprintf('puller_simple -oer -f file -u %s %s %s %s',...
+    index_fetch=sprintf('puller_simple -o -f file -u %s %s %s %s',...
         options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), study_workdir);
 else
     index_fetch=sprintf('cp -p %s %s ',  input_data, study_workdir);
