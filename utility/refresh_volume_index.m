@@ -5,12 +5,10 @@ function scan_data_setup = refresh_volume_index(input_data,the_scanner,study_wor
 % This is reduce chance of collision with many things grabbing it.
 min_index_age=5;
 if ~exist(input_data,'file')
-    % todo: time-bin this fetch command to only grab if current is older
-    % than 5 minutes
-    index_fetch=sprintf('puller_simple -o -f file -u %s %s %s %s',...
-        options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), study_workdir);
+    index_fetch=sprintf('puller_simple -o -f file -u %s %s ''%s'' ''%s''',...
+        options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), path_convert_platform(study_workdir,'lin'));
 else
-    index_fetch=sprintf('cp -p %s %s ',  input_data, study_workdir);
+    index_fetch=sprintf('cp -p ''%s'' ''%s'' ',  input_data, study_workdir);
 end
 % we (almost)always grab the index because it is how we know how much data
 % will be done. It is supposed to be prepopulated with numbers on
@@ -41,6 +39,7 @@ if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
         % local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid)
         idx_ready = cellfun(@(c) ~isempty(c),local_index.fid);
         full_paths = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid, 'UniformOutput', false);
+        full_paths =cellfun(@(c) path_convert_platform(c,'lin'), full_paths ,'UniformOutput',false);
         local_index.fid(idx_ready) = full_paths(idx_ready);
     end
     scan_data_setup.fid=local_index.fid;
