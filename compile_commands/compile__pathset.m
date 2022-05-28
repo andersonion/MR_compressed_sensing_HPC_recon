@@ -7,6 +7,7 @@ addpath(fullfile(pdir,'sparseMRI_v0.2/threshold'));
 addpath(fullfile(pdir,'sparseMRI_v0.2/utils'));
 %addpath(fullfile(pdir,'testing_and_prototyping'));
 addpath(fullfile(pdir,'utility'));
+addpath(fullfile(pdir,'schedulers'));
 % common_utils had to be added for cs_recon main
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils']);
 addpath([getenv('WORKSTATION_HOME') '/shared/civm_matlab_common_utils/mrsolutions']);

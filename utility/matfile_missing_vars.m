@@ -1,9 +1,16 @@
-function missing=matfile_missing_vars(mat_file,varlist)
+function missing=matfile_missing_vars(mat_file,varargin)
 % function missing_count=matfile_missing_vars(mat_file,varlist)
 % checks mat file for list of  vars,
 % mat_file is the path to the .mat file,
 % varlist is the comma separated list of expected variables, WATCH OUT FOR
 % SPACES.
+
+% if its a single cell 1ith 1 cell in it, unwrap it.
+varlist=varargin;
+if numel(varlist) == 1 && ( ~iscell(varargin{1}) || 1 < numel(varargin{1}) )
+    varlist=varlist{1};
+end
+
 if ~iscell(varlist)
     varlist=strsplit(varlist,',');
 end

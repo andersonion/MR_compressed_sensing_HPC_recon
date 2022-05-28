@@ -90,11 +90,13 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         fid_volume_number, ...
         recon_mat.original_dims,   only_non_zeros, process_precision  );
     %}
+    vol_hf_args={setup_variables};
     if strcmp(the_scanner.vendor,'mrsolutions')
         db_inplace(mfilename,'uncertain formatting');
         % didnt get this tested yet, had some troubles around getting
         % trailing meta data, which might be a big deal
         [hdr,data]=load_mrd(setup_var.volume_fid, process_precision);
+        vol_hf_args{end+1}=hdr;
     elseif strcmp(the_scanner.vendor,'agilent')
        data = load_fidCS(setup_var.volume_fid, ...
         max_blocks, ...
@@ -103,6 +105,7 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         fid_volume_number, ...
         recon_mat.original_dims,   only_non_zeros, process_precision  );
     end
+    save_vol_data_headfile(vol_hf_args{:});
     if ndims(data)==3
         %% convert back to 2d data, most of the time we dont get 3d from loadfid cs
         data=reshape(data,[size(data,1),size(data,2)*size(data,3)]);

@@ -190,48 +190,30 @@ if continue_recon_enabled
 end
 
 %% check on temp file, try to get amount complete, or exit on fail
-temp_file_error = 1;
+temp_file_available = 1;
 if exist(setup_var.temp_file,'file')
-    temp_file_error = 0;
+    temp_file_available = 0;
 end
-%{
-% this check "should" never be necessary.
-% Maybe it was originally here for slow-disk protection? 
-% Leaving it in for reference for now.
-if exist('setup_var.temp_file','var')
-    num_checks = 30;
-    for tt = 1:num_checks
-        if exist(setup_var.temp_file,'file')
-            temp_file_error = 0;
-            break;
-        else
-            pause(1)
-        end
-    end
-end
-%}
-error_flag=0;
-if temp_file_error
-    error_flag=1;
-    if ~exist('setup_var.temp_file','var')
-        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',setup_var.volume_runno,setup_variables);
-    else
-        log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
-    end
-else
+error_flag=~temp_file_available;
+if temp_file_available
     [tmp_header,slices_with_iterations,unreconned_slices,t_id] = load_cstmp_hdr(setup_var.temp_file);
-    if (continue_recon_enabled && ~variable_iterations)
+    if continue_recon_enabled && ~variable_iterations
         unreconned_slices = length(find(tmp_header<options.Itnlim));
     end
-    if  (unreconned_slices > 0)
+    if unreconned_slices == 0
+        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',setup_var.volume_runno,slices_with_iterations);
+    elseif  unreconned_slices > 0
         error_flag=1;
         log_msg =sprintf('Volume %s: %i slices appear to be inadequately reconstructed; DYING.\n',setup_var.volume_runno,unreconned_slices);
-    else
-        log_msg =sprintf('Volume %s: All %i slices appear to be reconstructed; cleaning up volume now.\n',setup_var.volume_runno,slices_with_iterations);
+    end
+else
+    log_msg =sprintf('Volume %s: Cannot find temporary file: %s; DYING.\n',setup_var.volume_runno,setup_var.temp_file);
+    if matfile_missing_vars(setup_variables,'temp_file')
+        log_msg =sprintf('Volume %s: Cannot find name of temporary file in variables file: %s; DYING.\n',setup_var.volume_runno,setup_variables);
     end
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
-if error_flag==1
+if ~temp_file_available
     fclose(t_id);
     if isdeployed
         quit force;
@@ -240,16 +222,11 @@ if error_flag==1
     end
 end
 
-%% Read in temporary data
 log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',setup_var.volume_runno,setup_var.temp_file);
 yet_another_logger(log_msg,log_mode,log_file);
+
+%%
 tic
-%{
-% inline open
-t_id=fopen(setup_var.temp_file,'r');
-header_size = fread(t_id,1,'uint16');
-fseek(t_id,2*header_size,0);
-%}
 
 % our magic number threshold to remove bright noise.
 % This is the percentage of data we scale to, instead of a simple scale to
@@ -257,7 +234,7 @@ fseek(t_id,2*header_size,0);
 % said otherwise, we overrange 0.05%.
 BRIGHT_NOISE_THRESHOLD=0.9995; 
 
-%% min memory mode, we only load 1 full CS slice at a time,
+% min memory mode, we only load 1 full CS slice at a time,
 % each is reduced to the proscribed acq dim
 % and inserted into a full size acq vol before moving on to the next.
 % Potentially we could do better using a  sparse load but thats a lot of
@@ -345,15 +322,6 @@ for ss=1:recon_dims(1)
     % slice_quantile(s)=quantile(abs(final_slice_out),BRIGHT_NOISE_THRESHOLD);
     data_out(ss,:,:)= final_slice_out;
     volume_hist=volume_hist+histcounts(abs(final_slice_out(:)),hist_bins); % Cumulative build a volume histogram
-    
-    %{
-        if ~isdeployed && strcmp(sys_user(),'rja20') && ~mod(ss,10)
-            figure(60)
-            %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
-            plot(hist_bins(2:end),volume_hist)
-            pause(1)
-        end
-    %}
 end
 log_msg = sprintf('Slice Processing % 6.2f%%...\n',100* ss/recon_dims(1));
 yet_another_logger(log_msg,log_mode,log_file);
@@ -446,15 +414,6 @@ if options.fermi_filter|| exist('output_size','var')
     end
     data_out =fftshift(ifftn(fftshift(data_out)));
 end
-%{
-% show the code dev a central slice.
-if ~isdeployed && strcmp(sys_user(),'THECODEDEV')
-    figure(666)
-    %imagesc(abs(squeeze(data_out(round(original_dims(1)/2),:,:))))
-    imagesc(abs(squeeze(data_out(:,:,round(original_dims(3)/2)))))
-    colormap gray
-end
-%}
 %% Save data
 if qsm_fermi_filter && write_qsm
     if ~exist(qsm_file,'file')
@@ -476,25 +435,11 @@ if qsm_fermi_filter && write_qsm
     end
 end
 % Rename var in memory to avoid accidentally doing invalid operations on
-% dat_out
-%data_out = abs(data_out);
+% data_out
 mag_data = abs(data_out);
 clear data_out;
-%{
-% Move to processing after the procpar file has been processed.
-write_archive_tag_nodev(setup_var.volume_runno,['/' target_machine 'space'],original_dims(3),struct1.U_code, ...
-    ['.' struct1.U_stored_file_format],struct1.U_civmid,true,images_dir)
-
-%}
-%write_civm_image(fullfile(images_dir,[setup_var.volume_runno struct1.scanner_tesla_image_code 'imx']), ...
-%    mag_data,struct1.U_stored_file_format,0,1)
-
-%% Pre 17 May 2018 code:
-%{
-    write_civm_image(fullfile(images_dir,[setup_var.volume_runno databuffer.headfile.scanner_tesla_image_code 'imx']), ...
-        mag_data,'raw',0,1)
-%}
-%% Post 17 May 2018 code:
+%% start integrating info to headfile
+% Post 17 May 2018 code:
 % while we take stats of our iterations, these are not currently variable
 % and may not be the information we're after.
 % line search iterations of the minimization are variable, and we dont report those out of the fnl code.
@@ -504,14 +449,6 @@ databuffer.addprop('headfile');
 databuffer.addprop('data');
 databuffer.headfile=recon_mat.headfile;
 
-
-%{
-db_inplace(mfilename,'REVISE')
-if exist('bollocks','var')
-    t_var=recon_mat.databuffer;
-    databuffer.headfile=t_var.headfile; clear t_var;
-end
-%}
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_total=tmp_header;
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_mean = mean(tmp_header(:));
 databuffer.headfile.iterations_per_CSslice_for_L_one_minimization_min = min(tmp_header(:));

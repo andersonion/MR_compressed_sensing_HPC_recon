@@ -586,6 +586,7 @@ if ~exist(complete_study_flag,'file')
         % if we've already collected fid_path REFUSE to update remotes by
         % reading back previous and only udpating current.
         fid_path_prev=recon_mat.fid_path;
+        fid_path_prev.local=fid_path.local;
         fid_path_prev.current=fid_path.current;
         recon_mat.fid_path=fid_path_prev;
         clear fid_path_prev;

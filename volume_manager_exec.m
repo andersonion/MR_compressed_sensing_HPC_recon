@@ -30,6 +30,7 @@ end
 % headfile=recon_mat.headfile;
 % unpack workstation_settings too
 the_scanner=recon_mat.the_scanner;
+the_workstation=recon_mat.the_workstation;
 remote_workstation=recon_mat.remote_workstation;
 
 log_mode=2;
@@ -71,7 +72,9 @@ cs_queue=CS_env_queue();
 % set an env var to get latest dev code, or will defacto run stable.
 % matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 matlab_path=recon_mat.matlab_path;
-cs_execs=CS_env_execs();
+if ~options.live_run
+    cs_execs=CS_env_execs();
+end
 %%
 if ischar(volume_number)
     volume_number=str2double(volume_number);
@@ -127,8 +130,30 @@ if iscell(status_fid) && numel(status_fid)>1
     single_data_file=false;
     status_fid=status_fid{volume_number};
     if isempty(status_fid)
-        scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,recon_mat.study_workdir,recon_mat.options);
+        % Fetch to volume we will update main later, but we WONT replace
+        % the info inside of the recon_mat file becuase that HAS run into
+        % corruption problems with many volume managers writing to it at
+        % once.
+        % old version grabbing to study dir direct.
+        %scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,recon_mat.study_workdir,recon_mat.options);
+        scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,volume_dir,recon_mat.options);
         status_fid=scan_data_setup.fid{volume_number};
+
+        % compare file age for voldir and study dir version, copy back if newer.
+        v_vol_idx=fullfile(volume_dir,'volume_index.txt');
+        s_vol_idx=fullfile(recon_mat.study_workdir,'volume_index.txt');
+        e_v=dir(v_vol_idx);
+        e_s=dir(s_vol_idx);
+        if ~isempty(status_fid) && numel(e_v) && numel(e_s) && e_s.datenum < e_v.datenum
+            % Considered a random pause of 8-18 seconds to give a
+            % better chance that the volume manager wont cause a data
+            % corruption issue.
+            % Decided it shouldnt be necessary.
+            %pause(8+rand(1)*10);
+            %delete(s_vol_idx);
+            [cp_success,cp_msg]=copyfile(v_vol_idx,s_vol_idx);
+            assert(cp_success==1,'Copy failed with message:%s',cp_msg);
+        end
 % CANT write to recon file! if we do, we'll break our friends!        
 %        recon_mat.Properties.Writable=true;
 %        recon_mat.scan_data_setup=scan_data_setup;
@@ -200,7 +225,8 @@ volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
 % flag_hf_fail=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
 % flag_hf_success=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
 % flag_fail=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
-flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
+% flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
+flag_success=         fullfile(volume_dir,sprintf('vol_send_%s', remote_workstation.name));
 % flag_at_fail=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,remote_workstation.name));
 % flag_at_success=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
 
@@ -223,7 +249,6 @@ vm_slurm_options.job_name = [volume_runno '_volume_manager'];
 vm_slurm_options.reservation = '';
 volume_manager_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_manager.bash']);
 vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.study_workdir);
-vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
 
 if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && volume_number ~=1  )
     %% starting point 0/1
@@ -272,6 +297,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path,vm_args);
 %}
     if ~options.live_run
+        vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
         batch_file = create_slurm_batch_files(volume_manager_batch, ...
             vm_cmd,vm_slurm_options);
         or_dependency = '';
@@ -445,7 +471,6 @@ else
             vsu_slurm_options.reservation = '';
             volume_setup_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_setup_for_CS_recon.bash']);
             vsu_args=sprintf('%s',setup_variables);
-            vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
             if  ~isempty(stage_1_running_jobs)
                 dep_string = stage_1_running_jobs;
                 dep_type = 'afterok-or';
@@ -454,6 +479,7 @@ else
                 dep_type = '';
             end
             if ~options.live_run
+                vsu_cmd = sprintf('%s %s %s', cs_execs.volume_setup,matlab_path, vsu_args);
                 batch_file = create_slurm_batch_files(volume_setup_batch,vsu_cmd,vsu_slurm_options);
                 stage_2_running_jobs = dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
             else
@@ -646,24 +672,30 @@ else
         end
         %% STAGE5 Scheduling
         % send data to remote workstation and write completion flags
+        % also slipping in meta-data handling, both fetch and competion.
         if (starting_point <= 5)
-            warning('TODO finish shipper update');
-            if ~options.keep_work && 0
-                
-                shipper_cmds=cs_recon_volume_transfer_commands();
-                shipper_slurm_options=struct;
-                shipper_slurm_options.v=''; % verbose
-                shipper_slurm_options.s=''; % shared; volume manager needs to share resources.
-                shipper_slurm_options.mem=500; % memory requested; shipper only needs a miniscule amount.
-                shipper_slurm_options.p=cs_queue.gatekeeper; % For now, will use gatekeeper queue for volume manager as well
-                shipper_slurm_options.job_name = [volume_runno '_ship_to_' remote_workstation.name];
-                %shipper_slurm_options.reservation = active_reservation;
+            if ~options.keep_work ...
+                && ~strcmp(remote_workstation.host_name,'localhost') ...
+                && ~strcmp(the_workstation.host_name,remote_workstation.host_name)
+                % transfer commands is obsolete.
+                % sender_cmds=cs_recon_volume_transfer_commands();
+                sender_slurm_options=struct;
+                sender_slurm_options.v=''; % verbose
+                sender_slurm_options.s=''; % shared; volume manager needs to share resources.
+                sender_slurm_options.mem=500; % memory requested; sender only needs a miniscule amount.
+                sender_slurm_options.p=cs_queue.gatekeeper; % For now, will use gatekeeper queue for sender
+                sender_slurm_options.job_name = [volume_runno '_ship_to_' remote_workstation.name];
+                %sender_slurm_options.reservation = active_reservation;
                 % using a blank reservation to force no reservation for this job.
-                shipper_slurm_options.reservation = '';
-                shipper_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_shipper.bash']);
-                %batch_file = create_slurm_batch_files(shipper_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},shipper_slurm_options);
-                if ~exist(flag_success,'file') && numel(shipper_cmds)>0
-                    batch_file = create_slurm_batch_files(shipper_batch,shipper_cmds,shipper_slurm_options);
+                sender_slurm_options.reservation = '';
+                sender_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_sender.bash']);
+                %batch_file = create_slurm_batch_files(sender_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},sender_slurm_options);
+                sender_cmds={
+                    sprintf('sender.pl --data=%s --device=%s --dest=%s --sent_flag=%s', ...
+                    images_dir, remote_workstation.name, volume_runno, flag_success)
+                    };
+                if ~exist(flag_success,'file') && 0 < numel(sender_cmds)
+                    batch_file = create_slurm_batch_files(sender_batch,sender_cmds,sender_slurm_options);
                     dep_status='';
                     if ~options.live_run
                         if stage_4_running_jobs
@@ -685,6 +717,7 @@ else
     end
     %% STAGE5+ Scheduling
     % data has been sent to remote workstation, we just neeed to finish meta-data
+    % this 
     %if (starting_point >= 5)%(starting_point <= 6)
     if (starting_point == 5)%(starting_point <= 6)
         % This is only scheduled at stage 5 because prior to that it wont
@@ -698,7 +731,12 @@ else
         else
             db_inplace(mfilename,'incomplete');
         end
-        %else
+        % maybe this shouldnt be scheduled and we should just try it right
+        % in line? if successuful we'd write archive tag and ship both?
+        stage_5e_running_jobs=schedule_combine_metadata(setup_variables,scan_data_setup.metadata{:});
+        %TODO: write archive tag here?
+        % ship updated headfile and archive tag?
+
         %% live run starting point advance handling
         % this prevents volume manager from running
         % recursively forever.
@@ -741,8 +779,8 @@ else
         vm_slurm_options.reservation = '';
         volume_manager_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_manager.bash']);
         vm_args=sprintf('%s %s %i %s',recon_file,volume_runno, volume_number,recon_mat.study_workdir);
-        vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
         if ~options.live_run
+            vm_cmd = sprintf('%s %s %s', cs_execs.volume_manager,matlab_path, vm_args);
             batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
             %{
             if stage_4_running_jobs
@@ -795,30 +833,6 @@ else
             volume_manager_exec(a{:});clear a;
             pause(1);
         end
-    end
-    %% meta data check
-    % try metadata fetch, but dont concern ourselves if we fail.
-    % includes multi-input, will not replace existing files. 
-    % volume_index has its own special fetch elsewhere becuase of that.
-    for i_m=1:numel(scan_data_setup.metadata)
-        meta_file=scan_data_setup.metadata{i_m};
-        m_dir=recon_mat.study_workdir;
-        if ~single_data_file && reg_match(meta_file,'<FID_NAME>')
-            % per-fid meta data goes into volume_dir, others are stored at
-            % main level.
-            m_dir=volume_dir;
-        end
-        [~,temp_n,~]=fileparts(fid_path.local);
-        meta_file=strrep(meta_file,'<FID_NAME>',temp_n);
-        meta_file=path_convert_platform(meta_file,'lin');
-        % [~,meta_name,meta_ext]=fileparts(meta_file);
-        pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
-                        options.scanner_user, recon_mat.scanner_name, ... 
-                        meta_file, ...
-                        path_convert_platform(m_dir,'lin') );
-                        %fullfile(path_convert_platform(m_dir,'lin'),[meta_name,meta_ext])  ); 
-        [s,sout] = system(pull_cmd);
-        if s~=0; fprintf('%s\n',sout); end
     end
 
     if starting_point == 6
