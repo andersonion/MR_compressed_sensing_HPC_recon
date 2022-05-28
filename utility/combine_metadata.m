@@ -1,4 +1,4 @@
-function combine_metadata(setup_variables,varargin)
+function headfile=combine_metadata(setup_variables,varargin)
 % put all of our metadata together in one headfile in a reasonable order.
 
 setup_var=matfile(setup_variables);
@@ -8,6 +8,9 @@ recon_mat=matfile(setup_var.recon_file);
 the_scanner=recon_mat.the_scanner;
 
 meta_data_cells=varargin;
+if  numel(meta_data_cells)==1 && iscell(meta_data_cells{1})
+    meta_data_cells=meta_data_cells{1};
+end
 
 %% meta data grab 
 % try metadata fetch, but dont concern ourselves if we fail.
@@ -32,7 +35,7 @@ for i_m=1:numel(meta_data_cells)
     meta_file=path_convert_platform(meta_file,'lin');
     % [~,meta_name,meta_ext]=fileparts(meta_file);
     pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
-        options.scanner_user, recon_mat.scanner_name, ...
+        the_scanner.user, the_scanner.name, ...
         meta_file, ...
         path_convert_platform(m_dir,'lin') );
     %fullfile(path_convert_platform(m_dir,'lin'),[meta_name,meta_ext])  );
@@ -74,15 +77,15 @@ if numel(i) && exist(meta_data_cells{i},'file')
 end
 dhf=read_headfile(data_headfile,1,dhf);
 [~,n]=fileparts(setup_var.headfile_path);
-headfile_bak=fullfile(volume_dir,[n '.bak']);
+headfile_bak=fullfile(setup_var.volume_dir,[n '.bak']);
 if ~exist(headfile_bak,'file')
     vhf=read_headfile(setup_var.headfile_path,1);
 else
     vhf=read_headfile(headfile_bak,1);
 end
-t=vhf;
-t=combine_struct(t,dhf);
-t=combine_struct(t,vhf);
+headfile=vhf;
+headfile=combine_struct(headfile,dhf);
+headfile=combine_struct(headfile,vhf);
 % add the classic headfile fields if they're missing
 field_transcriber.fovx={'fov_read',1e3};
 field_transcriber.fovy={'fov_phase',1e3};
@@ -102,17 +105,17 @@ for i=1:numel(fields)
     f_i=field_transcriber.(f_o){1};
     % field mul
     f_m=field_transcriber.(f_o){2};
-    if ~isfield(t,f_i)
+    if ~isfield(headfile,f_i)
         warning('missing %s, cant transcribe to %s',f_i,f_o);
         continue;
     end
     if ~ischar(f_m)
-        t.(f_o)=t.(f_i)*f_m;
+        headfile.(f_o)=headfile.(f_i)*f_m;
     else
-        t.(f_o)=t.(f_i);
+        headfile.(f_o)=headfile.(f_i);
     end
 end
 if ~exist(headfile_bak,'file')
     movefile(setup_var.headfile_path,headfile_bak);
 end
-write_headfile(setup_var.headfile_path,t,'',0)
+write_headfile(setup_var.headfile_path,headfile,'',0)

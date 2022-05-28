@@ -40,9 +40,6 @@ options=recon_mat.options;
 %original_dims(1)=6;
 %scale_file=aux_param2.scaleFile;
 
-default_archive_tag = fullfile(setup_var.images_dir,sprintf('READY_%s',setup_var.volume_runno));
-local_archive_tag_prefix = [ '_' options.target_machine];
-local_archive_tag = sprintf('%s%s',default_archive_tag,local_archive_tag_prefix);
 %% log details
 if ~exist('log_mode','var')
     log_mode = 1;
@@ -557,17 +554,7 @@ end
 unrecog_cell={'planned_ok'};
 unrecog_cell=[unrecog_cell mat_pipe_opt2cell(options.unrecognized_fields)];
 write_civm_image(databuffer,[{['write_civm_raw=' setup_var.images_dir],'overwrite','skip_write_archive_tag'} unrecog_cell]);
-if ~options.live_run
-    if ~exist(local_archive_tag,'file')
-        remote_workstation=recon_mat.remote_workstation;
-        if ~exist(default_archive_tag,'file')
-            write_archive_tag_nodev(setup_var.volume_runno,['/' remote_workstation.name 'space'], ...
-                recon_mat.dim_z,databuffer.headfile.U_code, ...
-                '.raw',databuffer.headfile.U_civmid,true,setup_var.images_dir);
-        end
-        system(sprintf('mv %s %s',default_archive_tag,local_archive_tag));
-    end
-else
+if options.live_run
     warning('Live run always keeps the work :p');
     options.keep_work=1;
 end

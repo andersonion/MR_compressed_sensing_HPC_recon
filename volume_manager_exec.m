@@ -222,12 +222,12 @@ else
 end
 volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
 
-% flag_hf_fail=         fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_FAILED',        volume_runno,remote_workstation.name));
+flag_hf=fullfile(volume_dir,sprintf('sent_hf_%s',remote_workstation.name));
 % flag_hf_success=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
 % flag_fail=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
 % flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
-flag_success=         fullfile(volume_dir,sprintf('vol_send_%s', remote_workstation.name));
-% flag_at_fail=         fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_FAILED',     volume_runno,remote_workstation.name));
+flag_vol=fullfile(volume_dir,sprintf('sent_vol_%s', remote_workstation.name));
+flag_tag=fullfile(images_dir,sprintf('sent_tag_%s',remote_workstation.name));
 % flag_at_success=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
 
 % original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
@@ -239,6 +239,7 @@ flag_success=         fullfile(volume_dir,sprintf('vol_send_%s', remote_workstat
 vm_slurm_options=struct;
 vm_slurm_options.v=''; % verbose
 vm_slurm_options.s=''; % shared; volume manager needs to share resources.
+vm_slurm_options.time='00:10:00'; % max run time 10 minutes, this should be MORE than enough.
 vm_slurm_options.mem=2048; % memory requested; vm only needs a miniscule amount.
 %--In theory only! For yz-array sizes > 2048^2, loading the
 % data of phmask, CSmask, etc can push the memory of 512 MB
@@ -674,6 +675,57 @@ else
         % send data to remote workstation and write completion flags
         % also slipping in meta-data handling, both fetch and competion.
         if (starting_point <= 5)
+            sender_cmds={};
+            %% STAGE5 metadata handling
+            if (starting_point == 5) && ~options.live_run
+                % This is only scheduled at stage 5 because prior to that it wont
+                % work anyway.
+                if strcmp(the_scanner.vendor,'agilent')
+                    % DO NOTHING agilent CANT clean up metadata before acq is
+                    % complete. acq complete should be local/static i think?
+                    % really its "does procpar exist", but idk if i have an easy
+                    % one of those righ tnow.
+                    if ~strcmp(data_mode,'streaming')
+                        % want to replace this messy thing witht something else.
+                        % stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
+                        headfile=finish_headfile(); % a missing function
+                        final_hf=1;
+                    end
+                else
+                    % maybe this shouldnt be scheduled and we should just try it right
+                    % in line? if successuful we'd write archive tag and ship both?
+                    %stage_5e_running_jobs=schedule_combine_metadata(setup_variables,scan_data_setup.metadata{:});
+                    %TODO: write archive tag here?
+                    % ship updated headfile and archive tag?
+                    db_inplace(mfilename,'incomplete');
+                    % Writes to the headfile location as part of
+                    % setup_variables.
+                    headfile=combine_metadata(setup_variables,scan_data_setup.metadata);
+                    final_hf=1;
+                end
+                if final_hf
+                    %remote_tag_location=fullfile(remote_workstation.data_directory,'Archive_tags');
+                    % sender takes care of this for us, it gets the right
+                    % place to put data prior to shoving it off. 
+                    % only the data_directory is waffely, and that is only
+                    % as good as the archive connetion setup.
+                    img_format='.raw';
+                    if isfield(headfile,'U_code') && isfield(headfile,'U_civmid')
+                        [~,local_tag_file]=write_archive_tag(volume_runno, remote_workstation.work_directory, ...
+                            recon_mat.dim_z, headfile.U_code, img_format, headfile.U_civmid, false, volume_dir);
+                    end
+                    % send hf
+                    hf_send_location=path_convert_platform(fullfile(volume_runno,sprintf('%simages',volume_runno)),'lin');
+                    sender_cmds{end+1}= ...
+                        sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
+                        headfile_path, remote_workstation.name, hf_send_location, flag_hf);
+                    % send tag
+                    sender_cmds{end+1}= ...
+                        sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
+                        local_tag_file, remote_workstation.name, 'Archive_tags', flag_tag);
+                end
+            end
+            %% prep to send data
             if ~options.keep_work ...
                 && ~strcmp(remote_workstation.host_name,'localhost') ...
                 && ~strcmp(the_workstation.host_name,remote_workstation.host_name)
@@ -690,11 +742,17 @@ else
                 sender_slurm_options.reservation = '';
                 sender_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_sender.bash']);
                 %batch_file = create_slurm_batch_files(sender_batch,{rm_previous_flag,local_size_cmd remote_size_cmd eval_cmd},sender_slurm_options);
-                sender_cmds={
-                    sprintf('sender.pl --data=%s --device=%s --dest=%s --sent_flag=%s', ...
-                    images_dir, remote_workstation.name, volume_runno, flag_success)
-                    };
-                if ~exist(flag_success,'file') && 0 < numel(sender_cmds)
+                log_mode = 1;
+                if ~exist(flag_vol,'file')
+                    sender_cmds= horzcat({  sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
+                        images_dir, remote_workstation.name, volume_runno, flag_vol)}, sender_cmds);
+                    log_msg=sprintf('volume %s will be stent to %s',volume_runo,remote_workstation.name);
+                else 
+                    log_msg =sprintf('volume %s previously sent to %s\nTo retry remove %s', ...
+                        volume_runno,remote_workstation.name,flag_vol);
+                end
+                yet_another_logger(log_msg,log_mode,log_file);
+                if 0 < numel(sender_cmds)
                     batch_file = create_slurm_batch_files(sender_batch,sender_cmds,sender_slurm_options);
                     dep_status='';
                     if ~options.live_run
@@ -715,40 +773,13 @@ else
             end
         end
     end
-    %% STAGE5+ Scheduling
-    % data has been sent to remote workstation, we just neeed to finish meta-data
-    % this 
-    %if (starting_point >= 5)%(starting_point <= 6)
-    if (starting_point == 5)%(starting_point <= 6)
-        % This is only scheduled at stage 5 because prior to that it wont
-        % work anyway.
-        % originally it was embedded in stage 5 scheduling, however somehow
-        % it kept leeking jobs... Adjusted to timeout after 3 minutes
-        % now(internal to the handlers function) 
-        %if ~options.live_run
-        if strcmp(the_scanner.vendor,'agilent')
-            stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
-        else
-            db_inplace(mfilename,'incomplete');
-        end
-        % maybe this shouldnt be scheduled and we should just try it right
-        % in line? if successuful we'd write archive tag and ship both?
-        stage_5e_running_jobs=schedule_combine_metadata(setup_variables,scan_data_setup.metadata{:});
-        %TODO: write archive tag here?
-        % ship updated headfile and archive tag?
-
-        %% live run starting point advance handling
-        % this prevents volume manager from running
-        % recursively forever.
-        if options.live_run && exist('ship_st','var') && ship_st==0
-            starting_point=6;
-        end
-        %end
-
-
-
+    %% live run starting point advance handling
+    % this prevents volume manager from running
+    % recursively forever.
+    % this needs to move
+    if starting_point==5 && options.live_run && exist('ship_st','var') && ship_st==0
+        starting_point=6;
     end
-    
     % Why is volume manager only re-scheduled if we have stage 4(cleanup)
     % jobs? That seems like a clear mistake! We should be rescheduling so
     % long as we're not stage 6. 
