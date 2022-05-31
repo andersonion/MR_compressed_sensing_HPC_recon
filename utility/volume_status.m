@@ -87,6 +87,8 @@ stage_n=stage_n+1;
 status_setup(stage_n).code='Send volume to workstation and write recon_completed flag.';
 status_setup(stage_n).pct=2;
 try
+    setup_variables = fullfile(volume_dir, [ volume_runno '_setup_variables.mat']);
+    setup_var=matfile(setup_variables);
     flags={setup_var.flag_vol,setup_var.flag_hf,setup_var.flag_tag};
     status_setup(stage_n).check=@() send_vol_is_complete(volume_dir,volume_runno,flags{:});
 catch
@@ -133,7 +135,7 @@ if starting_point==numel(status_setup) && stage_fraction==1
     status_setup(stage_n).code='All work done; do nothing.';
     status_setup(stage_n).pct=0;
     status_setup(stage_n).check=@() 1;
-    starting_point=starting_point+1;
+    %starting_point=starting_point+1;
 end
 
 % vol_status=sprintf('%s',status_codes{starting_point+1},vol_status);

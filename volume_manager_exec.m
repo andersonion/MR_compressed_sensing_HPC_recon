@@ -227,7 +227,7 @@ flag_hf=fullfile(volume_dir,sprintf('sent_hf_%s',remote_workstation.name));
 % flag_fail=            fullfile(images_dir,sprintf('.%s_send_images_to_%s_FAILED',          volume_runno,remote_workstation.name));
 % flag_success=         fullfile(images_dir,sprintf('.%s_send_images_to_%s_SUCCESSFUL',      volume_runno,remote_workstation.name));
 flag_vol=fullfile(volume_dir,sprintf('sent_vol_%s', remote_workstation.name));
-flag_tag=fullfile(images_dir,sprintf('sent_tag_%s',remote_workstation.name));
+flag_tag=fullfile(volume_dir,sprintf('sent_tag_%s',remote_workstation.name));
 % flag_at_success=      fullfile(images_dir,sprintf('.%s_send_archive_tag_to_%s_SUCCESSFUL', volume_runno,remote_workstation.name));
 
 % original_archive_tag= fullfile(images_dir,sprintf('READY_%s',volume_runno));
