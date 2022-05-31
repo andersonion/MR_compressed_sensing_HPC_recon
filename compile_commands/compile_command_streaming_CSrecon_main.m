@@ -12,6 +12,8 @@ include_files = {'/cm/shared/workstation_code_dev/recon/CS_v2/gui_info_collect.m
 include_files={
     'hamming.m' 
     'padarray.m'
+    'time_struct.m'
+    'time_units.m'
     };
 function_name='streaming_CS_recon_main_exec.m';
 compile_dir=compile_command__allpurpose(function_name,include_files);%,exec_env_var);
