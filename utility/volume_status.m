@@ -86,7 +86,12 @@ stage_n=stage_n+1;
 % step at 0.1% each
 status_setup(stage_n).code='Send volume to workstation and write recon_completed flag.';
 status_setup(stage_n).pct=2;
-status_setup(stage_n).check=@() send_vol_is_complete(volume_dir,volume_runno);
+try
+    flags={setup_var.flag_vol,setup_var.flag_hf,setup_var.flag_tag};
+    status_setup(stage_n).check=@() send_vol_is_complete(volume_dir,volume_runno,flags{:});
+catch
+    status_setup(stage_n).check=@() 0;
+end
 %% stage setup ready, loop through (backwards) integratnig vol_status
 vol_status=100;% starting at complete, keep working it down. 
 % current working params for each volume status
@@ -152,7 +157,7 @@ if hfinfo.bytes>hf_minKiB*BytesPerKiB
 end
 end
 
-function send_vol_status=send_vol_is_complete(volume_dir,volume_runno)
+function send_vol_status=send_vol_is_complete(volume_dir,volume_runno,flag_vol,flag_hf,flag_tag)
     % this 2 pct represents processing the procpar, and images and headfile
     % to dest engine. We could break this down further, but its probably
     % not worth it. eg, 1.8% is send data, 0.1% is proces procpar, 0.1% is
@@ -164,31 +169,33 @@ function send_vol_status=send_vol_is_complete(volume_dir,volume_runno)
     % Externally that'll be scaled to the "vol_send percent" which was 2 as
     % of this writing
     vol_status=2;
-    %% Check for archive_ready sent flag.
+    %{
+    % old fashioned tag finding
     % Previously checked for recon_completed, but that has since been changed.
-    send_archive_tag = fullfile(volume_dir,sprintf('%simages',volume_runno), ...
+    flag_tag = fullfile(volume_dir,sprintf('%simages',volume_runno), ...
         sprintf('.%s_send_archive_tag_to_*_SUCCESSFUL',volume_runno));
-    send_archive_tag=wildcard_tag_finder(send_archive_tag);
+    flag_tag=wildcard_tag_finder(flag_tag);
+    flag_vol=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
+        sprintf('.%s_send_images_to_*_SUCCESSFUL',volume_runno));
+    flag_vol=wildcard_tag_finder(flag_vol);
+    flag_hf=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
+        sprintf('.%s_send_headfile_to_*_SUCCESSFUL',volume_runno));
+    flag_hf=wildcard_tag_finder(flag_hf);
+    %}
     %% check headfile is complete
     headfile=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
         sprintf('%s.headfile',volume_runno));
     headfile_complete=is_headfile_complete(headfile);
-    if ~exist(send_archive_tag,'file') || ~headfile_complete
+    if ~exist(flag_tag,'file') || ~headfile_complete
         vol_status=vol_status-0.1;
     end
     %% Check sent images
-    send_images=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
-        sprintf('.%s_send_images_to_*_SUCCESSFUL',volume_runno));
-    send_images=wildcard_tag_finder(send_images);
-    if ~exist(send_images,'file')
+    if ~exist(flag_vol,'file')
         vol_status=vol_status-1.8;
     end
     %% check sent headfile
     %send_headfile='FILLMEINTWO';.T00020_m0_send_headfile_to_delos_SUCCESSFUL
-    send_headfile=fullfile(volume_dir,sprintf('%simages',volume_runno), ...
-        sprintf('.%s_send_headfile_to_*_SUCCESSFUL',volume_runno));
-    send_headfile=wildcard_tag_finder(send_headfile);
-    if ~exist(send_headfile,'file')
+    if ~exist(flag_hf,'file')
         vol_status=vol_status-0.1;
     end
     send_vol_status=vol_status/2;

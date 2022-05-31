@@ -111,6 +111,7 @@ types.standard_options={...
     'last_volume',          ' stop reconstructing after volume N.'
     'chunk_size',           ' How many cs slices per slice job. Controls job run time. Ideally we shoot for 5-15 min job time.'
     'CS_preview_data',      ' save a pre recon of kspace and imgspace. Defaults to orthocenter, can specify =volume for whole volume. WILL NOT DO RECON'
+    'volume_retry_delay',   ' when data is not ready, the time in minutes to wait before we try again'
     'roll_data',            ' pre-roll the data before reconstruction'
     'iteration_strategy',   ' the iteration/initalizaiton scheme to use, 10x5 by default. '
     're_init_count',        ' how many times will we be re-initalizing default 4(maybe this is bad because we do one more block of iterations than this implies)'
@@ -565,18 +566,20 @@ if ~exist(complete_study_flag,'file')
         scan_data_setup.fid=local_index.fid;
     end
     %}
+    t_scan_data_definition=tic;
     if ~reg_match(input_data,'volume_index.txt') 
         scan_data_setup=the_scanner.data_definition_cleanup(input_data);
     else
         scan_data_setup=refresh_volume_index(input_data,the_scanner,workdir,options);
     end
     recon_mat.scan_data_setup=scan_data_setup;
-
+    t_scan_data_definition=toc(t_scan_data_definition);
     % given a "fid" file path which is remote OR local, figure out the
     % current status, and return the local, remote and/or streaming file
     % paths
+    t_get_data_mode=tic;
     [data_mode,fid_path]=get_data_mode(the_scanner,workdir,scan_data_setup.fid);
-
+    t_get_data_mode=toc(t_get_data_mode);
     % old rad_mat var was kspace_data_path, but it was for the local
     % file, we only use the local file when it exists, so i'm not
     % saving it separately
@@ -597,6 +600,7 @@ if ~exist(complete_study_flag,'file')
     if reg_match(test_fid,'NO_FILE')
         test_fid=fid_path.remote;
     end
+    t_consistency_check=tic;
     if ~the_scanner.fid_consistency(test_fid, recon_mat.fid_tag_file,0)
         % may want to skip fid consistency for local becuase we have the 
         % whole thing to work on ?
@@ -606,6 +610,7 @@ if ~exist(complete_study_flag,'file')
         yet_another_logger(log_msg,3,log_file,1);
         if isdeployed; quit force; else; error(log_msg); end
     end
+    t_consistency_check=toc(t_consistency_check);
     % returing S_hdr for now for convenience, in the future all important
     % bits will be filed under acq_hdr, and that will be removed.
     [acq_hdr,S_hdr]=load_acq_hdr(the_scanner,recon_mat.fid_tag_file);

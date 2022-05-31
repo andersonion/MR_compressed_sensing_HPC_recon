@@ -255,7 +255,16 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     %% starting point 0/1
     % since we're not ready, ensure at least a 5 minute gap before we try
     % again.
-    vm_slurm_options.begin  = 'now+5minutes';
+    if isnumeric(options.volume_retry_delay)
+        vol_wait=5;
+        if options.volume_retry_delay
+            vol_wait=options.volume_retry_delay;
+        end
+        vol_wait_str=sprintf('%iminutes',vol_wait);
+    else
+        vol_wait_str=options.volume_retry_delay;
+    end
+    vm_slurm_options.begin  = sprintf('now+%s',vol_wait_str);
     running_jobs='';
 %{
     % FID not ready yet, schedule gatekeeper for us.
@@ -329,6 +338,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
         return;
     end
 else
+    setup_var = matfile(setup_variables,'Writable',true);
     stage_1_running_jobs='';
     stage_2_running_jobs='';
     stage_3_running_jobs='';
@@ -448,7 +458,6 @@ else
         if (starting_point <= 2 || ~islogical(options.CS_preview_data) )
             % Schedule setup
             %% Make variable file
-            setup_var = matfile(setup_variables,'Writable',true);
             setup_var.recon_file = recon_file;
             setup_var.volume_number = volume_number;
             setup_var.volume_runno = volume_runno;
@@ -491,6 +500,10 @@ else
         if options.CS_preview_data
             return;
         end
+        %% insert completion flags to setup var, in the future these should move to stage 2
+        setup_var.flag_vol=flag_vol;
+        setup_var.flag_hf=flag_hf;
+        setup_var.flag_tag=flag_tag;
         %% STAGE3 Scheduling
         % readout slices
         if (starting_point <= 3)
@@ -677,7 +690,7 @@ else
         if (starting_point <= 5)
             sender_cmds={};
             %% STAGE5 metadata handling
-            if (starting_point == 5) && ~options.live_run
+            if starting_point == 5 && ~options.live_run
                 % This is only scheduled at stage 5 because prior to that it wont
                 % work anyway.
                 if strcmp(the_scanner.vendor,'agilent')
@@ -746,7 +759,7 @@ else
                 if ~exist(flag_vol,'file')
                     sender_cmds= horzcat({  sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
                         images_dir, remote_workstation.name, volume_runno, flag_vol)}, sender_cmds);
-                    log_msg=sprintf('volume %s will be stent to %s',volume_runo,remote_workstation.name);
+                    log_msg=sprintf('volume %s will be sent to %s',volume_runno,remote_workstation.name);
                 else 
                     log_msg =sprintf('volume %s previously sent to %s\nTo retry remove %s', ...
                         volume_runno,remote_workstation.name,flag_vol);

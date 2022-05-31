@@ -2,7 +2,7 @@ function headfile=combine_metadata(setup_variables,varargin)
 % put all of our metadata together in one headfile in a reasonable order.
 
 setup_var=matfile(setup_variables);
-setup_var.headfile_path
+% setup_var.headfile_path
 
 recon_mat=matfile(setup_var.recon_file);
 the_scanner=recon_mat.the_scanner;
@@ -16,6 +16,7 @@ end
 % try metadata fetch, but dont concern ourselves if we fail.
 % includes multi-input, will not replace existing files.
 % volume_index has its own special fetch elsewhere becuase of that.
+t_meta=tic;
 for i_m=1:numel(meta_data_cells)
     meta_file=meta_data_cells{i_m};
     %{
@@ -44,6 +45,10 @@ for i_m=1:numel(meta_data_cells)
     [~,meta_name,meta_ext]=fileparts(meta_file);
     meta_data_cells{i_m}=fullfile(m_dir,[meta_name, meta_ext]);
 end
+meta_resolve_time=toc(t_meta);
+log_msg=sprintf('meta resolve time %s\n',time_struct(meta_resolve_time).string());
+fprintf(log_msg);
+% yet_another_logger(log_msg,log_mode,log_file);
 %% Temporarily save_vol_data_headfile here eventually, this'll
 % be take care of ahead of time by volume setup.
 data_headfile=save_vol_data_headfile(setup_variables);
