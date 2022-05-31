@@ -23,7 +23,7 @@ misguided_status_code = 0;
 scale_target=2^16-1;
 
 if ~isdeployed
-
+    C___=cell(0);
 else
     % for all execs run this little bit of code which prints start and stop time using magic.
     C___=exec_startup();
@@ -188,12 +188,13 @@ end
 
 %% check on temp file, try to get amount complete, or exit on fail
 temp_file_available = 1;
-if exist(setup_var.temp_file,'file')
+if ~exist(setup_var.temp_file,'file')
     temp_file_available = 0;
 end
 error_flag=~temp_file_available;
 if temp_file_available
     [tmp_header,slices_with_iterations,unreconned_slices,t_id] = load_cstmp_hdr(setup_var.temp_file);
+    C___{end+1}=onCleanup(@() fclose(t_id));
     if continue_recon_enabled && ~variable_iterations
         unreconned_slices = length(find(tmp_header<options.Itnlim));
     end
@@ -211,7 +212,6 @@ else
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
 if ~temp_file_available
-    fclose(t_id);
     if isdeployed
         quit force;
     else

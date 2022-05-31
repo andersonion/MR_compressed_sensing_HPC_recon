@@ -585,7 +585,8 @@ else
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
-                parfor ch_num=1:num_chunks
+                %parfor ch_num=1:num_chunks
+                for ch_num=1:num_chunks
                     %parfor ch_num=1:num_chunks
                     % extract this selection of slice indicies
                     sx=slices_to_process(:,ch_num);
