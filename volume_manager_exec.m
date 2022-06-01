@@ -555,8 +555,8 @@ else
             end
             if ~exist(temp_file,'file') || length(tmp_header) <= 2
                 % no temp file, or it failed to load
-                recon_dims=1:recon_mat.original_dims;
-                slices_to_process = recon_dims(1);
+                recon_dims=recon_mat.recon_dims;
+                slices_to_process = 1:recon_dims(1);
             end
             % if we have more than one element, or 1 element and its
             % non-zero
@@ -613,13 +613,17 @@ else
                     %}
                     
                         % force single_range output
+                        %{
                         if ~options.slice_randomization
+                            % problems here when we dont have a range of
+                            % work to do. 
                             slice_ranges=range_condenser(sx,1);
                             fmt=sprintf('%%0%ii_to_%%0%ii',zero_width,zero_width);
                             slice_string=sprintf(fmt,slice_ranges{1}(1),slice_ranges{1}(end));
                         else
+                        %}
                             slice_string=sprintf('%i ',sx);
-                        end
+                        % end
                         swr_args= sprintf('%s %s %s',setup_variables, slice_string);
                         swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
                         if  stage_2_running_jobs
@@ -665,6 +669,9 @@ else
             vcu_slurm_options.s=''; % shared; volume setup should to share resources.
             vcu_slurm_options.mem=66000; % memory requested; vcu needs a significant amount; could do this smarter, though.
             vcu_slurm_options.p=cs_queue.full_volume; % Really want this to be high_priority, and will usually be that.
+            % volume cleanup job name MUST match slice exec job name
+            % because we use singleton to hold the cleanup behind the slice
+            % jobs.
             vcu_slurm_options.job_name =[volume_runno '_CS_recon_NS' num2str(options.chunk_size)];
             %vcu_slurm_options.reservation = active_reservation;
             % using a blank reservation to force no reservation for this job.

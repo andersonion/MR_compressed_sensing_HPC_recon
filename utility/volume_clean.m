@@ -42,10 +42,10 @@ if ~options.keep_work && ~options.process_headfiles_only
     % When streaming procpar's are completed independent of this function,
     % and much later, so we're blind to them. 
     cleanup_ready=0;
-    if exist(setup_var.headfile,'file')
+    if exist(setup_var.headfile_path,'file')
         BytesPerKiB=2^10;
         hf_minKiB=20;
-        hfinfo=dir(setup_var.headfile);
+        hfinfo=dir(setup_var.headfile_path);
         if hfinfo.bytes>hf_minKiB*BytesPerKiB
             cleanup_ready=1;
         end

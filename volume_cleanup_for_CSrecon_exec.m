@@ -117,11 +117,7 @@ else %if (setup_var.volume_number > 1)
   error_flag = 1;
   log_msg =sprintf('Volume %s: cannot find scale file: (%s); DYING.\n',setup_var.volume_runno,recon_mat.scale_file);
   yet_another_logger(log_msg,log_mode,log_file,error_flag);
-  if isdeployed
-      quit force
-  else
-      error(log_msg);
-  end
+  if isdeployed; quit force; else error(log_msg); end
 end
 
 %% get options into base workspace.
@@ -211,12 +207,8 @@ else
     end
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
-if ~temp_file_available
-    if isdeployed
-        quit force;
-    else
-        error(log_msg);
-    end
+if ~temp_file_available|| error_flag
+    if isdeployed; quit(1,'force'); else error(log_msg); end
 end
 
 log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',setup_var.volume_runno,setup_var.temp_file);
@@ -355,7 +347,7 @@ clear suggested_final_scale sc_wc fid_sc;
 read_time = toc;
 log_msg =sprintf('Volume %s: Done reading in temporary data and slice-wise post-processing; Total elapsed time: %0.2f seconds.\n',setup_var.volume_runno,read_time);
 yet_another_logger(log_msg,log_mode,log_file);
-fclose(t_id);
+%fclose(t_id);
 
 %% Save complex data for QSM BEFORE the possibility of a fermi filter being
 % applied.
@@ -558,7 +550,7 @@ if options.live_run
     warning('Live run always keeps the work :p');
     options.keep_work=1;
 end
-if ~options.keep_work && ~options.process_headfiles_only && ~options.live_fun
+if ~options.keep_work && ~options.process_headfiles_only && ~options.live_run
     % Lets adjust to keeping work until our final headfile is complete.
     % That is, its more than 20KiB big. 
     % 20 was chosen because typical procpars are 60KiB, and incomplete
