@@ -702,6 +702,7 @@ else
             if starting_point == 5 && ~options.live_run
                 % This is only scheduled at stage 5 because prior to that it wont
                 % work anyway.
+                %img_format='.raw';
                 if strcmp(the_scanner.vendor,'agilent')
                     % DO NOTHING agilent CANT clean up metadata before acq is
                     % complete. acq complete should be local/static i think?
@@ -731,10 +732,9 @@ else
                     % place to put data prior to shoving it off. 
                     % only the data_directory is waffely, and that is only
                     % as good as the archive connetion setup.
-                    img_format='.raw';
                     if isfield(headfile,'U_code') && isfield(headfile,'U_civmid')
                         [~,local_tag_file]=write_archive_tag(volume_runno, remote_workstation.work_directory, ...
-                            recon_mat.dim_z, headfile.U_code, img_format, headfile.U_civmid, false, volume_dir);
+                            recon_mat.dim_z, headfile.U_code, headfile.F_imgformat, headfile.U_civmid, false, volume_dir);
                     end
                     % send hf
                     hf_send_location=path_convert_platform(fullfile(volume_runno,sprintf('%simages',volume_runno)),'lin');
