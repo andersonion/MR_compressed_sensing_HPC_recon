@@ -5,8 +5,9 @@ function scan_data_setup = refresh_volume_index(input_data,the_scanner,study_wor
 % This is reduce chance of collision with many things grabbing it.
 min_index_age=5;
 if ~exist(input_data,'file')
+    input_data=path_convert_platform(input_data,'linux');
     index_fetch=sprintf('puller_simple -o -f file -u %s %s ''%s'' ''%s''',...
-        options.scanner_user, the_scanner.name, path_convert_platform(input_data,'linux'), path_convert_platform(study_workdir,'lin'));
+        options.scanner_user, the_scanner.name, input_data, path_convert_platform(study_workdir,'lin'));
 else
     index_fetch=sprintf('cp -p ''%s'' ''%s'' ',  input_data, study_workdir);
 end
