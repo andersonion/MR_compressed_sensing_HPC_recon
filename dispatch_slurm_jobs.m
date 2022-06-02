@@ -1,177 +1,195 @@
-function [ jobids,msg1,msg2 ] = dispatch_slurm_jobs( batch_file,slurm_options_string,optional_dependencies,optional_dependency_type )
+function [ jobs, msg_out, msg_backup ] = dispatch_slurm_jobs( batch_file, slurm_options_string, dep_jobs, dep_type )
 % Custom handling of using the sbatch command
+% dep_jobs is supposed to be a : separated list of jobs
+% dep type is one of slurms dependecny types OR a special -or variant which
+% will allow any of the dependencies to satisfy the start criteria.
+%
+% internally that means use ? separator with slurm
 %
 % Copyright Duke University
 % Authors: Russell Dibb, James J Cook, Robert J Anderson, Nian Wang, G Allan Johnson
 
-jobids=0;
+if ~exist('slurm_options_string','var')
+    slurm_options_string='';
+end
+if ~exist('dep_jobs','var')
+  dep_jobs='';
+end
+if ~exist('dep_type','var')
+dep_type='';
+end
+
 dependencies='';
 dependency_string = '';
-msg1='';
-msg2='';
+or_flag = 0;
+old_slurm = 0;
 
 if exist(batch_file,'file') % batch_file could just be a naked command
-    bf_array = strsplit(batch_file,'/');
-    batch_file_name=bf_array(length(bf_array));
-    batch_file_name=batch_file_name{1};
-    bf_array(length(bf_array)) =[];
-    default_dir = strjoin(bf_array,'/');
-    if ~strcmp(default_dir(end),'/')
-       default_dir = [default_dir '/']; 
-    end
+    [default_dir,t_n,t_e]=fileparts(batch_file);
+    batch_file_name=[t_n,t_e];
     %%% DIRTY RESERVATION PATCH DUE TO ENV OVERRIDEING CONTENTS OF
     %%% BATCH FILE.
     % only do this if we have an sbatch file, and there is no reservation
     % string in the current dispatch to minimize collateral damage.
-    if isempty(regexpi(slurm_options_string,'.*reservation.*'))
-        [s,o]=system(sprintf('sed -rn ''s/.*(--reservation.*)/\\1/p'' %s',batch_file));
-        if s==0
-            slurm_options_string=[slurm_options_string ' ' strtrim(o)];
+    %if isempty(regexpi(slurm_options_string,'.*reservation.*'))
+    if ~reg_match(slurm_options_string,'.*reservation.*')
+        fid = fopen(batch_file);
+        batch_lines = textscan(fid, '%s', 'Delimiter', '\n');
+        fclose(fid);
+        % unwrap cell into cell of lines
+        if numel(batch_lines)==1&&iscell(batch_lines{1})
+            batch_lines=batch_lines{1}; end
+        res_match='.*(--reservation.*)';
+        res_idx = ~cellfun(@isempty,regexp(batch_lines,res_match));
+        assert(sum(res_idx)<=1,'error handling reservation bits from sbatch file');
+        if sum(res_idx)
+            opt=regexp(batch_lines{res_idx},res_match,'tokens');
+            opt=char(string(opt));
+            %[s,opt]=system(sprintf('sed -rn ''s/.*(--reservation.*)/\\1/p'' %s',batch_file));
+            %if s==0
+            slurm_options_string=[slurm_options_string ' ' strtrim(opt)];
+            %end
         end
+        clear fid res_match res_idx opt;
     end
     %%%
     %%%
 end
 
-or_flag = 0;
-old_slurm = 0;
-% {
-if exist('optional_dependency_type','var') && ~isempty(strfind(optional_dependency_type,'-or'))
-    
+if reg_match(dep_type,'-or')
     [~,s_version]=system('scontrol version');
-    
-    if ~isempty(strfind(s_version,'slurm 2.5.7'))
+    if reg_match(s_version,'slurm 2.5.7')
         old_slurm=1;
     end
-    optional_dependency_type((end-2):end) = [];
+    clear s_version;
+    %dep_type((end-2):end) = [];
+    dep_type=strrep(dep_type,'-or','');
     or_flag = 1;
 end
-%}
 
-if exist('optional_dependencies','var') && ~isempty(optional_dependencies)
-    
-    od_array_1 = strsplit(strjoin(strsplit(optional_dependencies,','),':'),':');
-    
-    dep_test = str2double(od_array_1{1});
-    
+jobs={};
+if ~isempty(dep_jobs)
+    % input is expected to NOT be fully slurm compliant
+    % it should be at most 1 deptype, and a list of jobs, OR a list of jobs and separate type.
+    % the list is either comma or colon separated.
+    dep_spec=strsplit(dep_jobs,{',',':'});
+    dep_test=str2double(dep_spec{1});
     if ~isnumeric(dep_test) || isnan(dep_test)
-        optional_dependency_type = od_array_1{1};
-        od_array_1(1)=[];
+        % if the first thing is a string, it must be the dependency type.
+        % lets make sure we've only got one dep type
+        assert(isempty(dep_type),' mutliple dependency types found!');
+        dep_type = dep_spec{1};
+        jobs=dep_spec(2:end);
+    else
+        if isempty(dep_type) 
+            dep_type='afterok';
+        end
+        jobs=dep_spec;
     end
-    
-    
-    list='';
-    if ~isempty(od_array_1)
-         list =[':' strjoin(od_array_1,':')];
-    end
-    
-    if ~exist('optional_dependency_type','var')
-        optional_dependency_type = 'afterok';
-    end
-    optional_dependencies = list;
-
-    dependency_string = [optional_dependency_type optional_dependencies];
-elseif exist('optional_dependency_type','var' )
-    dependency_string = optional_dependency_type;
+    dependency_string = strjoin([{dep_type},jobs],':');
+    clear dep_spec;
+else
+    % singletons slip in here.
+    dependency_string = dep_type;
 end
 
-if ~isempty(strfind(dependency_string,':')) && or_flag
-   if old_slurm
-       dependency_string = strrep(dependency_string,optional_dependency_type,'afterany');
-   else
+if numel(jobs) && or_flag
+    % next process will run if at least 1 depenency exits cleanly
+    if ~old_slurm
+        %{
         dep_array = strsplit(dependency_string,':');
         d_type = dep_array{1};
         d_limiter = ['?' d_type ':'];
         dep_array(1)=[];
         dep_array{1}=[d_type ':' dep_array{1}];
         dependency_string = strjoin(dep_array,d_limiter);
+        %}
+        dependency_string=sprintf('%s:%s',dep_type, strjoin(jobs,sprintf('?%s:',dep_type)));
+    else
+        dependency_string = strrep(dependency_string,dep_type,'afterany');
+        error('untested');
    end
 end
-
 if ~isempty(dependency_string)
    dependencies = ['--dependency=' dependency_string]; 
 end
-if exist('slurm_options_string','var')
-    out_test_array = strsplit(slurm_options_string,'--out');
-    out_test = 2 - length(out_test_array);
-    
-    if out_test % no --out specified, use directory of batch file
-        if exist(batch_file,'file') % batch_file could just be a naked command
-            %bf_array = strsplit(batch_file,'/');
-            %bf_array(length(bf_array)) = [];
-            %out_dir = strjoin(bf_array,'/');
-            slurm_out_string = 'slurm-%j.out'; % trying to avoid premature interpretation of '%j'...
-            out_string = sprintf(' --out=%s%s ',default_dir,slurm_out_string);
-            slurm_options_string=[slurm_options_string out_string];
-        end
+
+default_slurm_out_name = 'slurm-%j.out';
+default_slurm_out = fullfile(default_dir,default_slurm_out_name);
+opt = sprintf(' --out=%s ',default_slurm_out);
+if exist(batch_file,'file') % batch_file could just be a naked command
+    if ~reg_match(slurm_options_string,'--out')
+        %out_test_array = strsplit(slurm_options_string,'--out');
+        %out_test = 2 - length(out_test_array);
+        %if out_test % no --out specified, use directory of batch file
+        slurm_options_string=[slurm_options_string opt];
     end
-else
-    slurm_options_string='';
-    if exist(batch_file,'file') % batch_file could just be a naked command
-        %bf_array = strsplit(batch_file,'/');
-        %bf_array(length(bf_array)) =[];
-        %out_dir = strjoin(bf_array,'/');
-        slurm_out_string = 'slurm-%j.out'; % trying to avoid premature interpretation of '%j'...
-        out_string = sprintf(' --out=%s%s ',default_dir,slurm_out_string);
-        slurm_options_string=[slurm_options_string out_string];
-    end
-    % Add other defaults
-    
 end
 
-sbatch_cmd = sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);%['sbatch --requeue --mem=' mem ' -s -p ' queue ' ' slurm_options ' ' setup_dependency ' --job-name=' job_name ' --out=' batch_folder 'slurm-%j.out ' batch_file];
+%['sbatch --requeue --mem=' mem ' -s -p ' queue ' ' slurm_options ' ' setup_dependency ' --job-name=' job_name ' --out=' batch_folder 'slurm-%j.out ' batch_file];
+sbatch_cmd = sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);
+
 % SLOPADASHERY insert sbatch_cmd to our sbatch file :D
 fid = fopen(batch_file, 'a+');
 fprintf(fid, '\n# %s\n', sbatch_cmd);
 fclose(fid);
-
+%% schedule and capture job id
 [sbatch_status,msg]=system(sbatch_cmd);
 if sbatch_status~=0 
     warning('PROBLEM Scheduling with command %s output:%s ',sbatch_cmd,msg);
 end
 msg_string = strsplit(msg,' ');
-jobid = strtrim(msg_string{end});
-msg1=msg;
+jobid=strtrim(msg_string{end});
+c_jobid={};
+if ~isnan(str2double(jobid))
+    c_jobid={jobid};
+end
+msg_out=msg;
+%msg1=msg;
 %disp(msg)
 
-
-if ~isempty(str2num(jobid)) % On successful schedule, schedule a backup job.
-    jobids=jobid;
-    
-    %% Code for creating backup jobs in case originals fail. 25 May 2017, BJA
-    dependencies = [' --dependency=afternotok:' jobid ];
-    backup_sbatch_cmd =  sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);
-    [~,msg]=system(backup_sbatch_cmd);
-    msg_string = strsplit(msg,' ');
-    jobid_bu = strtrim(msg_string{end});
-    msg2=msg;    
-
-    if ~isempty(str2num(jobid_bu))
-        jobids=[jobids ':' jobid_bu];
+enable_backup_jobs=0;
+%if ~isempty(str2num(jobid)) 
+if numel(c_jobid)
+    % if successfully scheduled add jobid to name (and maybe schedule backup)
+    cmd='cp -p ';
+    if ~enable_backup_jobs
+        cmd='mv ';
     end
-    
     if exist(batch_file,'file')
-        %% Rename batch files
-        if  ~isempty(str2num(jobid))
-            rename_sbatch_cmd = ['cp -p ' batch_file ' ' default_dir jobid '_' batch_file_name]; % changed 'mv' to 'cp'
-            system(rename_sbatch_cmd);
-            msg1='';
-        end
-        if   ~isempty(str2num(jobid_bu))
-            rename_sbatch_cmd = ['mv ' batch_file ' ' default_dir jobid_bu '_backup_' batch_file_name]; % New code
-            system(rename_sbatch_cmd);
-            msg2='';
-        end
+        % copy(or move) original sbatch file to jobid_filename.bash
+        rename_sbatch_cmd = sprintf('%s %s %s',cmd, batch_file, fullfile(default_dir, sprintf('%s_%s',jobid,batch_file_name))); % changed 'mv' to 'cp'
+        system(rename_sbatch_cmd);
     end
-else
-    if exist(batch_file,'file')
-        if ~isempty(str2num(jobid))
-            rename_sbatch_cmd = ['mv ' batch_file ' ' default_dir jobid '_' batch_file_name]; % changed 'mv' to 'cp'
+    if enable_backup_jobs
+        %% Code for creating backup jobs in case originals fail. 25 May 2017, BJA
+        dependencies = sprintf(' --dependency=afternotok:%s', c_jobid{1});
+        sbatch_cmd =  sprintf('sbatch %s %s %s',slurm_options_string,dependencies,batch_file);
+        [sbatch_status,msg]=system(sbatch_cmd);
+        if sbatch_status~=0
+            warning('PROBLEM Scheduling with command %s output:%s ',sbatch_cmd,msg);
+        end
+        msg_string = strsplit(msg,' ');
+        jobid = strtrim(msg_string{end});
+        msg_backup=msg;
+        %disp(msg)
+        if ~isnan(str2double(jobid))
+            c_jobid={jobid};
+        end
+        %if   ~isempty(str2num(jobid_bu))
+        if numel(c_jobid)==2
+            cmd='mv'
+            rename_sbatch_cmd = sprintf('%s %s %s',cmd, batch_file, fullfile(default_dir, sprintf('%s_backup_%s',jobid,batch_file_name)));
             system(rename_sbatch_cmd);
-            msg1='';
         end
     end
 end
-
+if ~exist('msg_backup','var')
+    msg_backup='';
+end
+jobs=strjoin(c_jobid,':');
+if ~numel(jobs)
+    jobs=0;
+end
 end
 
