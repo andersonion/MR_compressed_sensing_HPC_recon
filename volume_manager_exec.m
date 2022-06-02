@@ -333,7 +333,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
         volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
     if ~options.live_run
-        quit force
+        quit(1,'force')
     else
         return;
     end
@@ -381,7 +381,7 @@ else
                     log_msg,fid_path.current,recon_mat.fid_tag_file,volume_number,recon_mat.scanner_name,the_scanner.user);
                 log_msg = sprintf('%sCRITICAL ERROR data_mode=%i\n',log_msg,data_mode);
                 yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                if isdeployed; quit force; else error(log_msg); end
+                if isdeployed; quit(1,'force'); else error(log_msg); end
             end
             % Getting subvolume should be the job of volume setup.
             % TODO: Move get vol code into setup!
@@ -425,7 +425,7 @@ else
                     log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
                         scanner,[datapath '/fid']);
                     yet_another_logger(log_msg,log_mode,log_file,error_flag);
-                    if isdeployed; quit force; else; error(log_msg); end
+                    if isdeployed; quit(1,'force'); else; error(log_msg); end
                 end
                 if single_data_file && recon_mat.nechoes > 1 && volume_number == 1
                     error('INCOMPLETE UPDATE');
@@ -585,6 +585,13 @@ else
                 % slice in this for loop would be better named chunk, or
                 % slab
                 % we could parfor this when we're in live_mode.
+                if  stage_2_running_jobs
+                    dep_string = stage_2_running_jobs;
+                    dep_type = 'afterok-or';
+                else
+                    dep_string = '';
+                    dep_type = '';
+                end
                 %parfor ch_num=1:num_chunks
                 for ch_num=1:num_chunks
                     %parfor ch_num=1:num_chunks
@@ -626,18 +633,12 @@ else
                         % end
                         swr_args= sprintf('%s %s %s',setup_variables, slice_string);
                         swr_cmd = sprintf('%s %s %s', cs_execs.slice_recon,matlab_path,swr_args);
-                        if  stage_2_running_jobs
-                            dep_string = stage_2_running_jobs;
-                            dep_type = 'afterok-or';
-                        else
-                            dep_string = '';
-                            dep_type = '';
-                        end
                         c_running_jobs ='';
-                        if options.slice_randomization
-                            fmt=sprintf('set_%%0%ii_rand%i',zero_width,options.chunk_size);
+                        %if options.slice_randomization
+                            %fmt=sprintf('set_%%0%ii_rand%i',zero_width,options.chunk_size);
+                            fmt=sprintf('set_%%0%ii_chunk_sz%i',zero_width,options.chunk_size);
                             slice_string=sprintf(fmt,ch_num);
-                        end
+                        %end
                         slicewise_recon_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_slice' slice_string '_CS_recon.bash']);
                         batch_file = create_slurm_batch_files(slicewise_recon_batch,swr_cmd,swr_slurm_options);
                         [c_running_jobs, msg1,msg2]= dispatch_slurm_jobs(batch_file,'',dep_string,dep_type);
