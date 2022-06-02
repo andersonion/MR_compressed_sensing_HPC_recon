@@ -51,7 +51,7 @@ fprintf(log_msg);
 % yet_another_logger(log_msg,log_mode,log_file);
 %% Temporarily save_vol_data_headfile here eventually, this'll
 % be take care of ahead of time by volume setup.
-data_headfile=save_vol_data_headfile(setup_variables);
+fid_headfile=save_vol_data_headfile(setup_variables);
 %% combine different meta data bits here
 % load incoming scanner data-file aux meta data.
 if reg_match(the_scanner.vendor,'mrsolutions')
@@ -74,23 +74,27 @@ else
     error('unrecognized vendor: %s',the_scanner.vendor);
 end
 if numel(i) && exist(meta_data_cells{i},'file')
-    % acquisition headfile
-    dhf=read_headfile(meta_data_cells{i},1);
+    % acquisition auxilliary metadata
+    meta_hf=read_headfile(meta_data_cells{i},1);
     if ~isempty(hf_prefix)
-        dhf=combine_struct(struct,dhf,hf_prefix);
+        meta_hf=combine_struct(struct,meta_hf,hf_prefix);
     end
 end
-dhf=read_headfile(data_headfile,1,dhf);
+meta_hf=read_headfile(fid_headfile,1,meta_hf);
+% load up the imagedata hf
 [~,n]=fileparts(setup_var.headfile_path);
 headfile_bak=fullfile(setup_var.volume_dir,[n '.bak']);
 if ~exist(headfile_bak,'file')
-    vhf=read_headfile(setup_var.headfile_path,1);
+    image_hf=read_headfile(setup_var.headfile_path,1);
 else
-    vhf=read_headfile(headfile_bak,1);
+    image_hf=read_headfile(headfile_bak,1);
 end
-headfile=vhf;
-headfile=combine_struct(headfile,dhf);
-headfile=combine_struct(headfile,vhf);
+%% build the full hf
+% initializes as image_hf to set the order of fields, this is then added
+% again later to ensure the image_hf values take priority.
+headfile=image_hf;
+headfile=combine_struct(headfile,meta_hf);
+headfile=combine_struct(headfile,image_hf);
 % add the classic headfile fields if they're missing
 field_transcriber.fovx={'fov_read',1e3};
 field_transcriber.fovy={'fov_phase',1e3};
