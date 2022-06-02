@@ -123,6 +123,7 @@ types.standard_options={...
     'fermi_w1',             ''
     'fermi_w2',             ''
     'fid_archive',          ' sends CS_fid to target_machine so we can run fid_archive on it there'
+    'fp32_magnitude',       ' write floating point 32-bit civm raws instead of the default 16-bit unsigned int'
     };
 types.beta_options={...
     'wavelet_dims',         '[filter_size,wave_scale] filter_size can be from 4 to 20, in steps of 2. wave_scale is the final wavelet scale. 4 is generally a good value, it can be increased for larger volumes, but it wont really change your image quality( up or down). We do need to take care that 2^wave_scale <= log2(dim_y/2^scale_count). We think 4 is a good wave scale count. '
@@ -227,6 +228,12 @@ if options.CS_preview_data
        error('bad CS_preview_data value, choose slice or volume');
    end
 end
+if ~options.fp32_magnitude
+    F_imgformat='raw';
+else
+    F_imgformat='fp32';
+end
+
 %% iteration determination with glorious complication !
 % uses "temporary" option re_init_count which is 
 % the number of iteration blocks -1 (becuase Re_init :) ) 
@@ -804,7 +811,7 @@ if ~exist(complete_study_flag,'file')
     end
     % add sktiptable/mask stuff to our recon.mat
     % we do check if we've done this before using the missing matfile check
-    varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
+    varlist=['F_imgformat,dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0
@@ -838,6 +845,7 @@ if ~exist(complete_study_flag,'file')
         bh.A_dti_vols=recon_mat.n_volumes;
         bh.A_channels = 1;
         bh.A_echoes = recon_mat.nechoes;
+        bh.F_imgformat = F_imgformat;
         
         bh.CS_working_array=recon_mat.recon_dims;
         bh.CS_sampling_fraction = recon_mat.sampling_fraction;
