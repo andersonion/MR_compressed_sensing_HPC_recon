@@ -48,7 +48,7 @@ if sum(work_to_do)
     if exist('ME','var') || fid<0 
         close all;
         fprintf('Trouble with opening fid:%s\n',local_fid)
-        quit force
+        quit(1,'force')
     end
     
     bytes_per_point=class_bytes(recon_mat.kspace_data_type);
@@ -70,7 +70,7 @@ recon_mat fields available
     %}
     db_inplace(mfilename,'untested');
     if isdeployed()
-        error('untested');quit force;
+        error('untested');quit(1,'force');
     end
     the_scanner=recon_mat.the_scanner;
     hdr_byte_count=the_scanner.header_bytes + the_scanner.block_header_bytes;

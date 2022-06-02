@@ -82,7 +82,7 @@ else
         log_msg=sprintf('Failure to open /tmp script %s for writing',scr_f);
         % error_due_to_network_issues
         if isdeployed
-            quit force;
+            quit(1,'force');
         else
             error(log_msg);
         end

@@ -392,7 +392,7 @@ for index=1:length(slice_numbers)
                     slice_index,header_info,setup_var.temp_file,tt);
                 yet_another_logger(log_msg,log_mode,log_file,1);
                 if isdeployed
-                    quit force;
+                    quit(1,'force');
                 else
                     error(log_msg);
                 end                
@@ -438,7 +438,7 @@ if  (num_af > 0)
         yet_another_logger(log_msg,log_mode,sprintf('%s,%s',log_file,recon_mat.log_file));
     end
     if isdeployed
-        quit force
+        quit(1,'force')
     else
         error(log_msg);
     end

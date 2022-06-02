@@ -208,7 +208,7 @@ else
 end
 yet_another_logger(log_msg,log_mode,log_file,error_flag);
 if ~temp_file_available|| error_flag
-    if isdeployed; quit(1,'force'); else error(log_msg); end
+    if isdeployed; quit(1,'force'); else; error(log_msg); end
 end
 
 log_msg =sprintf('Volume %s: Reading data from temporary file: %s...\n',setup_var.volume_runno,setup_var.temp_file);

@@ -37,7 +37,7 @@ if ~exist(fid_tag_path,'file')
         error_flag = 1;
         log_msg =sprintf('Original fid_tag path (''%s'') does not exist. Dying now.\n',fid_tag_path);
         yet_another_logger(log_msg,log_mode,'',error_flag);
-        quit force
+        quit(1,'force')
         % end
     end
 end

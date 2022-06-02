@@ -608,7 +608,7 @@ if ~exist(complete_study_flag,'file')
         % consistent too, and its an inexpensive check
         log_msg=sprintf('FID consistency check failed!\n');
         yet_another_logger(log_msg,3,log_file,1);
-        if isdeployed; quit force; else; error(log_msg); end
+        if isdeployed; quit(1,'force'); else; error(log_msg); end
     end
     t_consistency_check=toc(t_consistency_check);
     % returing S_hdr for now for convenience, in the future all important
@@ -656,7 +656,7 @@ if ~exist(complete_study_flag,'file')
             if floor(dx) ~= dx
                 log_msg=sprintf('ERROR pulling dim_x from fid hdr field npoints!\n');
                 yet_another_logger(log_msg,3,log_file,1);
-                if isdeployed; quit force; else; error(log_msg); end
+                if isdeployed; quit(1,'force'); else; error(log_msg); end
             end
             recon_mat.dim_x=dx;
             vs=strsplit(varlist,',');
@@ -921,7 +921,7 @@ if ~exist(complete_study_flag,'file')
                         volume_runno,volume_dir);
                     yet_another_logger(log_msg,log_mode,log_file,1);
                     if isdeployed
-                        quit force
+                        quit(1,'force')
                     else
                         error(log_msg);
                     end

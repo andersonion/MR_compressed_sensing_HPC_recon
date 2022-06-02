@@ -77,7 +77,7 @@ else
     log_msg=sprintf('\nWaiting for the input data for the file ''%s'' was NOT ready after %i minutes of waiting.\n',local_file,wait_time);
     yet_another_logger(log_msg,log_mode,log_file,error_flag);
     if isdeployed
-        quit force;
+        quit(1,'force');
     else
         error(log_msg);
     end
