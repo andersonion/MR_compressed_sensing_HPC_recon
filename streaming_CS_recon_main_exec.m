@@ -49,6 +49,7 @@ if nargin==1 || reg_match(varargin{1},'restart')
         error('restart mode conceptually hard, not supported yet. Sorry for the tease');
     end
     runno=varargin{1+o};
+    fprintf('Restart mode for %s, will start with last use settings.\n',runno);
     % trim 'restart' and runno off the front so we can update options.
     varargin(1:o+1)=[];
     restart_mode=true;
