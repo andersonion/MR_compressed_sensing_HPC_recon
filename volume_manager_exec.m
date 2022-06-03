@@ -732,19 +732,21 @@ else
                     % place to put data prior to shoving it off. 
                     % only the data_directory is waffely, and that is only
                     % as good as the archive connetion setup.
-                    if isfield(headfile,'U_code') && isfield(headfile,'U_civmid')
-                        [~,local_tag_file]=write_archive_tag(volume_runno, remote_workstation.work_directory, ...
-                            recon_mat.dim_z, headfile.U_code, headfile.F_imgformat, headfile.U_civmid, false, volume_dir);
-                    end
                     % send hf
                     hf_send_location=path_convert_platform(fullfile(volume_runno,sprintf('%simages',volume_runno)),'lin');
                     sender_cmds{end+1}= ...
                         sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
                         headfile_path, remote_workstation.name, hf_send_location, flag_hf);
-                    % send tag
-                    sender_cmds{end+1}= ...
-                        sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
-                        local_tag_file, remote_workstation.name, 'Archive_tags', flag_tag);
+                    if isfield(headfile,'U_code') && isfield(headfile,'U_civmid')
+                        [~,local_tag_file]=write_archive_tag(volume_runno, remote_workstation.work_directory, ...
+                            recon_mat.dim_z, headfile.U_code, headfile.F_imgformat, headfile.U_civmid, false, volume_dir);
+                        % send tag
+                        sender_cmds{end+1}= ...
+                            sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
+                            local_tag_file, remote_workstation.name, 'Archive_tags', flag_tag);
+                    else
+                        warning('incomplete headfile, no U_code or U_civmid, cannot neatly finish up. Not archivable. Will not transfer tag');
+                    end
                 end
             end
             %% prep to send data
