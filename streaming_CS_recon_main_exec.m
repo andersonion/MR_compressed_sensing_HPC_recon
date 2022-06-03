@@ -62,7 +62,7 @@ else
     % unpack args to the required trio
     [scanner_name, runno, input_data]=varargin{1:3};
     % trim input args to pass into option handler.
-    varargin=varargin{4:end};
+    varargin=varargin(4:end);
 end
 scratch_drive=getenv('BIGGUS_DISKUS');
 workdir=fullfile(scratch_drive,[runno '.work']);
@@ -71,7 +71,7 @@ log_file=fullfile(workdir,[ runno '_recon.log']);
 % fid_path.local= fullfile(workdir,'fid');
 complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 recon_file = fullfile(workdir,[runno '_recon.mat']);
-recon_mat = matfile(recon_file,'Writable',false);
+recon_mat = matfile(recon_file,'Writable',~restart_mode);
 
 % old function line before joining the scanner data fields
 %function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
