@@ -768,9 +768,9 @@ else
                 if ~exist(flag_vol,'file')
                     sender_cmds= horzcat({  sprintf('sender --data=%s --device=%s --dest=%s --sent_flag=%s', ...
                         images_dir, remote_workstation.name, volume_runno, flag_vol)}, sender_cmds);
-                    log_msg=sprintf('volume %s will be sent to %s',volume_runno,remote_workstation.name);
+                    log_msg=sprintf('volume %s will be sent to %s\n',volume_runno,remote_workstation.name);
                 else 
-                    log_msg =sprintf('volume %s previously sent to %s\nTo retry remove %s', ...
+                    log_msg =sprintf('volume %s previously sent to %s\nTo retry remove %s\n', ...
                         volume_runno,remote_workstation.name,flag_vol);
                 end
                 yet_another_logger(log_msg,log_mode,log_file);
