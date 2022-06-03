@@ -1,5 +1,7 @@
-function streaming_recon_exec(scanner_name, runno, input_data, varargin )
+function streaming_recon_exec(varargin)
 %function streaming_recon_exec(scanner, runno, input, options_cell_array)
+%function streaming_recon_exec(runno)
+%function streaming_recon_exec('restart', runno, options_cell_array)
 %
 % scanner  - short name of scanner to get data input from
 % runno    - run number for output. Multi_volume output will have a suffix
@@ -14,14 +16,19 @@ function streaming_recon_exec(scanner_name, runno, input_data, varargin )
 %
 % option   - for a list and explaination use 'help'.
 %
-% scanner_data for nested structures would be data1/data2
+% input for nested structures would be data1/data2
 % for our agilent scanners
 %   study/series01.fid
 %   study/series01
 % for our mrsolutions scanners
+%   path/to/volume_index.txt
+%   path/to/file.mrd
+%
+% To restart a failed recon the runno
+% ex sreaming_recon_exec N12345
+% 
 % Copyright Duke University
 % Authors: James J Cook, G Allan Johnson
-
 
 % fileinput help for scanners we never made compression work on
 %          - for aspect  '004534', by convention asepect runnumbers are
@@ -31,14 +38,43 @@ function streaming_recon_exec(scanner_name, runno, input_data, varargin )
 %          - list file support? List in radish_scale_bunch format? via
 %          listmaker.
 
+%% Get workdir and main state file 
+% doing this super early so we can easily restart "without" changeing things
+% what will really happen is we'll short circut all option handling.
+restart_mode=false;
+if nargin==1 || reg_match(varargin{1},'restart')
+    o=0;
+    if reg_match(varargin{1},'restart')
+        o=1;
+        error('restart mode conceptually hard, not supported yet. Sorry for the tease');
+    end
+    runno=varargin{1+o};
+    % trim 'restart' and runno off the front so we can update options.
+    varargin(1:o+1)=[];
+    restart_mode=true;
+    clear o;
+else
+    assert(3<=nargin,'wrong input count need scanner, runno, input, or only only runno to restart');
+    % unpack args to the required trio
+    [scanner_name, runno, input_data]=varargin{1:3};
+    % trim input args to pass into option handler.
+    varargin=varargin{4:end};
+end
+scratch_drive=getenv('BIGGUS_DISKUS');
+workdir=fullfile(scratch_drive,[runno '.work']);
+log_file=fullfile(workdir,[ runno '_recon.log']);
+% fid_path.local= fullfile(workdir,[runno '.fid']);
+% fid_path.local= fullfile(workdir,'fid');
+complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
+recon_file = fullfile(workdir,[runno '_recon.mat']);
+recon_mat = matfile(recon_file,'Writable',false);
 
 % old function line before joining the scanner data fields
 %function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
 % matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
 matlab_path=getenv('MATLAB_2021b_PATH');
 recon_type = 'CS_v3.0';
-typical_pa=1.8;
-typical_pb=5.4;
+
 if ~isdeployed
     %% Get all necessary code for reconstruction
     f_path=which('FWT2_PO');
@@ -52,6 +88,10 @@ end
 if numel(varargin)==1 && iscell(varargin{1})
     varargin=varargin{1};
 end
+
+typical_pa=1.8;
+typical_pb=5.4;
+
 % shutting off legacy inputs for now
 legacy_positional_args=0;
 if legacy_positional_args
@@ -293,20 +333,23 @@ end
 if numel(options.wavelet_dims)~=2
     options.wavelet_dims=[12,12];
 end
+
+%% pull the previous options now
+% noteworthy, currently no way to update opts.
+if restart_mode
+  input_data=recon_mat.scanner_data;
+  scanner_name=recon_mat.scanner_name;
+  options=recon_mat.options;
+end
+
 %% Reservation/ENV support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
 cs_queue=CS_env_queue();
 %% Determine where the matlab executables live
 [cs_execs,cs_exec_set]=CS_env_execs();
-%% Get workdir
-scratch_drive=getenv('BIGGUS_DISKUS');
-workdir=fullfile(scratch_drive,[runno '.work']);
-log_file=fullfile(workdir,[ runno '_recon.log']);
-% fid_path.local= fullfile(workdir,[runno '.fid']);
-% fid_path.local= fullfile(workdir,'fid');
-complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
-%% read system/scanner settings
+
+%% read system dest workstation settings
 % check that important things are found
 %engine_constants = load_engine_dependency();
 % scanner_constants = load_scanner_dependency(scanner_name);
@@ -369,7 +412,6 @@ if ~exist(complete_study_flag,'file')
     % only work if a flag_file for complete recon missing
     %% First things first: get specid from user!
     % Create or get one ready.
-    recon_file = fullfile(workdir,[runno '_recon.mat']);
     param_file_name=sprintf('%s.param',runno);
     param_file_path=fullfile(the_workstation.recongui_paramfile_directory,...
         param_file_name);
@@ -434,8 +476,6 @@ if ~exist(complete_study_flag,'file')
         mkdir_cmd = sprintf('mkdir "%s"',workdir);
         [s,sout]=system(mkdir_cmd); assert(s==0,sout);
     end
-    recon_mat = matfile(recon_file,'Writable',true);
-    recon_mat.matlab_path = matlab_path;
     % intentionally re-writing these params instead of avoiding it.
     % cannot directly access structs, so we have to pull headfile out.
     if matfile_missing_vars(recon_file,'headfile')
@@ -443,8 +483,15 @@ if ~exist(complete_study_flag,'file')
     else
         headfile=recon_mat.headfile;
     end
-    recon_mat.runno = runno;
-    recon_mat.scanner_name = scanner_name;
+    if ~restart_mode
+        recon_mat.runno = runno;
+        recon_mat.scanner_name = scanner_name;
+        recon_mat.scanner_data=input_data;
+    else
+        % enable writable for input file, and resume normal
+        recon_mat.Properties.Writable=true;
+    end
+    recon_mat.matlab_path = matlab_path;
     % TODO: generic for studdy/series but wee dont know how new sys will be
     % organized yet
     if strcmp(the_scanner.vendor,'agient')
@@ -460,7 +507,6 @@ if ~exist(complete_study_flag,'file')
     else 
         %scanner_data={scanner_data};
     end
-    recon_mat.scanner_data=input_data;
     headfile.U_runno=runno;
     headfile.U_scanner=scanner_name;
     headfile=combine_struct(headfile,the_scanner.hf);
