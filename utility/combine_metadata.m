@@ -13,9 +13,14 @@ if  numel(meta_data_cells)==1 && iscell(meta_data_cells{1})
 end
 
 %% meta data grab 
-% try metadata fetch, but dont concern ourselves if we fail.
-% includes multi-input, will not replace existing files.
+% clean meta-data definitions and try metadata fetch, 
+% 
+% dont concern ourselves if we fail.
+%
+% Includes handling multi-input, will not replace existing files.
 % volume_index has its own special fetch elsewhere becuase of that.
+% Also, this'll fetch a per volume copy of volume index, not in the volume
+% shared location.
 t_meta=tic;
 for i_m=1:numel(meta_data_cells)
     meta_file=meta_data_cells{i_m};
@@ -126,5 +131,10 @@ for i=1:numel(fields)
 end
 if ~exist(headfile_bak,'file')
     movefile(setup_var.headfile_path,headfile_bak);
+end
+if ~isfield(headfile,'F_imgformat')
+    % Preliminary data patch
+    warning('Missing expected parameter F_imgformat, insterting with valu eof raw');
+    headfile.F_imgformat='raw';
 end
 write_headfile(setup_var.headfile_path,headfile,'',0)
