@@ -27,7 +27,13 @@ if numel(e)
 end
 if fetch_index
     [s,sout] = system(index_fetch);
-    assert(s==0,sout);
+    if s~=0
+        if 1.5 < days(file_age)
+            assert(s==0,sout);
+        else
+            warning(sout);
+        end
+    end
 end
 % cleans up user input to solidly hold REMOTE file locations
 scan_data_setup=the_scanner.data_definition_cleanup(input_data);
