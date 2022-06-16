@@ -255,13 +255,18 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     %% starting point 0/1
     % since we're not ready, ensure at least a 5 minute gap before we try
     % again.
-    if isnumeric(options.volume_retry_delay)
+    if islogical(options.volume_retry_delay) || isnumeric(options.volume_retry_delay)
+        % volume_retry_delay is logical 0/1 or any numeric value
         vol_wait=5;
         if options.volume_retry_delay
+            % any numerical thing EXCEPT 0 will be used as the count of
+            % minutes. I dont know if fractional minutes works
             vol_wait=options.volume_retry_delay;
         end
         vol_wait_str=sprintf('%iminutes',vol_wait);
     else
+        % vol_retry_delay is non-numeric, hopefully char/string containing
+        % proper words to start job
         vol_wait_str=options.volume_retry_delay;
     end
     vm_slurm_options.begin  = sprintf('now+%s',vol_wait_str);
@@ -333,7 +338,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
         volume_runno,running_jobs);
     yet_another_logger(log_msg,log_mode,log_file);
     if ~options.live_run
-        quit(1,'force')
+        quit(0,'force')
     else
         return;
     end
@@ -413,7 +418,7 @@ else
                     % puller is linuxish only, so we gotta make sure we
                     % give it linish paths. 
                     pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
-                        options.scanner_user, recon_mat.scanner_name, ... 
+                        options.scanner_user, recon_mat.scanner_name, ... 13
                         path_convert_platform(fid_path.remote,'lin'), ...
                         path_convert_platform(work_subfolder,'lin'));
                     [s,sout] = system(pull_cmd);
