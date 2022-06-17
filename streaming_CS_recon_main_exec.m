@@ -558,12 +558,14 @@ if ~exist(complete_study_flag,'file')
     puller_test=sprintf('puller_simple -o -f file %s ../../../../home/vnmr1/vnmrsys/tablib/%s %s/%s',...
         the_scanner.name,options.CS_table,workdir,options.CS_table);
     %}
-    puller_test=sprintf('puller_simple -u %s -o -f file %s /home/%s/.bashrc %s_%s_connection_check',...
-        options.scanner_user, the_scanner.name, options.scanner_user, the_scanner.name, options.scanner_user);
+    % puller_test=sprintf('puller_simple -u %s -o -f file %s /home/%s/.bashrc %s_%s_connection_check',...
+    puller_test=sprintf('puller_simple -u %s -o -f file %s /etc/profile connection_check_%s_%s',...
+        options.scanner_user, the_scanner.name, the_scanner.name, options.scanner_user);
     [s,sout]=system(puller_test,'-echo');
     assert(s==0,'Failed to contact scanner, %s',sout);
     
     if ~options.skip_target_machine_check
+        % could switch this to pull /etc/profile too
         puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
             sys_user(),options.target_machine,options.target_machine,sys_user());
         fprintf('Test target_machine (%s) connection...\n',options.target_machine);
@@ -766,7 +768,7 @@ if ~exist(complete_study_flag,'file')
     end
     % local_table_path='test';warning('test hard set table');
     if ~strcmp(data_mode,'streaming') && isempty(local_table_path) ...
-            && strcmp(the_scanner.vendor,'agilent')
+            && strcmp(the_scanner.vendor,'agilent') && exist('agilent_specific','var')
         %%% local or static mode
         if exist('agilent_specific','var')
             %%%

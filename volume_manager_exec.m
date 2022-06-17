@@ -690,8 +690,8 @@ else
             vcu_slurm_options.reservation = ''; 
             volume_cleanup_batch = fullfile(volume_dir, 'sbatch', [ volume_runno '_volume_cleanup_for_CS_recon.bash']);
             vcu_args=sprintf('%s',setup_variables);
-            vcu_cmd = sprintf('%s %s %s', cs_execs.volume_cleanup,matlab_path,vcu_args);
             if ~options.live_run
+                vcu_cmd = sprintf('%s %s %s', cs_execs.volume_cleanup,matlab_path,vcu_args);
                 batch_file = create_slurm_batch_files(volume_cleanup_batch,vcu_cmd,vcu_slurm_options);
                 maybe_im_a_singleton='';
                 if (stage_3_running_jobs)
@@ -722,7 +722,8 @@ else
                     if ~strcmp(data_mode,'streaming')
                         % want to replace this messy thing witht something else.
                         % stage_5e_running_jobs = deploy_procpar_handlers(setup_variables);
-                        headfile=finish_headfile(); % a missing function
+                        %%%headfile=finish_headfile(setup_variables,scan_data_setup.metadata); % a missing function
+                        headfile=combine_metadata(setup_variables,scan_data_setup.metadata); % wait, does combine_metadata work?
                         final_hf=1;
                     end
                 else
