@@ -28,11 +28,16 @@ end
 if fetch_index
     [s,sout] = system(index_fetch);
     if s~=0
-        if 1.5 < days(file_age)
+      warning(sout);
+      scan_data_setup=[];
+      return;
+%{
+        if ~exist('file_age','var') ||  1.5 < days(file_age)
             assert(s==0,sout);
         else
             warning(sout);
         end
+%}
     end
 end
 % cleans up user input to solidly hold REMOTE file locations

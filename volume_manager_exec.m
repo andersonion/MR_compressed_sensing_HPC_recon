@@ -136,9 +136,15 @@ if iscell(status_fid) && numel(status_fid)>1
         % once.
         % old version grabbing to study dir direct.
         %scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,recon_mat.study_workdir,recon_mat.options);
-        scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,volume_dir,recon_mat.options);
-        status_fid=scan_data_setup.fid{volume_number};
 
+        next_scan_data_setup=refresh_volume_index(recon_mat.scanner_data,the_scanner,volume_dir,recon_mat.options);
+        % refresh_volume_index should return either a struct OR an empty array on failure.
+        if ~isnumeric(next_scan_data_setup)
+            scan_data_setup=next_scan_data_setup; clear next_scan_data_setup;
+        else
+            warning('failed to refresh volume index');
+        end
+        status_fid=scan_data_setup.fid{volume_number};
         % compare file age for voldir and study dir version, copy back if newer.
         v_vol_idx=fullfile(volume_dir,'volume_index.txt');
         s_vol_idx=fullfile(recon_mat.study_workdir,'volume_index.txt');
