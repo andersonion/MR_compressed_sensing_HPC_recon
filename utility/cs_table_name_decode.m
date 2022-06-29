@@ -24,7 +24,7 @@ cs_table_regex='CS(?:a|table)?([0-9]+)(x[0-9]+)?_([0-9]+([.][0-9]+)?)x_pa([0-9]+
 regres=regexp(cs_table,cs_table_regex,'tokens');
 regres=regres{1};
 if numel(regres) ~=5
-    error('failed to parse cstable name %s did not match regex %s',CS_table_name,cs_table_regex);
+    error('failed to parse cstable name %s did not match regex %s',cs_table,cs_table_regex);
 end
 if ~exist('dim2','var')
     dim2=str2double(regres{1});
