@@ -52,38 +52,40 @@ else
     % status incomplete
     status_setup(stage_n).check=@() 0;
 end
-stage_n=stage_n+1;
 %% have we pulled this chunk of data to this ppsystem
+stage_n=stage_n+1;
 status_setup(stage_n).code='Extract fid.';
 status_setup(stage_n).pct=4;
 if ~exist('input_data','var')
     status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno);
+elseif exist(input_data','file')
+    status_setup(stage_n).check=@() exist(input_data,'file')>0;
 elseif exist('the_scanner','var')
     status_setup(stage_n).check=@() check_local_fid(the_scanner.fid_file_local(work_subfolder,input_data));
 else
     % bogus condition, just a placeholder
     status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno,input_data);
 end
-stage_n=stage_n+1;
 %% has the workspace.mat and tmp file been created
+stage_n=stage_n+1;
 status_setup(stage_n).code='Run volume setup. (create workspace.mat and .tmp files)';
 status_setup(stage_n).pct=0;
 status_setup(stage_n).check=@() check_vol_setup(work_subfolder,volume_runno);
-stage_n=stage_n+1;
 %% have we reconstucted the cs_recon slices
+stage_n=stage_n+1;
 status_setup(stage_n).code='Slice jobs.';
 status_setup(stage_n).pct=90;
 status_setup(stage_n).check=@() check_recon_slices(volume_dir,volume_runno);
-stage_n=stage_n+1;
 %% have the reconstructed cs slices been written out as image slices, what
+stage_n=stage_n+1;
 % about the headfile
 status_setup(stage_n).code='volume cleanup.';
 status_setup(stage_n).pct=3;
 status_setup(stage_n).check=@() check_img(volume_dir,volume_runno);
-stage_n=stage_n+1;
 %% have we copied image slices to our dest system
 % send final headfile, and send archive tag file are integrated to this
 % step at 0.1% each
+stage_n=stage_n+1;
 status_setup(stage_n).code='Send volume to workstation and write recon_completed flag.';
 status_setup(stage_n).pct=2;
 try

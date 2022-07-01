@@ -125,9 +125,13 @@ elseif strcmp(the_scanner.vendor,'mrsolutions')
     end
     hdr.ray_length=double(dims(1));
     % a guess...
-    hdr.rays_per_block=prod(dims(2:4));
+    % prior to moving echos into the "block" definition
+    %hdr.rays_per_block=prod(dims(2:4));
+    hdr.rays_per_block=prod(dims(2:5));
     %echos=dims(5); %echo
-    hdr.ray_blocks=prod(dims(5:6));
+    % this included echos in the ray_blocks
+    %hdr.ray_blocks=prod(dims(5:6));
+    hdr.ray_blocks=dims(6);
     hdr.rays_acquired_in_total=prod(dims(2:end));
     hdr.bytes_per_block = prod([ ...
         hdr.bytes_per_point, 1+hdr.data_is_complex, ...

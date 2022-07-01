@@ -118,7 +118,7 @@ status_dir=volume_dir;
 if strcmp(fid_path.current,fid_path.local)
     % status_dir=fileparts(fid_path.current);
 end
-clear fid_path;
+%clear fid_path;
 % missing check for full fid here, need to enhance.
 
 % multi-input mode, pluck out the relevant fid to work with, after the
@@ -199,13 +199,19 @@ if isfield(data_mode_check,'data_mode')
     % same check internally. If it does that check it will
     % actually return the value packed into a struct.
     data_mode=data_mode_check.data_mode;
-    fid_path=data_mode_check.fid_path;
+    updated_fid_path=data_mode_check.fid_path;
     clear data_mode_check;
 else
-    [data_mode,fid_path]=get_data_mode(the_scanner, ...
+    [data_mode,updated_fid_path]=get_data_mode(the_scanner, ...
         work_subfolder, status_fid);
 end
-
+if single_data_file && ~strcmp(updated_fid_path.current,updated_fid_path.local)
+    updated_fid_path.local=fid_path.local;
+    fid_path=updated_fid_path;
+else
+    fid_path=updated_fid_path;
+end
+%{
 if single_data_file
     % we've already collected fid_path REFUSE to update remotes by
     % reading back previous and only udpating current. This is only good for
@@ -219,14 +225,20 @@ if single_data_file
 %    recon_mat.Properties.Writable = false;
     clear fid_path_prev;
 end
+%}
 
-
-if exist('fid_path','var') && ~single_data_file
+% this little bit of stuff separates mrsolutions from agilent. 
+if exist('fid_path','var') && (~single_data_file || recon_mat.nechoes > 1)
     volume_fid=fid_path.local;
 else
     volume_fid =     fullfile(work_subfolder,[ volume_runno '.fid']);
 end
 volume_workspace = fullfile(work_subfolder, [volume_runno '_workspace.mat']);
+
+if starting_point==1 && exist(volume_fid,'file')
+% patch a glitch with the way we define status.
+    starting_point=2;
+end
 
 flag_hf=fullfile(volume_dir,sprintf('sent_hf_%s',remote_workstation.name));
 % flag_hf_success=      fullfile(images_dir,sprintf('.%s_send_headfile_to_%s_SUCCESSFUL',    volume_runno,remote_workstation.name));
@@ -356,6 +368,9 @@ else
     stage_4_running_jobs='';
     stage_5_running_jobs='';
     stage_5e_running_jobs='';
+    if ~exist(work_subfolder,'dir')
+        mkdir(work_subfolder);
+    end
     if (~options.process_headfiles_only)
         if starting_point>=4
             fid_path.current='BOGUS_INPUT_FOR_DONE_WORK';
@@ -371,11 +386,6 @@ else
             % first, and that is not likely to fail independently FOR
             % SINGLE FILE ACQUISITIONS. Multi-file acquisitions could
             % totally fail independently, and we've adjusted accordingly.
-            if ~exist(work_subfolder,'dir')
-                % decided to let shis vol manager create its own work folder
-                % warning('  Creating work subfolder to fetch fid, this shouldn''t happen here. This only occurs in exotic testing or recovery conditions.');
-                mkdir(work_subfolder);
-            end
             vol_tag=fullfile(work_subfolder,sprintf('.%s.fid_tag',volume_runno));
             f_tag=recon_mat.fid_tag_file;
             if ~single_data_file
@@ -404,7 +414,7 @@ else
                 % can only operate when static, further we should only
                 % enter this code block if already static.
                 %
-                % This is coded to only trigger for multi-echo,
+                % This was coded to only trigger for multi-echo,
                 % Hopefully single vol will be handled correctly in necho 1 block above.
                 %
                 % schedule local gatekeeper on volume fid
@@ -426,7 +436,7 @@ else
                     pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
                         options.scanner_user, recon_mat.scanner_name, ... 13
                         path_convert_platform(fid_path.remote,'lin'), ...
-                        path_convert_platform(work_subfolder,'lin'));
+                        path_convert_platform(fileparts(fid_path.local),'lin'));
                     [s,sout] = system(pull_cmd);
                     assert(s==0,sout);
                 end
@@ -434,11 +444,11 @@ else
                     % It is assumed that the target of puller is the local_fid
                     error_flag = 1;
                     log_msg =sprintf('Unsuccessfully attempt to pull file from scanner %s: %s. Dying now.\n',...
-                        scanner,[datapath '/fid']);
+                        scanner,[fid_path.remote '/fid']);
                     yet_another_logger(log_msg,log_mode,log_file,error_flag);
                     if isdeployed; quit(1,'force'); else; error(log_msg); end
                 end
-                if single_data_file && recon_mat.nechoes > 1 && volume_number == 1
+                if single_data_file && recon_mat.nechoes > 1 && volume_number == 1 && strcmp(the_scanner.vendor,'agilent')
                     error('INCOMPLETE UPDATE');
                     % Run splitter
                     fs_slurm_options=struct;

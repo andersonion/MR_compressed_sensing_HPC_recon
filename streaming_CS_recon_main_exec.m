@@ -863,7 +863,7 @@ if ~exist(complete_study_flag,'file')
     end
     % add sktiptable/mask stuff to our recon.mat
     % we do check if we've done this before using the missing matfile check
-    varlist=['F_imgformat,dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
+    varlist=['dim_y,dim_z,n_sampled_lines,sampling_fraction,mask,'...
         'CSpdf,phmask,recon_dims,original_mask,original_pdf,original_dims,nechoes,n_volumes'];
     missing=matfile_missing_vars(recon_file,varlist);
     if missing>0

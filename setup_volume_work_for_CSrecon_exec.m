@@ -35,6 +35,29 @@ starting_point=volume_status(setup_var.volume_dir,...
     setup_var.volume_fid, ...
     recon_mat.bytes_per_block);
 
+%{
+
+tomfoollery from volume manager when dealing with data files containing
+more than 1 volume(mgre) Thought I'd need it here, but maybe not.
+
+if isfield(data_mode_check,'data_mode')
+    % volume status which we call really early has to do this
+    % same check internally. If it does that check it will
+    % actually return the value packed into a struct.
+    data_mode=data_mode_check.data_mode;
+    updated_fid_path=data_mode_check.fid_path;
+    clear data_mode_check;
+else
+    [data_mode,updated_fid_path]=get_data_mode(the_scanner, ...
+        work_subfolder, status_fid);
+end
+if single_data_file && ~strcmp(updated_fid_path.current,updated_fid_path.local)
+    updated_fid_path.local=fid_path.local;
+    fid_path=updated_fid_path;
+else
+    fid_path=updated_fid_path;
+end
+%}
 
 make_workspace = 0;
 make_tmp = 0;
@@ -95,7 +118,12 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         db_inplace(mfilename,'uncertain formatting');
         % didnt get this tested yet, had some troubles around getting
         % trailing meta data, which might be a big deal
+%%%% INSERT echo reduction here? so we dont waste time/effort (save/load)ing for fun
         [hdr,data]=load_mrd(setup_var.volume_fid, process_precision);
+        if recon_mat.nechoes>1
+            warning('multi echo eliminating other echos');
+            data=data(:,:,:,:,volume_number);
+        end
         vol_hf_args{end+1}=hdr;
     elseif strcmp(the_scanner.vendor,'agilent')
        data = load_fidCS(setup_var.volume_fid, ...
