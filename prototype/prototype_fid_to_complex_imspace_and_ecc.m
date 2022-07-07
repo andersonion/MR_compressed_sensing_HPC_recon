@@ -135,3 +135,29 @@ parfor is=1:numel(suffix)
     s{is}=ps;
     sout{is}=psout
 end
+%% reload complex parts to a complex
+n=463;
+spread=5;
+d=cell(1,spread);
+h=cell(1,spread);
+i=0;
+slice_idx=round(n-0.5*spread):round(n+0.5*spread);
+for n=slice_idx
+    i=i+1;
+    slice_ri=cell(1,2);
+    for is=1:numel(suffix)
+        slice_file=sprintf('y:/.jamesdirtyscratchspace/co_reg_N58204_m000%s-work/hc/%s_%i_m000.nhdr',suffix{is},suffix{is},n);
+        [slice_ri{is},hdr]=nrrdread(slice_file);
+    end
+    %[h,d]=read_civm_image(test)
+    d{i}=complex(slice_ri{1},slice_ri{2});
+    h{i}=hdr;
+end
+%% move back to kspace
+sel=zeros([spread,size(d{1})],'like',d{1});
+for s=1:numel(d)
+    sel(s,:,:)=d{s};
+    temp_data=d{s};
+    temp_data=fftshift(fftshift(fft(fft(fftshift(fftshift(temp_data,1),2),[],1),[],2),1),2);
+    sel(s,:,:)=temp_data;
+end
