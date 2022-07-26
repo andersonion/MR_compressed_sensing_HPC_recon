@@ -16,6 +16,13 @@ function [hdr,S_hdr]= load_acq_hdr(the_scanner,data_file)
 % bytes_per_point - bytes per point(before accounting for complex numbers)
 % data_type - matlab type name
 % data_is_complex - is data real numbers or complex-numbers
+
+tmp = the_scanner;
+if ischar(the_scanner)
+    the_scanner = struct;
+    the_scanner.vendor = tmp;
+end
+
 hdr=struct;
 if strcmp(the_scanner.vendor,'agilent')
     % if need be we can also add the_scanner.header_type
