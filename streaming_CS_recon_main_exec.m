@@ -626,11 +626,11 @@ if ~exist(complete_study_flag,'file')
     end
     %}
     t_scan_data_definition=tic;
-    if ~reg_match(input_data,'volume_index.txt') 
-        scan_data_setup=the_scanner.data_definition_cleanup(input_data);
-    else
+    % if ~reg_match(input_data,'volume_index.txt') 
+    %     scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+    % else
         scan_data_setup=refresh_volume_index(input_data,the_scanner,workdir,options);
-    end
+    % end
     recon_mat.scan_data_setup=scan_data_setup;
     t_scan_data_definition=toc(t_scan_data_definition);
     % given a "fid" file path which is remote OR local, figure out the
