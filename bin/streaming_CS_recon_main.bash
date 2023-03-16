@@ -5,7 +5,7 @@ if [ -z "$CS_CODE_DEV" ]; then
     declare -x CS_CODE_DEV=stable;
 fi;
 if [ -z "$MATLAB_EXEC_PATH" ]; then
-    declare -x MATLAB_EXEC_PATH=$WORKSTATION_HOME/matlab_execs;
+    declare -x MATLAB_EXEC_PATH=$WORKSTATION_AUX/matlab_execs;
 fi;
 exec_path="$MATLAB_EXEC_PATH/streaming_CS_recon_main_executable/$CS_CODE_DEV/run_streaming_CS_recon_main_exec_builtin_path.sh";
 if [ ! -f $exec_path ]; then
@@ -23,7 +23,7 @@ fi;
 echo "# start $CS_CODE_DEV exec ($exec_path)"
 echo "# with args ( $@ $c_force)";
 # this echo captures the command used to the activity_log.
-# It might be good to use the activity_log matab function, but I dont think it works for execs.
+# It might be good to use the activity_log matlab function, but I dont think it works for execs.
 echo -e "$(date +"%F_%T")\t$USER\t$0\t$@ $c_force" >> $BIGGUS_DISKUS/activity_log.txt
 # Run recon.
 $exec_path $@ $c_force
