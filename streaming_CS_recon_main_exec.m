@@ -1,4 +1,4 @@
-function streaming_recon_exec(varargin)
+function streaming_CS_recon_main_exec(varargin)
 %function streaming_recon_exec(scanner, runno, input, options_cell_array)
 %function streaming_recon_exec(runno)
 %function streaming_recon_exec('restart', runno, options_cell_array)
@@ -719,11 +719,11 @@ if ~exist(complete_study_flag,'file')
             end
             recon_mat.dim_x=dx;
             vs=strsplit(varlist,',');
-            for vn=1:numel(vs)
-                if isnumeric(recon_mat.(vs{vn})) % && ~ischar(m.(vs{vn}))
-                    recon_mat.(vs{vn})=double(recon_mat.(vs{vn}));
+            for volume_number=1:numel(vs)
+                if isnumeric(recon_mat.(vs{volume_number})) % && ~ischar(m.(vs{vn}))
+                    recon_mat.(vs{volume_number})=double(recon_mat.(vs{volume_number}));
                 end
-            end; clear vs vn dx missing;
+            end; clear vs volume_number dx missing;
         end
     end
     %% get a cs table into work folder
@@ -909,35 +909,40 @@ if ~exist(complete_study_flag,'file')
         clear bh
     end
     %% Check all n_volumes for incomplete reconstruction
-    %WARNING: this code relies on each entry in recon status being
-    %filled in. This should be fine, but take care when refactoring.
-    recon_status=zeros(1,recon_mat.n_volumes);
-    vol_strings=cell(1,recon_mat.n_volumes);
-    for vn = 1:recon_mat.n_volumes
-        vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.n_volumes-1))) 'i' ],vn-1);
-        volume_runno = sprintf('%s_m%s',runno,vol_string);
-        volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
-            workdir,volume_runno,volume_runno,volume_runno,options.target_machine);
-        vol_strings{vn}=vol_string;
-        [stage_n,~,pc]=volume_status(fullfile(workdir,volume_runno),volume_runno);
+    prog_struct=struct;
+    prog_struct.volume_runno='template';
+    prog_struct.vn=nan;
+    prog_struct.status=-1;
+    %progress_acq(recon_mat.n_volumes)=prog_struct; % array of structs with
+    %empty elements except final
+    progress_acq=repmat(prog_struct,[1,67]); % array of structs with default.
 
+    for volume_number = 1:recon_mat.n_volumes
+        progress_acq(volume_number).volume_number=volume_number;
+        vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.n_volumes-1))) 'i' ],volume_number-1);
+        progress_acq(volume_number).volume_runno = sprintf('%s_m%s',runno,vol_string);
+        volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
+            workdir,progress_acq(volume_number).volume_runno,progress_acq(volume_number).volume_runno,progress_acq(volume_number).volume_runno,options.target_machine);
+        %vol_strings{vn}=vol_string;
+        [~,~,pc]=volume_status(fullfile(workdir,progress_acq(volume_number).volume_runno),progress_acq(volume_number).volume_runno);
         % [~,~,pc]=check_status_of_CSrecon(fullfile(workdir,volume_runno),volume_runno);
         if exist(volume_flag,'file') && pc >= 100
-            recon_status(vn)=1;
+            progress_acq(volume_number).status=1;
+        else
+            progress_acq(volume_number).status=0;
         end
         if isnumeric(options.last_volume) && options.last_volume
-            if vn~=1 && vn>options.last_volume
+            if volume_number~=1 && volume_number>options.last_volume
                 break;
             end
         end
     end
-    %reconned_volumes=find(recon_status);
-    %reconned_volumes_strings=vol_strings(find(recon_status));
-    %num_reconned = length(reconned_volumes); % For reporting purposes
-    unreconned_volumes=find(~recon_status);
-    unreconned_volumes_strings=vol_strings(find(~recon_status));
-    num_unreconned = length(unreconned_volumes); % For reporting purposes
-    clear volume_flag vol_string vol_strings vn;
+    % find any volume which was not checked, and remove it from the
+    % progress_acq struct array.
+    omitted_idx=[progress_acq(:).status]==-1;
+    progress_acq(omitted_idx)=[];
+    num_unreconned = nnz(~[progress_acq(:).status]);
+    clear prog_struct volume_flag vol_string vol_strings volume_number;
     %% Let the user know the status of thesave recon.
     log_msg =sprintf('%i of %i volume(s) have fully reconstructed.\n',recon_mat.n_volumes-num_unreconned,recon_mat.n_volumes);
     yet_another_logger(log_msg,log_mode,log_file);
@@ -948,21 +953,21 @@ if ~exist(complete_study_flag,'file')
         running_jobs = '';
         % Setup individual volumes to be reconned, with the assumption that
         % its own .fid file exists
-        for vs = 1:length(unreconned_volumes_strings)
+        scheduled_volumes=0;
+        for progress_vol=progress_acq
             %%% first_volume, last_volume handling, by just skiping loop.
-            vn=str2num(unreconned_volumes_strings{vs})+1;
+            volume_runno=progress_vol.volume_runno;
+            volume_number=progress_vol.volume_number;
             if isnumeric(options.first_volume) && options.first_volume
-                if vn~=1 && vn<options.first_volume
+                if volume_number~=1 && volume_number<options.first_volume
                     continue;
                 end
             end
             if isnumeric(options.last_volume) && options.last_volume
-                if vn~=1 && vn>options.last_volume
+                if volume_number~=1 && volume_number>options.last_volume
                     continue;
                 end
             end
-            volume_runno = [runno '_m' unreconned_volumes_strings{vs}];
-            volume_number = unreconned_volumes(vs);
             volume_dir = fullfile(workdir,volume_runno);
             vol_sbatch_dir = fullfile(volume_dir, 'sbatch');
             mkdir_s=zeros([1,4]);
@@ -1008,7 +1013,7 @@ if ~exist(complete_study_flag,'file')
             %%% James's happy delay patch
             if ~options.process_headfiles_only && ~options.live_run
                 delay_unit=5;
-                vm_cmd=sprintf('sleep %i\n%s',(vs-1)*delay_unit,vm_cmd);
+                vm_cmd=sprintf('sleep %i\n%s',scheduled_volumes*delay_unit,vm_cmd);
             end
             if ~options.live_run
                 batch_file = create_slurm_batch_files(volume_manager_batch,vm_cmd,vm_slurm_options);
@@ -1020,6 +1025,7 @@ if ~exist(complete_study_flag,'file')
                 log_msg =sprintf('Initializing Volume Manager for volume %s (SLURM jobid(s): %s).\n', ...
                     volume_runno,c_running_jobs);
                 yet_another_logger(log_msg,log_mode,log_file);
+                scheduled_volumes=scheduled_volumes+1;
             elseif options.live_run
                 a=strsplit(vm_args);
                 volume_manager_exec(a{:});clear a;
