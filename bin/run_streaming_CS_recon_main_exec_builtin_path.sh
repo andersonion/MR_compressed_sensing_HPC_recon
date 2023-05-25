@@ -13,7 +13,7 @@ if [ "x$1" = "x" ]; then
   echo    $0 \<deployedMCRroot\> args
 else
 #  echo Setting up environment variables
-  MCRROOT="/cm/shared/apps/MATLAB/R2015b/";#"$1"
+  MCRROOT="/cm/shared/apps/MATLAB/R2021b/";#"$1"
 #  echo ---
   LD_LIBRARY_PATH=.:${MCRROOT}/runtime/glnxa64 ;
   LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${MCRROOT}/bin/glnxa64 ;

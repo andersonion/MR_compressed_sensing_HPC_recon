@@ -28,7 +28,10 @@ if islogical(opt_struct.param_file) && ~opt_struct.testmode
         ' ' data_buffer.scanner_constants.scanner_tesla ...
         ' ''']);
     fprintf('%s\n',gui_cmd);
-    [~, gui_dump]=system(gui_cmd);
+    [s, gui_dump]=system(gui_cmd);
+    if s~=0
+        warning('problem running %s: %s',gui_cmd,gui_dump);
+    end
     use_GUI_DUMP=true;
     %opt_struct.param_file
 elseif ~islogical(opt_struct.param_file)
@@ -37,11 +40,15 @@ elseif ~islogical(opt_struct.param_file)
         [~, param_file_name, e]=fileparts(opt_struct.param_file);
         param_file_name=[param_file_name e ];
 %         data_buffer.scanner_constants.scanner_host_name
-        [~]=system(sprintf('%s '' %s %s %s'' ',getenv('GUI_APP') ,...
+        cmd=sprintf('%s '' %s %s %s'' ',getenv('GUI_APP') ,...
             data_buffer.engine_constants.engine_constants_path ,...%    ec.engine_recongui_menu_path ,...
             data_buffer.headfile.U_scanner ,... %     ' ' sc.scanner_tesla ...
             param_file_name ...
-            ));
+            );
+	[s,sout]=system(cmd);
+	if s~=0
+            warning('problem running %s: %s',cmd,sout);
+	end
     end
     if ~exist([ data_buffer.engine_constants.engine_recongui_paramfile_directory '/' opt_struct.param_file ],'file')
         error('Param file %s/%s failed to generate!',data_buffer.engine_constants.engine_recongui_paramfile_directory,opt_struct.param_file );

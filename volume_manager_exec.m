@@ -51,7 +51,10 @@ active_reservation=get_reservation(options.CS_reservation);
 cs_queue=CS_env_queue();
 %% Executables support
 % set an env var to get latest dev code, or will defacto run stable.
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+matlab_path=getenv('MATLAB_RUNTIME_PATH');
+if isempty(matlab_path)
+    matlab_path = '/cm/shared/apps/MATLAB/R2021b/';
+end
 cs_execs=CS_env_execs();
 %%
 if ischar(volume_number)

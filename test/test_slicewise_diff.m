@@ -18,7 +18,7 @@ end
 %% Commands run to extract a volume fid from our macaque and get its workspace
 %%% this was run in debugging to get volume manager command 
 % streaming_CS_recon_main_exec heike S67962 LOCAL FID xfmWeight=.002 TVWeight=0.0012 target_machine=delos first_volume=25 last_volume=25 planned_ok chunk_size=10 iteration_strategy=10x5 unrecognized_ok
-% /cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/macaque_v1/run_volume_manager_exec.sh /cm/shared/apps/MATLAB/R2015b/ /mnt/civmbigdata/civmBigDataVol/jjc29/S67962.work/S67962recon.mat S67962_m024 25 /mnt/civmbigdata/civmBigDataVol/jjc29/S67962.work
+% /cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/macaque_v1/run_volume_manager_exec.sh /cm/shared/apps/MATLAB/R2021b/ /mnt/civmbigdata/civmBigDataVol/jjc29/S67962.work/S67962recon.mat S67962_m024 25 /mnt/civmbigdata/civmBigDataVol/jjc29/S67962.work
 %%% this was run in debugging to get the volume extract command
 % volume_manager_exec /mnt/civmbigdata/civmBigDataVol/jjc29/S67963.work/S67963recon.mat S67963_m024 25 /mnt/civmbigdata/civmBigDataVol/jjc29/S67963.work
 %{
@@ -39,7 +39,7 @@ setup_volume_work_for_CSrecon_exec /mnt/civmbigdata/civmBigDataVol/jjc29/S67963.
 % then copied the fnl1verbose function to a _BJ version, and modified
 % slicewise to use it.
 run compile__pathset
-mat_runtime='/cm/shared/apps/MATLAB/R2015b/';
+mat_runtime='/cm/shared/apps/MATLAB/R2021b/';
 mat_execs='/cm/shared/workstation_code_dev/matlab_execs';
 function_versions={'slicewise_CSrecon_exec','latest','macaque_v1', ...
     'slicewise_CSrecon_exec_BJ', ...

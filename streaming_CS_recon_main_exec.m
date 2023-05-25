@@ -256,7 +256,10 @@ if ~options.scanner_user
 else
     scanner_user=options.scanner_user;
 end
-matlab_path = '/cm/shared/apps/MATLAB/R2015b/';
+matlab_path=getenv('MATLAB_RUNTIME_PATH');
+if isempty(matlab_path)
+    matlab_path = '/cm/shared/apps/MATLAB/R2021b/';
+end
 %% Reservation/ENV support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
@@ -342,11 +345,11 @@ if ~exist(agilent_study_flag,'file')
     %% Write initialization info to log file.
     if ~exist(workdir,'dir');
         mkdir_cmd = sprintf('mkdir %s',workdir);
-        system(mkdir_cmd);
+        [s,sout]=system(mkdir_cmd); if s~=0; error(sout); end
     end
     if ~exist(log_file,'file')
         % Initialize a log file if it doesn't exist yet.
-        system(['touch ' log_file]);
+        [s,sout]=system(['touch ' log_file]); if s~=0; error(sout); end
     end
     ts=fix(clock);
     t=datetime(ts(1:3));

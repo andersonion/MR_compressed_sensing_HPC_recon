@@ -34,43 +34,48 @@ if isempty(exec_set)
     exec_set='stable';
 end
 
+MATLAB_EXEC_PATH=getenv('MATLAB_EXEC_PATH');
+if isempty(MATLAB_EXEC_PATH)
+    MATLAB_EXEC_PATH='/cm/shared/workstation_code_dev/matlab_execs';
+end
+
 cs_execs.gatekeeper = getenv('CS_GATEKEEPER_EXEC');
 if isempty(cs_execs.gatekeeper)
-    cs_execs.gatekeeper = [ '/cm/shared/workstation_code_dev/matlab_execs/gatekeeper_executable/' exec_set '/run_gatekeeper_exec.sh'] ;
+    cs_execs.gatekeeper = [ MATLAB_EXEC_PATH '/gatekeeper_executable/' exec_set '/run_gatekeeper_exec.sh'] ;
     setenv('CS_GATEKEEPER_EXEC',cs_execs.gatekeeper);
 end
 cs_execs.fid_splitter = getenv('CS_FID_SPLITTER_EXEC');
 if isempty(cs_execs.fid_splitter)
-    cs_execs.fid_splitter = [ '/cm/shared/workstation_code_dev/matlab_execs/fid_splitter_executable/' exec_set '/run_fid_splitter_exec.sh' ];
+    cs_execs.fid_splitter = [ MATLAB_EXEC_PATH '/fid_splitter_executable/' exec_set '/run_fid_splitter_exec.sh' ];
     setenv('CS_FID_SPLITTER_EXEC',cs_execs.fid_splitter);
 end
 cs_execs.volume_manager = getenv('CS_VOLUME_MANAGER_EXEC');
 if isempty(cs_execs.volume_manager)
-    cs_execs.volume_manager = [ '/cm/shared/workstation_code_dev/matlab_execs/volume_manager_executable/' exec_set '/run_volume_manager_exec.sh'];
+    cs_execs.volume_manager = [ MATLAB_EXEC_PATH '/volume_manager_executable/' exec_set '/run_volume_manager_exec.sh'];
     setenv('CS_VOLUME_MANAGER_EXEC',cs_execs.volume_manager);
 end
 cs_execs.volume_setup = getenv('CS_VOLUME_SETUP_EXEC'); % Error check for isempty?
 if isempty(cs_execs.volume_setup)
-    cs_execs.volume_setup = ['/cm/shared/workstation_code_dev/matlab_execs/setup_volume_work_for_CSrecon_executable/' exec_set '/run_setup_volume_work_for_CSrecon_exec.sh' ];
+    cs_execs.volume_setup = [MATLAB_EXEC_PATH '/setup_volume_work_for_CSrecon_executable/' exec_set '/run_setup_volume_work_for_CSrecon_exec.sh' ];
     setenv('CS_VOLUME_SETUP_EXEC',cs_execs.volume_setup);
 end
 cs_execs.slice_recon = getenv('CS_SLICEWISE_RECON_EXEC'); % Error check for isempty?
 if isempty(cs_execs.slice_recon)
-    cs_execs.slice_recon = ['/cm/shared/workstation_code_dev/matlab_execs/slicewise_CSrecon_executable/' exec_set '/run_slicewise_CSrecon_exec.sh'] ;
+    cs_execs.slice_recon = [MATLAB_EXEC_PATH '/slicewise_CSrecon_executable/' exec_set '/run_slicewise_CSrecon_exec.sh'] ;
     setenv('CS_SLICEWISE_RECON_EXEC',cs_execs.slice_recon);
 end
 cs_execs.volume_cleanup = getenv('CS_VOLUME_CLEANUP_EXEC'); % Error check for isempty?
 if isempty(cs_execs.volume_cleanup)
-    cs_execs.volume_cleanup = ['/cm/shared/workstation_code_dev/matlab_execs/volume_cleanup_for_CSrecon_executable/' exec_set '/run_volume_cleanup_for_CSrecon_exec.sh'];
+    cs_execs.volume_cleanup = [MATLAB_EXEC_PATH '/volume_cleanup_for_CSrecon_executable/' exec_set '/run_volume_cleanup_for_CSrecon_exec.sh'];
     setenv('CS_VOLUME_CLEANUP_EXEC',cs_execs.volume_cleanup);
 end
 cs_execs.procpar_gatekeeper = getenv('CS_PROCPAR_GATEKEEPER_EXEC'); 
 if isempty(cs_execs.procpar_gatekeeper)
-    cs_execs.procpar_gatekeeper =['/cm/shared/workstation_code_dev/matlab_execs/local_file_gatekeeper_executable/' exec_set '/run_local_file_gatekeeper_exec.sh'];
+    cs_execs.procpar_gatekeeper =[MATLAB_EXEC_PATH '/local_file_gatekeeper_executable/' exec_set '/run_local_file_gatekeeper_exec.sh'];
     setenv('CS_PROCPAR_GATEKEEPER_EXEC',cs_execs.procpar_gatekeeper);
 end
 cs_execs.procpar_cleanup = getenv('CS_PROCPAR_CLEANUP_EXEC');
 if isempty(cs_execs.procpar_cleanup)
-    cs_execs.procpar_cleanup=['/cm/shared/workstation_code_dev/matlab_execs/process_headfile_CS_executable/' exec_set '/run_process_headfile_CS.sh'];
+    cs_execs.procpar_cleanup=[MATLAB_EXEC_PATH '/process_headfile_CS_executable/' exec_set '/run_process_headfile_CS.sh'];
     setenv('CS_PROCPAR_CLEANUP_EXEC',cs_execs.procpar_cleanup);
 end
