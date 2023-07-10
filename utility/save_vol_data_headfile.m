@@ -8,8 +8,10 @@ data_headfile=fullfile(setup_var.volume_dir,[fid_name,'.headfile']);
 
 e_f=dir(setup_var.volume_fid);
 e_hf=dir(data_headfile);
-if numel(e_f) && numel(e_hf) && e_f.datenum <= e_hf.datenum 
+if numel(e_f) && numel(e_hf) && e_f.datenum <= e_hf.datenum ...
+         || numel(e_f) ==0 && numel(e_hf)
     % work done and hf is newer than fid, bail.
+    % OR no fid, and hf is done
     return;
 end
 
