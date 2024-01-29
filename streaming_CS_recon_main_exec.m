@@ -437,7 +437,13 @@ if ~exist(complete_study_flag,'file')
         gui_app=getenv('GUI_APP');
         if ~strcmp(gui_app,'')
             gui_cmd=sprintf('%s %s',getenv('GUI_APP') , args);
-            [s,sout]=system(gui_cmd); assert(s==0,sout);
+            if options.debug_mode>=50
+	      fprintf('running gui using cmd\n\t%s\n',gui_cmd);
+            end
+            [s,sout]=system(gui_cmd);
+            % SILENT FAILURE BECAUSE JAVA BAD. 
+            %assert(s==0,sout);
+            assert(exist(param_file_path,'file'),'recon GUI failed to create %s',param_file_path');
         else
             warning('GUI NOT SET archive info will not be saved');
         end
