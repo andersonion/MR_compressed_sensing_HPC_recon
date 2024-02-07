@@ -118,8 +118,23 @@ if (make_workspace || ~islogical(options.CS_preview_data) )
         db_inplace(mfilename,'uncertain formatting');
         % didnt get this tested yet, had some troubles around getting
         % trailing meta data, which might be a big deal
-%%%% INSERT echo reduction here? so we dont waste time/effort (save/load)ing for fun
-        [hdr,data]=load_mrd(setup_var.volume_fid, process_precision);
+        %%%% INSERT echo reduction here? so we dont waste time/effort (save/load)ing for fun
+        try
+            [hdr,data]=load_mrd(setup_var.volume_fid, process_precision);
+        catch merr
+            % loading failure.
+            % move volume fid, to volume_fid .bak so we'll retry?
+            % we use puller simple, so we could retry in line... 
+            [p,n,e]=fileparts(setup_var.volume_fid);
+            e=[e '.failed'];
+            fail_m=fullfile(p,[n,e]);
+            if ~exist(fail_m,'file')
+                movefile(setup_var.volume_fid,fail_m);
+            else
+                delete(setup_var.volume_fid);
+            end
+            throw(merr);
+        end
         if recon_mat.nechoes>1
             warning('multi echo eliminating other echos');
             data=data(:,:,:,:,volume_number);
