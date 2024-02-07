@@ -1100,6 +1100,7 @@ if ~exist(complete_study_flag,'file')
             end
         end
     end
+    status_CS_recon(runno);
 end % This 'end' belongs to the scanner_patient_flag check
 
 if options.fid_archive && local_or_streaming_or_static==3
