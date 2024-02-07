@@ -33,8 +33,30 @@ function [ starting_point ,log_msg, vol_status, extended] = volume_status( ...
 % would be cool to define the different checks, and then loop over the
 % array of states, performing each test.
 work_subfolder = fullfile(volume_dir, 'work');
-stage_n=1;
+% simple struct setup so i can check if empty
+% if we can check for failed fid, local and failed will be populated.
+fid_path=struct;
+fid_path.local='';
+fid_path.failed='';
+setup_variables=regexpdir(volume_dir,[volume_runno,'.*setup.*[.]mat$']);
+if ~isempty(setup_variables)
+    % if more than one found, do our best guess and get first one.
+    setup_var=matfile(char(setup_variables{1}));
+    fid_path.local=setup_var.volume_fid;
+end
+if exist('the_scanner','var') && ~isempty(input_data)
+    fid_path.local=the_scanner.fid_file_local(work_subfolder,input_data);
+end
+if ~isempty(fid_path.local)
+    fid_path.failed=[fid_path.local '.failed' ];
+end
 %% is this chunk of data ready on scanner
+% NOTE: we have NOT run this check yet! That happens in a loop below! 
+% IF a previous stage is NOT complete, this check will run.
+% That is why the failure marking is okay at very negative.
+% This may need to be adjusted in the future to only change text, and set
+% otherwise normal completion to facilitate retry.
+stage_n=1;
 status_setup(stage_n).code='Acquistion in progress on scanner.';
 status_setup(stage_n).pct=1;
 if exist('the_scanner','var') ...
@@ -47,21 +69,31 @@ if exist('the_scanner','var') ...
     end
     if ~exist('bbytes','var'); bbytes=0; end
     status_setup(stage_n).check=@() check_remote_fid(work_subfolder,volume_runno,the_scanner,input_data,volume_number,bbytes);
+elseif ~isempty(fid_path.failed) && exist(fid_path.failed,'file')
+    status_setup(stage_n).code='FAILURE IN ACQUISITION or data transfer.';
+    %status_setup(stage_n).check=@() 0;
+    status_setup(stage_n).check=@() -inf;
+    status_setup(stage_n).pct=100;
 else
     % cannot check on scanner without params, so we will consider this
     % status incomplete
     status_setup(stage_n).check=@() 0;
 end
-%% have we pulled this chunk of data to this ppsystem
+
+%% have we pulled this chunk of data to this system
 stage_n=stage_n+1;
 status_setup(stage_n).code='Extract fid.';
 status_setup(stage_n).pct=4;
-if ~exist('input_data','var')
+if ~exist('input_data','var') && isempty(fid_path.local)
     status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno);
-elseif exist(input_data','file')
-    status_setup(stage_n).check=@() exist(input_data,'file')>0;
-elseif exist('the_scanner','var')
-    status_setup(stage_n).check=@() check_local_fid(the_scanner.fid_file_local(work_subfolder,input_data));
+elseif ~isempty(fid_path.local)
+    if ~exist('input_data','var')
+        f=fid_path.local;
+    else
+        f=input_data;
+    end
+    status_setup(stage_n).check=@() check_local_fid(f);
+    clear f;
 else
     % bogus condition, just a placeholder
     status_setup(stage_n).check=@() check_local_fid(work_subfolder,volume_runno,input_data);
@@ -126,7 +158,7 @@ for starting_point=numel(status_setup):-1:1
     vol_status=vol_status-(1-stage_fraction)*status_setup(starting_point).pct;
 end
 % detect 0 work done
-if starting_point==1 && stage_fraction==0
+if starting_point==1 && stage_fraction<=0
     starting_point=0;
 end
 % detect all work done
@@ -145,6 +177,7 @@ end
 log_msg =sprintf('Starting point for volume %s: Stage %i. %s\n',volume_runno,starting_point,status_setup(starting_point+1).code);
 
 end
+%% END OF FUNCTION
 %%%
 %%% individual stages check functions
 %%%

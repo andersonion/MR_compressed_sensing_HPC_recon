@@ -362,6 +362,9 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     end
 else
     setup_var = matfile(setup_variables,'Writable',true);
+    if ischar(options.update_biggus)
+            matfile_strrep(setup_var,options.former_biggus,recon_mat.scratch_drive);
+    end
     stage_1_running_jobs='';
     stage_2_running_jobs='';
     stage_3_running_jobs='';
@@ -407,7 +410,7 @@ else
             % Getting subvolume should be the job of volume setup.
             % TODO: Move get vol code into setup!
             if recon_mat.nechoes == 1 && single_data_file
-                % for multi-block fids(diffusion)
+                % for multi-block fids(diffusion agilent)
                 the_scanner.fid_get_block(fid_path.current,volume_fid,volume_number,recon_mat.bytes_per_block);
             else %if ~multi_volume_fid || ( recon_mat.nechoes > 1 && volume_number == 1 )
                 % for 1 block fids, mgre, and single vol, in theory we
@@ -430,15 +433,44 @@ else
                     local_fid= fullfile(recon_mat.study_workdir,'fid');
                 %}
                 % if ~exist(local_fid,'file')
-                if ~exist(fid_path.local,'file')
-                    % puller is linuxish only, so we gotta make sure we
-                    % give it linish paths. 
-                    pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
-                        options.scanner_user, recon_mat.scanner_name, ... 13
-                        path_convert_platform(fid_path.remote,'lin'), ...
-                        path_convert_platform(fileparts(fid_path.local),'lin'));
-                    [s,sout] = system(pull_cmd);
-                    assert(s==0,sout);
+                % clever retry logic here, will attempt each part twice, 
+                % will pull data, try load, on load fail will rename.
+                % will pull again, try load on fresh, this will NOT rename
+                % exising skips pull, try load on last file, 
+                [p,n,e]=fileparts(fid_path.local);
+                e=[e '.failed'];
+                fail_m=fullfile(p,[n,e]);
+                for attempt=1:2
+                    if ~exist(fid_path.local,'file')
+                        % puller is linuxish only, so we gotta make sure we
+                        % give it linish paths.
+                        pull_cmd=sprintf('puller_simple -oer -f file -u %s %s ''%s'' ''%s''',...
+                            options.scanner_user, recon_mat.scanner_name, ... 13
+                            path_convert_platform(fid_path.remote,'lin'), ...
+                            path_convert_platform(fileparts(fid_path.local),'lin'));
+                        [s,sout] = system(pull_cmd);
+                        assert(s==0,sout);
+                    end
+                    %% check fid for file transfer error.
+                    if strcmp(the_scanner.vendor,'mrsolutions') ...
+                            && exist(fid_path.local,'file')
+                        try
+                            load_mrd(fid_path.local);
+                        catch merr
+                            % loading failure.
+                            % move volume fid, to volume_fid .bak so we'll retry?
+                            % we use puller simple, so we could retry in line...
+                            if ~exist(fail_m,'file')
+                                movefile(fid_path.local,fail_m);
+                                
+                            else
+                                delete(fid_path.local);
+                                throw(merr);
+                            end
+                        end
+                    else
+
+                    end
                 end
                 if ~exist(fid_path.local,'file')
                     % It is assumed that the target of puller is the local_fid
@@ -448,6 +480,8 @@ else
                     yet_another_logger(log_msg,log_mode,log_file,error_flag);
                     if isdeployed; quit(1,'force'); else; error(log_msg); end
                 end
+                clear fail_m;
+
                 if single_data_file && recon_mat.nechoes > 1 && volume_number == 1 && strcmp(the_scanner.vendor,'agilent')
                     error('INCOMPLETE UPDATE');
                     % Run splitter
