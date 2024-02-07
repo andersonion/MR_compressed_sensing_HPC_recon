@@ -1,6 +1,5 @@
 function scan_data_setup = refresh_volume_index(input_data,the_scanner,study_workdir,options)
 % gets the volume index file from our custom mrsolutions code.
-
 % how many minutes old does the index have to be before we try to replace it
 % This is reduce chance of collision with many things grabbing it.
 min_index_age=5;
@@ -18,12 +17,25 @@ end
 fetch_index=true;
 [~,dn,de]=fileparts(input_data);
 index_name=[dn,de];
-local_index=fullfile(study_workdir,index_name);
-e=dir(local_index);
+index_file=fullfile(study_workdir,index_name);
+e=dir(index_file);
 if numel(e)
     file_age=datetime(datestr(now))-datetime(e.date);
     ts=time_struct(seconds(file_age));
     fetch_index  = min_index_age <= minutes(ts.duration());
+end
+
+% cleans up user input to solidly hold REMOTE file locations
+scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
+    % If we didnt find the fid yet, and are the special volume_index.txt
+    % case, load it to see if its complete.
+    fid_index=load_index_file(index_file,scan_data_setup.main);
+    if sum(cellfun(@isempty,fid_index.fid))==0
+        % if there are no empty entries, shut off fetch_index because even
+        % if its old, it should be done.
+        fetch_index=0;
+    end
 end
 if fetch_index
     [s,sout] = system(index_fetch);
@@ -40,20 +52,14 @@ if fetch_index
 %}
     end
 end
-% cleans up user input to solidly hold REMOTE file locations
-scan_data_setup=the_scanner.data_definition_cleanup(input_data);
+
 % becuase i dont want to make data_definition_cleanup complicated, we
 % load volume index externally, maybe we can load it and pass it as
 % input data? and that would be more reasonable?
 if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
-    local_index=load_index_file(local_index);
-    if ~path_is_absolute(local_index.fid{1})
-        % local_index.fid = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid)
-        idx_ready = cellfun(@(c) ~isempty(c),local_index.fid);
-        full_paths = cellfun(@(c) fullfile(scan_data_setup.main,c), local_index.fid, 'UniformOutput', false);
-        full_paths =cellfun(@(c) path_convert_platform(c,'lin'), full_paths ,'UniformOutput',false);
-        local_index.fid(idx_ready) = full_paths(idx_ready);
+    if fetch_index
+        fid_index=load_index_file(index_file,scan_data_setup.main);
     end
-    scan_data_setup.fid=local_index.fid;
+    scan_data_setup.fid=fid_index.fid;
 end
 
