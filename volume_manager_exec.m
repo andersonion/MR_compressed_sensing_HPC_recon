@@ -362,7 +362,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     end
 else
     setup_var = matfile(setup_variables,'Writable',true);
-    if isfield(options.former_biggus) && ischar(options.former_biggus)
+    if isfield(options,'former_biggus') && ischar(options.former_biggus)
             matfile_strrep(setup_var,options.former_biggus,recon_mat.scratch_drive);
     end
     stage_1_running_jobs='';
