@@ -72,6 +72,9 @@ log_file=fullfile(workdir,[ runno '_recon.log']);
 complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 recon_file = fullfile(workdir,[runno '_recon.mat']);
 recon_mat = matfile(recon_file,'Writable',~restart_mode);
+if ~restart_mode
+    recon_mat.scratch_drive=scratch_drive;
+end
 
 % old function line before joining the scanner data fields
 %function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
@@ -185,9 +188,12 @@ types.planned_options={...
     'email_addresses',      ''
     'verbosity',            ''
     'scanner_user',         ' what user do we use to pull from scanner.'
+    'former_biggus',        ' debugging option, if we move our folder we need to update internal paths. This has three forms, either a flag which will use an internal var ''scratch_disk'' and replace that with current BIGGUS_DISKUS, or the previous path.'
     'live_run',             ' run the code live in matlab, igored when deployed.'
     };
 options=mat_pipe_option_handler(varargin,types); clear varargin types;
+% any option in this list will be allowed to over ride on restart.
+restart_override=list2cell('chunk_size CS_preview_data CS_reservation email_addresses fid_archive first_volume keep_work last_volume live_run process_headfiles_only skip_target_machine_check former_biggus verbosity volume_retry_delay');
 % A reminder, mat_pipe_option handler exists to do two things. 
 % 1. provide half decent help for your function. 
 % 2. clean up options to a known state to make option use easier, 
@@ -343,7 +349,50 @@ end
 if restart_mode
   input_data=recon_mat.scanner_data;
   scanner_name=recon_mat.scanner_name;
+  all_opts=fieldnames(options);
+  keep_idx=ismember(all_opts,restart_override);
+  o_C=struct2cell(options);
+  new_opts=cell2struct(o_C(keep_idx),all_opts(keep_idx));
   options=recon_mat.options;
+  options=combine_struct(options,new_opts);
+  clear all_opts keep_idx o_C new_opts;
+end
+
+if ~ischar(options.former_biggus) && options.former_biggus ...
+    || ischar(options.former_biggus) && length(options.former_biggus) <= 5
+    % former_biggus is being used as a flag var, get the former biggus from
+    % the recon_mat.
+    mat_list=who('-file',recon_file);
+    if ~ismember('scratch_drive',mat_list)
+        error('former_biggus needs to know what the former biggus was');
+    end
+
+    options.former_biggus = recon_mat.scratch_drive;
+    if strcmp(scratch_drive,options.former_biggus)
+        %% current biggus and update are the same, do nothing
+        options.former_biggus=false;
+    else
+    end
+end
+if ischar(options.former_biggus)
+    %% we're supposed to update biggus(scratch_drive) in recon.mat.
+    % ... there are no paths in options, so this will just cause trouble.
+    % Leaving it as a reminder for me for later. 
+    %former_biggus=options.former_biggus;
+    %options=struct_strrep(options,former_biggus,scratch_drive);
+    %options.former_biggus=former_biggus;
+    %matfile_strrep(recon_file,former_biggus,scratch_drive);
+    %recon_mat = matfile(recon_file,'Writable',~restart_mode);
+
+    recon_mat.Properties.Writable=true;
+    matfile_strrep(recon_mat,options.former_biggus,scratch_drive);
+    % Because we update the internal variable scrach_drive, the second time
+    % this runs it might not work. 
+    % That is only if user didnt specify what the former biggus was.
+    % That cannot be helped easily! To work around that, former_biggus must
+    % be specified! 
+    recon_mat.scratch_drive=scratch_drive;
+    recon_mat.options=options;
 end
 
 %% Reservation/ENV support
@@ -572,8 +621,10 @@ if ~exist(complete_study_flag,'file')
     
     if ~options.skip_target_machine_check
         % could switch this to pull /etc/profile too
-        puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
-            sys_user(),options.target_machine,options.target_machine,sys_user());
+        %puller_test=sprintf('puller_simple -u %s -o -f file %s activity_log.txt .%s_%s_activity_log.txt ',...
+        %    sys_user(),options.target_machine,options.target_machine,sys_user());
+        puller_test=sprintf('puller_simple -o -f file %s activity.log .%s_%s_activity.log ',...
+            options.target_machine,options.target_machine,sys_user());
         fprintf('Test target_machine (%s) connection...\n',options.target_machine);
         [s,sout]=system(puller_test,'-echo');
         if s~=0
@@ -921,11 +972,22 @@ if ~exist(complete_study_flag,'file')
     prog_struct.status=-1;
     %progress_acq(recon_mat.n_volumes)=prog_struct; % array of structs with
     %empty elements except final
-    progress_acq=repmat(prog_struct,[1,67]); % array of structs with default.
-
+    progress_acq=repmat(prog_struct,[1,recon_mat.n_volumes]); % array of structs with default.
+    vol_num_len=numel(sprintf('%i',recon_mat.n_volumes-1));
+    vol_num_formatter=sprintf('%%0%ii',vol_num_len);
     for volume_number = 1:recon_mat.n_volumes
         progress_acq(volume_number).volume_number=volume_number;
-        vol_string =sprintf(['%0' num2str(numel(num2str(recon_mat.n_volumes-1))) 'i' ],volume_number-1);
+        if isnumeric(options.first_volume) && options.first_volume
+            if volume_number~=1 && volume_number<options.first_volume
+                continue;
+            end
+        end
+        if isnumeric(options.last_volume) && options.last_volume
+            if volume_number~=1 && volume_number>options.last_volume
+                continue;
+            end
+        end
+        vol_string =sprintf(vol_num_formatter,volume_number-1);
         progress_acq(volume_number).volume_runno = sprintf('%s_m%s',runno,vol_string);
         volume_flag=sprintf('%s/%s/%simages/.%s_send_archive_tag_to_%s_SUCCESSFUL', ...
             workdir,progress_acq(volume_number).volume_runno,progress_acq(volume_number).volume_runno,progress_acq(volume_number).volume_runno,options.target_machine);
