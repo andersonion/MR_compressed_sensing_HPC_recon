@@ -362,7 +362,7 @@ if (starting_point == 0) ||  (  recon_mat.nechoes > 1 && starting_point == 1 && 
     end
 else
     setup_var = matfile(setup_variables,'Writable',true);
-    if ischar(options.update_biggus)
+    if isfield(options.former_biggus) && ischar(options.former_biggus)
             matfile_strrep(setup_var,options.former_biggus,recon_mat.scratch_drive);
     end
     stage_1_running_jobs='';
@@ -462,7 +462,7 @@ else
                             % we use puller simple, so we could retry in line...
                             if ~exist(fail_m,'file')
                                 movefile(fid_path.local,fail_m);
-                                
+
                             else
                                 delete(fid_path.local);
                                 throw(merr);
