@@ -27,7 +27,9 @@ end
 
 % cleans up user input to solidly hold REMOTE file locations
 scan_data_setup=the_scanner.data_definition_cleanup(input_data);
-if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
+if ~isfield(scan_data_setup,'fid') ...
+        && reg_match(input_data,'volume_index.txt') ...
+        && exist(index_file,'file')
     % If we didnt find the fid yet, and are the special volume_index.txt
     % case, load it to see if its complete.
     fid_index=load_index_file(index_file,scan_data_setup.main);
@@ -56,7 +58,9 @@ end
 % becuase i dont want to make data_definition_cleanup complicated, we
 % load volume index externally, maybe we can load it and pass it as
 % input data? and that would be more reasonable?
-if ~isfield(scan_data_setup,'fid') && reg_match(input_data,'volume_index.txt')
+if ~isfield(scan_data_setup,'fid') ...
+        && reg_match(input_data,'volume_index.txt') ...
+        && exist(index_file,'file')
     if fetch_index
         fid_index=load_index_file(index_file,scan_data_setup.main);
     end
