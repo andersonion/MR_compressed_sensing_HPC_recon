@@ -72,9 +72,7 @@ log_file=fullfile(workdir,[ runno '_recon.log']);
 complete_study_flag=fullfile(workdir,['.' runno '.recon_completed']);
 recon_file = fullfile(workdir,[runno '_recon.mat']);
 recon_mat = matfile(recon_file,'Writable',~restart_mode);
-if ~restart_mode
-    recon_mat.scratch_drive=scratch_drive;
-end
+
 
 % old function line before joining the scanner data fields
 %function streaming_CS_recon_main_exec(scanner_name,runno,scanner_patient,scanner_acquisition, varargin )
@@ -357,44 +355,45 @@ if restart_mode
   options=combine_struct(options,new_opts);
   clear all_opts keep_idx o_C new_opts;
 end
+if restart_mode
+    % former biggus handling ONLY valid in restart mode!
+    if ~ischar(options.former_biggus) && options.former_biggus ...
+            || ischar(options.former_biggus) && length(options.former_biggus) <= 5
+        % former_biggus is being used as a flag var, get the former biggus from
+        % the recon_mat.
+        mat_list=who('-file',recon_file);
+        if ~ismember('scratch_drive',mat_list)
+            error('former_biggus needs to know what the former biggus was');
+        end
 
-if ~ischar(options.former_biggus) && options.former_biggus ...
-    || ischar(options.former_biggus) && length(options.former_biggus) <= 5
-    % former_biggus is being used as a flag var, get the former biggus from
-    % the recon_mat.
-    mat_list=who('-file',recon_file);
-    if ~ismember('scratch_drive',mat_list)
-        error('former_biggus needs to know what the former biggus was');
+        options.former_biggus = recon_mat.scratch_drive;
+        if strcmp(scratch_drive,options.former_biggus)
+            %% current biggus and update are the same, do nothing
+            options.former_biggus=false;
+        else
+        end
     end
+    if ischar(options.former_biggus)
+        %% we're supposed to update biggus(scratch_drive) in recon.mat.
+        % ... there are no paths in options, so this will just cause trouble.
+        % Leaving it as a reminder for me for later.
+        %former_biggus=options.former_biggus;
+        %options=struct_strrep(options,former_biggus,scratch_drive);
+        %options.former_biggus=former_biggus;
+        %matfile_strrep(recon_file,former_biggus,scratch_drive);
+        %recon_mat = matfile(recon_file,'Writable',~restart_mode);
 
-    options.former_biggus = recon_mat.scratch_drive;
-    if strcmp(scratch_drive,options.former_biggus)
-        %% current biggus and update are the same, do nothing
-        options.former_biggus=false;
-    else
+        recon_mat.Properties.Writable=true;
+        matfile_strrep(recon_mat,options.former_biggus,scratch_drive);
+        % Because we update the internal variable scrach_drive, the second time
+        % this runs it might not work.
+        % That is only if user didnt specify what the former biggus was.
+        % That cannot be helped easily! To work around that, former_biggus must
+        % be specified!
+        recon_mat.scratch_drive=scratch_drive;
+        recon_mat.options=options;
     end
 end
-if ischar(options.former_biggus)
-    %% we're supposed to update biggus(scratch_drive) in recon.mat.
-    % ... there are no paths in options, so this will just cause trouble.
-    % Leaving it as a reminder for me for later. 
-    %former_biggus=options.former_biggus;
-    %options=struct_strrep(options,former_biggus,scratch_drive);
-    %options.former_biggus=former_biggus;
-    %matfile_strrep(recon_file,former_biggus,scratch_drive);
-    %recon_mat = matfile(recon_file,'Writable',~restart_mode);
-
-    recon_mat.Properties.Writable=true;
-    matfile_strrep(recon_mat,options.former_biggus,scratch_drive);
-    % Because we update the internal variable scrach_drive, the second time
-    % this runs it might not work. 
-    % That is only if user didnt specify what the former biggus was.
-    % That cannot be helped easily! To work around that, former_biggus must
-    % be specified! 
-    recon_mat.scratch_drive=scratch_drive;
-    recon_mat.options=options;
-end
-
 %% Reservation/ENV support
 active_reservation=get_reservation(options.CS_reservation);
 options.CS_reservation=active_reservation;
@@ -534,6 +533,9 @@ if ~exist(complete_study_flag,'file')
     if ~exist(workdir,'dir')
         mkdir_cmd = sprintf('mkdir "%s"',workdir);
         [s,sout]=system(mkdir_cmd); assert(s==0,sout);
+    end
+    if ~restart_mode
+        recon_mat.scratch_drive=scratch_drive;
     end
     % intentionally re-writing these params instead of avoiding it.
     % cannot directly access structs, so we have to pull headfile out.
