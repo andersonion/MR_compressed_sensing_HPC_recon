@@ -8,22 +8,22 @@ st_dir=pwd;
 %% add ALTERNATE code versions from russ-bucket
 % WARNING WARNING WARNING! ORDER OF ADDITION IS CRITICAL! SEVERAL FUNCTIONS
 % OVERRIDE ONE ANOTHER AND ARE DIFFERENT!(in subtle dumb ways!)
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','agilent'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','agilent'));
 %% add other russ code
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','ImageProcessing'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','AgilentReconScripts'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','NIFTI_20130306_with_edits'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','MTools'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','MultipleEchoRecon'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','Segmentation'));
-addpath(fullfile(getenv('WKS_HOME'),'recon','XCalc'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','ImageProcessing'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','AgilentReconScripts'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','NIFTI_20130306_with_edits'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','MTools'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','MultipleEchoRecon'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','Segmentation'));
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','External','XCalc'));
 %{
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','
-addpath(fullfile(getenv('WKS_HOME'),'recon','MATLAB_scripts_rmd','
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','
+addpath(fullfile(getenv('WORKSTATION_CODE'),'recon','MATLAB_scripts_rmd','
 %}
 %%% THIS MUST BE LAST OR THINGS BREAK!
-code_dir_QSM_STI_star=fullfile(getenv('WKS_HOME'),'recon','QSM_STI_star');
+code_dir_QSM_STI_star=fullfile(getenv('WORKSTATION_CODE'),'recon','External','QSM_STI_star');
 addpath(genpath(code_dir_QSM_STI_star));
 
 %% do work for each

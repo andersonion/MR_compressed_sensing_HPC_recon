@@ -2,7 +2,9 @@
 function prototype_qsm_cs_workdir(runno)
 % rad_mat('heike','N56315','N56275_02/ser53.fid');  %%%%DTI NO fermi filter
 C__ = onCleanup(@() cd(pwd));
-
+% w2bart, wbart, CS_v3, CS_v2, CS_v1
+% w == wyatt.
+cs_code_selection='w2bart';
 % reset for new test data where we have fetched from archive.
 % To fit the old data setuo to get started, a CS_v2 recon work folder was
 % copied from RUNNO.work to RUNNO
@@ -13,7 +15,28 @@ use_new_CS=1;
 skip_mask=0;
 
 %% old fashioned get data from scanner out of use
-if ~use_new_CS
+if strcmp(cs_code_selection,'w2bart')
+    BD=getenv('BIGGUS_DISKUS');
+    if ~exist('runno','var') || strcmp(runno,'test') || ~exist(runno,'dir')
+        project='test';
+        runno='MGRE_BART';
+        runno='MGRE_FISTA';
+        spec='spec';
+        qsm_work=sprintf('%s_qsm',runno);
+
+        folder_parts={BD,[project '.work'],spec,runno};
+        datapath=fullfile(folder_parts{:});
+        folder_parts{end}=qsm_work;
+        workpath=fullfile(folder_parts{:});
+
+    elseif exist(runno,'dir')
+        datapath=runno;
+        [p,runno,e]=fileparts(runno);
+        workpath=fullfile(p,[runno '_qsm']);
+    end
+    
+
+elseif strcmp(cs_code_selection,'CS_v1')
     % scanner = 'kamy';
     % runno = 'S66730';
     % study = 'S66730_01';a
@@ -33,16 +56,25 @@ if ~use_new_CS
     if ~exist(workpath,'dir')
         workpath = agilent2nas4_k(scanner,runno,study,series);
     end
+    cd(workpath);
 end
-% new CS_v2 data format, had to be run with keep_work option to be useful
-workpath=fullfile(getenv('BIGGUS_DISKUS'),[runno '.work']);
-%workpath='/mnt/duhsnas-pri.dhe.duke.edu/civm-projectdata/jjc29/clusterscratch/S69222.work'
-cd(workpath);
-if ~exist('qsm','dir')
-    mkdir('qsm');
+if reg_match(cs_code_selection,'w2?bart')
+    % WARNING changing the meaning of workpath to be my QSM workpath!
+    if ~exist(workpath,'dir')
+        mkdir(workpath);
+    end
+    chdir(workpath);
+    %
+else
+    % new CS_v2 data format, had to be run with keep_work option to be useful
+    workpath=fullfile(getenv('BIGGUS_DISKUS'),[runno '.work']);
+    %workpath='/mnt/duhsnas-pri.dhe.duke.edu/civm-projectdata/jjc29/clusterscratch/S69222.work'
+    cd(workpath);
+    if ~exist('qsm','dir')
+        mkdir('qsm');
+    end
+    cd('qsm');
 end
-cd('qsm');
-
 
 if exist('star_qsm.nii.gz','file') || exist('star_qsm.nii','file')
     warning('%s complete',workpath);
@@ -50,28 +82,44 @@ if exist('star_qsm.nii.gz','file') || exist('star_qsm.nii','file')
 end
 
 %% example to load CS data
-must_raw=1; %% somehow be nice to hold onto th e "raw" data instead of re-calculating.
-if use_new_CS
+must_raw=1; %% somehow be nice to hold onto the "raw" data instead of re-calculating.
+%% old fashioned get data from scanner out of use
+if strcmp(cs_code_selection,'w2bart')
+    echo_dirs=regexpdir(datapath,'.*m[0-9]+',0);
+    echo_images=cell(size(echo_dirs));
+    e=0;
+    for d=echo_dirs(:)'
+        cfl_path=regexpdir(d{1},'.*[.]cfl',0);
+        [p,n,~]=fileparts(cfl_path{1});
+        e_cfl=readcfl(fullfile(p,n));
+        echo_images(e+1)={e_cfl};
+        e=e+1;
+    end
+    echo_file=regexpdir(datapath,'echo_times_ms.txt');
+    echo_file=echo_file{1};
+    echos=csvread(echo_file);
+    voldims=size(echo_images{1});
+    % fov
+    res=[0.025,0.025,0.025];
+    nechoes=numel(echos);
+    TE_ms = echos;
+    TE_s = TE_ms/1000;
+    raw=cell2mat(echo_images);
+    raw=reshape(raw,[voldims(1),4,voldims(2),voldims(3)]);
+    raw=permute(raw,[1,3,4,2]);
+elseif reg_match(cs_code_selection,'CS_v[23]')
     procpar=readprocpar(fullfile(workpath,'procpar'));
     if ~exist('mag.nii','file')||must_raw
         raw=load_imagespace_from_CS_tmp(workpath);
-        % get back to kspace
-        % raw=ifftshift(raw);
-        raw = ifft(raw,[],1);
-        raw = ifft(raw,[],2);
-        raw = ifft(raw,[],3);
-        raw=ifftshift(raw);
     end
     %disp_vol_center(raw(:,:,:,1))
     %vars=matfile([runno 'recon.mat']);
-    
     voldims=[procpar.np/2 procpar.nv procpar.nv2];
     % not-valid becuse CS
     %nvols=(npoints/2*ntraces*nblocks)/prod(voldims);
     %blocks_per_vol=nblocks/nvols;
     fov=[procpar.lro procpar.lpe procpar.lpe2].*10; %fov in mm this may not be right for multislice data
     res=fov./voldims;
-    
     if exist('procpar','var')
         nechoes = numel(procpar.TE);
     else
@@ -101,6 +149,13 @@ elseif exists('cartesean_sample_example','var')
     toc
     cd ..
 end
+
+% get back to kspace
+% raw=ifftshift(raw);
+raw = ifft(raw,[],1);
+raw = ifft(raw,[],2);
+raw = ifft(raw,[],3);
+raw=ifftshift(raw);
 
 vox=res; save vox vox; clear res;
 %
@@ -283,6 +338,7 @@ else
     warning('guess of field strength not available, set manually right now, also warnings have been forced to dbstop, clear that if you want.');
     dbstop if warning;
     dbstop if error;
+    keyboard
 end
 niter = 50;
 %%
