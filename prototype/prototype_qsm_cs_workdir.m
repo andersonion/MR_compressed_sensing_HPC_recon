@@ -2,26 +2,47 @@
 function prototype_qsm_cs_workdir(runno)
 % rad_mat('heike','N56315','N56275_02/ser53.fid');  %%%%DTI NO fermi filter
 C__ = onCleanup(@() cd(pwd));
-% w2bart, wbart, CS_v3, CS_v2, CS_v1
+% w3bart w2bart, wbart, CS_v3, CS_v2, CS_v1
 % w == wyatt.
-cs_code_selection='w2bart';
+cs_code_selection='w3bart';
 % reset for new test data where we have fetched from archive.
 % To fit the old data setuo to get started, a CS_v2 recon work folder was
 % copied from RUNNO.work to RUNNO
 % hard links were created from fid to RUNNO.fid
 % and procpar to RUNNO.procpar
-use_new_CS=1;
+
 % MASKING IMPORTANT FOR GOOD RESULT!
 skip_mask=0;
-
 %% old fashioned get data from scanner out of use
-if strcmp(cs_code_selection,'w2bart')
+if strcmp(cs_code_selection,'w3bart')
+    BD=getenv('BIGGUS_DISKUS');
+    if ~exist('runno','var') || strcmp(runno,'test') || ~exist(runno,'dir')
+        project='24.mst.01';
+        runno='S69875';
+        spec='230703-1-1';
+        B0 = 7.0; H = [0 0 1];
+
+        qsm_work=sprintf('%s_qsm',runno);
+        folder_parts={BD,project,spec,runno};
+        datapath=fullfile(folder_parts{:});
+        folder_parts={BD,[project '.work'],spec,runno};
+        folder_parts{end}=qsm_work;
+        workpath=fullfile(folder_parts{:});
+
+    elseif exist(runno,'dir')
+        datapath=runno;
+        [p,runno,e]=fileparts(runno);
+        workpath=fullfile(p,[runno '_qsm']);
+    end
+elseif strcmp(cs_code_selection,'w2bart')
     BD=getenv('BIGGUS_DISKUS');
     if ~exist('runno','var') || strcmp(runno,'test') || ~exist(runno,'dir')
         project='test';
         runno='MGRE_BART';
         runno='MGRE_FISTA';
         spec='spec';
+        
+        B0 = 9.4; H = [0 0 1];
         qsm_work=sprintf('%s_qsm',runno);
 
         folder_parts={BD,[project '.work'],spec,runno};
@@ -35,7 +56,6 @@ if strcmp(cs_code_selection,'w2bart')
         workpath=fullfile(p,[runno '_qsm']);
     end
     
-
 elseif strcmp(cs_code_selection,'CS_v1')
     % scanner = 'kamy';
     % runno = 'S66730';
@@ -58,7 +78,7 @@ elseif strcmp(cs_code_selection,'CS_v1')
     end
     cd(workpath);
 end
-if reg_match(cs_code_selection,'w2?bart')
+if reg_match(cs_code_selection,'w[0-9]?bart')
     % WARNING changing the meaning of workpath to be my QSM workpath!
     if ~exist(workpath,'dir')
         mkdir(workpath);
@@ -83,8 +103,16 @@ end
 
 %% example to load CS data
 must_raw=1; %% somehow be nice to hold onto the "raw" data instead of re-calculating.
-%% old fashioned get data from scanner out of use
-if strcmp(cs_code_selection,'w2bart')
+if strcmp(cs_code_selection,'w3bart')
+    echo_dirs=regexpdir(datapath,'.*c_m[0-9]+/?$',0);
+    [raw,hfs]=load_4d(echo_dirs{:});
+    res=[hfs{1}.fovx,hfs{1}.fovy,hfs{1}.fovz]./[hfs{1}.dim_X,hfs{1}.dim_Y,hfs{1}.dim_Z];
+    nechoes=numel(echo_dirs);
+    echos=hfs{1}.z_Agilent_TE;
+    assert(numel(echos)==nechoes)
+    TE_ms = echos;
+    TE_s = TE_ms/1000;
+elseif strcmp(cs_code_selection,'w2bart')
     echo_dirs=regexpdir(datapath,'.*m[0-9]+',0);
     echo_images=cell(size(echo_dirs));
     e=0;
@@ -98,6 +126,9 @@ if strcmp(cs_code_selection,'w2bart')
     echo_file=regexpdir(datapath,'echo_times_ms.txt');
     echo_file=echo_file{1};
     echos=csvread(echo_file);
+    warning('\n\n\n\t%s\n\n','reversing echos due to schenanigans found in processing');
+    pause(0.6);
+    echos=reverse(echos);
     voldims=size(echo_images{1});
     % fov
     res=[0.025,0.025,0.025];
@@ -108,6 +139,7 @@ if strcmp(cs_code_selection,'w2bart')
     raw=reshape(raw,[voldims(1),4,voldims(2),voldims(3)]);
     raw=permute(raw,[1,3,4,2]);
 elseif reg_match(cs_code_selection,'CS_v[23]')
+    %% old fashioned get data from scanner out of use
     procpar=readprocpar(fullfile(workpath,'procpar'));
     if ~exist('mag.nii','file')||must_raw
         raw=load_imagespace_from_CS_tmp(workpath);
@@ -130,6 +162,7 @@ elseif reg_match(cs_code_selection,'CS_v[23]')
     %dims = [voldims nechoes];
 elseif exists('cartesean_sample_example','var')
     %% this was written for NON-CS data!
+    %{
     % AND has not been updated for adjustments made to other parts of the
     % script!(sorry)
     mkdir ser12
@@ -148,24 +181,52 @@ elseif exists('cartesean_sample_example','var')
     delete k_single_echo_*.raw
     toc
     cd ..
+    %}
 end
 
-% get back to kspace
-% raw=ifftshift(raw);
-raw = ifft(raw,[],1);
-raw = ifft(raw,[],2);
-raw = ifft(raw,[],3);
-raw=ifftshift(raw);
+% get back to kspace, 1. fft, 2. fftshift.
+% these two methods produce identical results. One may be faster/use less
+% memory, requires testing.
+raw3=raw;
+for e=1:nechoes
+    raw3(:,:,:,e)=fftshift(fftn(raw(:,:,:,e)));
+end
+%{
+disp_vol_center(raw3,1,200);
+disp_vol_center(angle(raw3),1,210);
+%}
 
+%{
+raw2=fft(fft(fft(raw,[],1),[],2),[],3);
+raw2=fftshift(fftshift(fftshift(raw2,1),2),3);
+disp_vol_center(raw2,1,220);
+disp_vol_center(angle(raw2),1,230);
+raw=raw2;clear raw2;
+%}
+
+raw=raw3;clear raw3;
+%  kspc=raw;
 vox=res; save vox vox; clear res;
+%%
 %
 % WAWRNING: run-rerun variability, a re-loaded mag will be single precision
 % but a fresh recon mag will be double! (hopefully that doesn't matter)
 %
+warning('\n\n\n\t%s\n\n','THIS CODE CAUSES RESORTING OF DATA WHICH DOES NOT MATCH ECHOS.')
+pause(0.6);
 if ~exist('mag.nii','file')||must_raw
+    % now in kspace.
     [raw,phase_shift]=phase_ramp_remove1(raw);
+    %  kspc2=raw;
     save phase_shift phase_shift; clear phase_shift;
-    raw = iftME(raw);
+    % This code right here, flips the data WRONG and reshuffles echoes.
+    % in conjunction with getting the imgspce -> kspace wrong above!
+    %raw = iftME(raw);
+    %% run ifftME in line, which is a 3D centered fft if the code stack is to be believed.
+    magic_number=sqrt( prod( size(raw,1:3) ) );
+    for e=1:nechoes
+        raw(:,:,:,e)=magic_number*ifftn(ifftshift(raw(:,:,:,e)));
+    end
     % autoC is auto-centering, this is MORE prmitive than our typical centering
     % which finds BOTH minimums near the volume edge, and centers the data
     % between them.
@@ -192,16 +253,17 @@ if ~exist('R2.nii','file')
     %}
 end
 if ~exist('raw.mat','file')
-    warning('SKIP SAVINGING mat_format raw becuase its slower than re-calculating!');
+    warning('SKIP SAVING mat_format raw becuase its slower than re-calculating!');
     %save raw raw -v7.3
 end
 
 %% mask generation
 %trying to skip!
 %tic
+use_strip_mask_exec=true;
 if ~skip_mask
-    if ~exist('mag_sos.nii','file')&& ~skip_mask
-        % additional step for mag_sos (sum of squares)
+    if ~exist('mag_sos.nii','file') && ~skip_mask
+        % additional step for mag_sos (sum of squares?)
         %% inline method
         % inline may be better on memory/time.
         mag_sos=mag.^2;
@@ -223,7 +285,22 @@ if ~skip_mask
         %mag_sos=load_niigz('mag_sos.nii');mag_sos=mag_sos.img;
         mag_sos=open_nii('mag_sos');
     end
-    if ~exist('msk.nii.gz','file')
+    if ~exist('msk.nii.gz','file') && use_strip_mask_exec
+        % strip_mask_exec('mag_sos16.nii',1,-2,'mask_u16.nii',12,2.5,2);
+        if ~exist('mag_sos16.nii','file')
+            mag_sos16=scale_data(mag_sos,2^16-1);
+            mag_sos16=cast(mag_sos16,'uint16');
+            mat2nii(mag_sos16);
+        end
+        % these mask params probably would change for different voxel size.
+        % This was civm-9t at 25um. 
+        %
+        %strip_mask_exec('mag_sos16.nii',1,-2,'msk.nii',12,1.9,2);
+        % for the new test data set, default params work.
+        strip_mask_exec('mag_sos16.nii',1,2,'msk.nii',[],[],2);
+        [s,sout]=system(sprintf('gzip -9 %s','msk.nii'));
+        assert(s==0,sout);
+    elseif ~exist('msk.nii.gz','file')     
         % brainext inputs are data_vol, threshold_zero, threshold
         % multiplier
         % its rather funny to choose a higher threhold zero, and then
@@ -239,7 +316,7 @@ if ~skip_mask
         catch
             brainext(mag_sos);
         end
-        display('Threshold Mag SOS in ImageJ then combine with scripted msk')
+        disp('Threshold Mag SOS in ImageJ then combine with scripted msk')
     end
     %%
     if ~exist('msk_comb.nii.gz','file')
@@ -278,7 +355,7 @@ if ~exist('meanSNR.mat','file')
         autoSNR(mag,mask);
     end
 end
-load meanSNR
+load('meanSNR');
 if skip_mask
     mask=ones(size(mag),'single');
 end
