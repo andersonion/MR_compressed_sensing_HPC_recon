@@ -13,6 +13,7 @@ cs_code_selection='w3bart';
 
 % MASKING IMPORTANT FOR GOOD RESULT!
 skip_mask=0;
+verbosity=0;
 %% old fashioned get data from scanner out of use
 if strcmp(cs_code_selection,'w3bart')
     BD=getenv('BIGGUS_DISKUS');
@@ -21,14 +22,14 @@ if strcmp(cs_code_selection,'w3bart')
         runno='S69875';
         spec='230703-1-1';
         B0 = 7.0; H = [0 0 1];
-
+        
         qsm_work=sprintf('%s_qsm',runno);
         folder_parts={BD,project,spec,runno};
         datapath=fullfile(folder_parts{:});
         folder_parts={BD,[project '.work'],spec,runno};
         folder_parts{end}=qsm_work;
         workpath=fullfile(folder_parts{:});
-
+        verbosity=3;
     elseif exist(runno,'dir')
         datapath=runno;
         [p,runno,e]=fileparts(runno);
@@ -295,9 +296,9 @@ if ~skip_mask
         % these mask params probably would change for different voxel size.
         % This was civm-9t at 25um. 
         %
-        %strip_mask_exec('mag_sos16.nii',1,-2,'msk.nii',12,1.9,2);
+        %strip_mask_exec('mag_sos16.nii',1,-2,'msk.nii',12,1.9,verbosity);
         % for the new test data set, default params work.
-        strip_mask_exec('mag_sos16.nii',1,2,'msk.nii',[],[],2);
+        strip_mask_exec('mag_sos16.nii',1,2,'msk.nii',[],[],verbosity);
         [s,sout]=system(sprintf('gzip -9 %s','msk.nii'));
         assert(s==0,sout);
     elseif ~exist('msk.nii.gz','file')     
