@@ -1,191 +1,79 @@
-%% pull the data and create raw image
-function prototype_qsm_cs_workdir(runno)
-% rad_mat('heike','N56315','N56275_02/ser53.fid');  %%%%DTI NO fermi filter
-C__ = onCleanup(@() cd(pwd));
-% w3bart w2bart, wbart, CS_v3, CS_v2, CS_v1
-% w == wyatt.
-cs_code_selection='w3bart';
-% reset for new test data where we have fetched from archive.
-% To fit the old data setuo to get started, a CS_v2 recon work folder was
-% copied from RUNNO.work to RUNNO
-% hard links were created from fid to RUNNO.fid
-% and procpar to RUNNO.procpar
+function prototype_starqsm(echo_dirs,workpath,out_qsm,varargin)
+
+prototype_starqsm_path();
+start_dir=pwd;
+C__ = onCleanup(@() cd(start_dir));
+
+if numel(varargin)
+    mask_file=varargin{1};
+    if ~iscell(mask_file)
+        assert(exist(mask_file,'file'),'Missing specified mask file: %s',mask_file);
+    else
+        assert(all(cellfun(@(x) exist(x,'file'),mask_file)), ...
+            'Missing one of the specified mask files:\n\t%s',strjoin(mask_file,'\n\t'));
+    end
+end
 
 % MASKING IMPORTANT FOR GOOD RESULT!
 skip_mask=0;
 verbosity=0;
-%% old fashioned get data from scanner out of use
-if strcmp(cs_code_selection,'w3bart')
-    BD=getenv('BIGGUS_DISKUS');
-    if ~exist('runno','var') || strcmp(runno,'test') || ~exist(runno,'dir')
-        project='24.mst.01';
-        runno='S69875';
-        spec='230703-1-1';
-        B0 = 7.0; H = [0 0 1];
-        
-        qsm_work=sprintf('%s_qsm',runno);
-        folder_parts={BD,project,spec,runno};
-        datapath=fullfile(folder_parts{:});
-        folder_parts={BD,[project '.work'],spec,runno};
-        folder_parts{end}=qsm_work;
-        workpath=fullfile(folder_parts{:});
-        verbosity=3;
-    elseif exist(runno,'dir')
-        datapath=runno;
-        [p,runno,e]=fileparts(runno);
-        workpath=fullfile(p,[runno '_qsm']);
-    end
-elseif strcmp(cs_code_selection,'w2bart')
-    BD=getenv('BIGGUS_DISKUS');
-    if ~exist('runno','var') || strcmp(runno,'test') || ~exist(runno,'dir')
-        project='test';
-        runno='MGRE_BART';
-        runno='MGRE_FISTA';
-        spec='spec';
-        
-        B0 = 9.4; H = [0 0 1];
-        qsm_work=sprintf('%s_qsm',runno);
+must_raw=1; 
 
-        folder_parts={BD,[project '.work'],spec,runno};
-        datapath=fullfile(folder_parts{:});
-        folder_parts{end}=qsm_work;
-        workpath=fullfile(folder_parts{:});
-        verbosity=3;
-    elseif exist(runno,'dir')
-        datapath=runno;
-        [p,runno,e]=fileparts(runno);
-        workpath=fullfile(p,[runno '_qsm']);
-    end
-    
-elseif strcmp(cs_code_selection,'CS_v1')
-    % scanner = 'kamy';
-    % runno = 'S66730';
-    % study = 'S66730_01';a
-    % series = 'ser13';
-    % rad_mat('heike','N56302','N56275_02/ser12.fid',{'skip_filter'});  %%%%GRE
-    scanner = 'kamy';
-    %runno = 'S69054s';
-    study = 'S200221_05';
-    series = 'ser49';
-    %runno = 'S69240';
-    study='localdata';
-    series='localseries';
-    % workpath returned by agilent2nas4(and similar
-    % scripts) it is a old format CS recon folder.
-    %workpath = agilent2glusterspace_k(scanner,runno,study,series,'o');
-    workpath=fullfile(getenv('BIGGUS_DISKUS'),runno );
-    if ~exist(workpath,'dir')
-        workpath = agilent2nas4_k(scanner,runno,study,series);
-    end
-    cd(workpath);
+if ~exist(workpath,'dir')
+    mkdir(workpath);
 end
-if reg_match(cs_code_selection,'w[0-9]?bart')
-    % WARNING changing the meaning of workpath to be my QSM workpath!
-    if ~exist(workpath,'dir')
-        mkdir(workpath);
-    end
-    chdir(workpath);
-    %
-else
-    % new CS_v2 data format, had to be run with keep_work option to be useful
-    workpath=fullfile(getenv('BIGGUS_DISKUS'),[runno '.work']);
-    %workpath='/mnt/duhsnas-pri.dhe.duke.edu/civm-projectdata/jjc29/clusterscratch/S69222.work'
-    cd(workpath);
-    if ~exist('qsm','dir')
-        mkdir('qsm');
-    end
-    cd('qsm');
-end
+chdir(workpath);
 
-if exist('star_qsm.nii.gz','file') || exist('star_qsm.nii','file')
-    warning('%s complete',workpath);
+default_out='star_qsm.nii';
+if exist(default_out,'file')
+    gzcur=0;
+    cur=default_out;
+elseif exist([default_out '.gz'],'file') 
+    gzcur=1;
+    cur=[default_out '.gz'];
+end
+gzout=reg_match(out_qsm,'gz$');
+if exist('cur','var')
+    if gzcur && ~gzout
+        out_qsm=[out_qsm '.gz'];
+    elseif ~gzcur && gzout
+        out_qsm=regexprep(out_qsm,'.gz$','');
+    end
+    movefile(cur,out_qsm);
+end
+if exist(out_qsm,'file')
+    %{
+    star_qsm=open_nii('star_qsm');
+    show3(star_qsm);
+    %}
+    warning('%s complete',out_qsm);
     return;
 end
+out_qsm=regexprep(out_qsm,'.gz$','');
 
-%% example to load CS data
-must_raw=1; %% somehow be nice to hold onto the "raw" data instead of re-calculating.
-if strcmp(cs_code_selection,'w3bart')
-    echo_dirs=regexpdir(datapath,[runno 'c_m[0-9]+/?$'],0);
-    [raw,hfs]=load_4d(echo_dirs{:});
-    res=[hfs{1}.fovx,hfs{1}.fovy,hfs{1}.fovz]./[hfs{1}.dim_X,hfs{1}.dim_Y,hfs{1}.dim_Z];
-    nechoes=numel(echo_dirs);
-    echos=hfs{1}.z_Agilent_TE;
-    assert(numel(echos)==nechoes)
-    TE_ms = echos;
-    TE_s = TE_ms/1000;
-elseif strcmp(cs_code_selection,'w2bart')
-    echo_dirs=regexpdir(datapath,'.*m[0-9]+',0);
-    echo_images=cell(size(echo_dirs));
-    e=0;
-    for d=echo_dirs(:)'
-        cfl_path=regexpdir(d{1},'.*[.]cfl',0);
-        [p,n,~]=fileparts(cfl_path{1});
-        e_cfl=readcfl(fullfile(p,n));
-        echo_images(e+1)={e_cfl};
-        e=e+1;
+%echo_dirs=regexpdir(datapath,[runno 'c_m[0-9]+/?$'],0);
+[raw,hfs]=load_4d(echo_dirs{:});
+runno1=hfs{1}.U_runno;
+res=[hfs{1}.fovx,hfs{1}.fovy,hfs{1}.fovz]./[hfs{1}.dim_X,hfs{1}.dim_Y,hfs{1}.dim_Z];
+nechoes=numel(echo_dirs);
+echos=hfs{1}.z_Agilent_TE;
+if numel(echos)~=nechoes
+    warning('echo count doenst match attempting to use runno _m[0-9]+ formatting to select from echo array.')
+    runnos=cell(size(hfs));
+    for r_idx=1:numel(runnos)
+        runnos{r_idx}=hfs{r_idx}.U_runno;
     end
-    echo_file=regexpdir(datapath,'echo_times_ms.txt');
-    echo_file=echo_file{1};
-    echos=csvread(echo_file);
-    %{
-    warning('\n\n\n\t%s\n\n','reversing echos due to schenanigans found in processing');
-    pause(0.6);
-    echos=reverse(echos);
-    %}
-    voldims=size(echo_images{1});
-    % fov
-    res=[0.025,0.025,0.025];
-    nechoes=numel(echos);
-    TE_ms = echos;
-    TE_s = TE_ms/1000;
-    raw=cell2mat(echo_images);
-    raw=reshape(raw,[voldims(1),4,voldims(2),voldims(3)]);
-    raw=permute(raw,[1,3,4,2]);
-elseif reg_match(cs_code_selection,'CS_v[23]')
-    %% old fashioned get data from scanner out of use
-    procpar=readprocpar(fullfile(workpath,'procpar'));
-    if ~exist('mag.nii','file')||must_raw
-        raw=load_imagespace_from_CS_tmp(workpath);
+    t=regexpi(runnos,'_m([0-9]+)$','tokens');
+    echo_indicies=zeros(size(t))-1;
+    for r_idx=1:numel(runnos)
+        echo_indicies(r_idx)=str2double(t{r_idx}{1});
     end
-    %disp_vol_center(raw(:,:,:,1))
-    %vars=matfile([runno 'recon.mat']);
-    voldims=[procpar.np/2 procpar.nv procpar.nv2];
-    % not-valid becuse CS
-    %nvols=(npoints/2*ntraces*nblocks)/prod(voldims);
-    %blocks_per_vol=nblocks/nvols;
-    fov=[procpar.lro procpar.lpe procpar.lpe2].*10; %fov in mm this may not be right for multislice data
-    res=fov./voldims;
-    if exist('procpar','var')
-        nechoes = numel(procpar.TE);
-    else
-        nechoes = 1;
-    end
-    TE_ms= procpar.TE;
-    TE_s = procpar.TE/1000; 
-    %dims = [voldims nechoes];
-elseif exists('cartesean_sample_example','var')
-    %% this was written for NON-CS data!
-    %{
-    % AND has not been updated for adjustments made to other parts of the
-    % script!(sorry)
-    mkdir ser12
-    cd ser12
-    save fov fov
-    vox = res; save vox vox
-    TE = procpar.TE/1000; save TE TE
-    dims = [voldims nechoes]; save dims dims
-    
-    load([runno 'recon.mat']);
-    % phase ramp removal
-    load_fid_ME_wrapper4;
-    raw=readMEraw('k','','single',1:nechoes);
-    tic
-    % save_nii(make_nii(raw,vox,[0 0 0],32),'img.nii');
-    delete k_single_echo_*.raw
-    toc
-    cd ..
-    %}
+    echo_indicies=echo_indicies+1;
+    echos=echos(echo_indicies);
 end
+assert(numel(echos)==nechoes)
+TE_ms = echos;
+TE_s = TE_ms/1000;
 
 % get back to kspace, 1. fft, 2. fftshift.
 % these two methods produce identical results. One may be faster/use less
@@ -219,7 +107,7 @@ if ~exist('mag.nii','file')||must_raw
     % now in kspace.
     [raw,phase_shift]=phase_ramp_remove1(raw);
     %  kspc2=raw;
-    save phase_shift phase_shift; clear phase_shift;
+    save phase_shift phase_shift;
     % This code right here, flips the data WRONG and reshuffles echoes.
     % in conjunction with getting the imgspce -> kspace wrong above!
     %raw = iftME(raw);
@@ -262,8 +150,31 @@ end
 %trying to skip!
 %tic
 use_strip_mask_exec=true;
-if ~skip_mask
-    if ~exist('mag_sos.nii','file') && ~skip_mask
+if ~skip_mask && exist('mask_file','var') 
+    if ~iscell(mask_file)
+        [mask,mhdr]=read_civm_image(mask_file,1);
+    else
+        [mask,mhdrs]=load_4d(mask_file{:});
+        mhdr=mhdrs{1};
+    end
+    if phase_shift~=0 || any(shift_vector)
+        % by testing it looks like phase_shift not needed....
+        mask_shift=shift_vector;%+phase_shift;
+        mask=circshift(mask,mask_shift);
+        %{
+% test mask adjustment
+        t=raw;
+        for eidx=1:nechoes
+            v=t(:,:,:,eidx);
+            v(mask==0)=0;
+            t(:,:,:,eidx)=v;
+        end;clear eidx;
+        disp_vol_center(t)
+        %}
+    end
+end
+if ~skip_mask && ~exist('mask','var')
+    if ~exist('mag_sos.nii','file') && ~exist('msk.nii.gz','file')
         % additional step for mag_sos (sum of squares?)
         %% inline method
         % inline may be better on memory/time.
@@ -442,10 +353,10 @@ toc
 
 warning('hard coding B0 and H field');
 %B0 = 3.0; H = [1 0 0]; % define B0 and direction of main field H
-if runno(1) == 'N'
+if runno1(1) == 'N'
     % agilent 9t
     B0 = 9.4; H = [0 0 1];
-elseif runno(1) == 'S'
+elseif runno1(1) == 'S'
     % agilent 7t
     B0 = 7.0; H = [0 0 1];
 else
@@ -477,23 +388,22 @@ back = 0; time = 0;
 
 TissuePhase_all=zeros(size(raw),'single');
 Freq_v=zeros(size(raw),'single');
-for necho = 1:nechoes
-    [back,time] = progress(necho,nechoes,'Phase unwrap and V_SHARP per echo',back,time);
+for e = 1:nechoes
+    [back,time] = progress(e,nechoes,'Phase unwrap and V_SHARP per echo',back,time);back=0;
     % if necho <= size(mask,4)
     %     mask2 = applyautocrop(single(mask(:,:,:,necho)));
     % else
     %     mask2 = applyautocrop(mask(:,:,:,1));
     % end
-    
-    if necho <= size(mask,4)
-        mask2 = (single(mask(:,:,:,necho)));
+    if e <= size(mask,4)
+        mask2 = single(mask(:,:,:,e));
     else
         mask2 = single(mask(:,:,:,1));
     end
     if exist('Freq_v.nii.gz','file') || exist('Freq_v.nii','file')
         continue;
     end
-    ScalingCoeff = ScalingFactor(B0,TE_ms(necho));
+    ScalingCoeff = ScalingFactor(B0,TE_ms(e));
     if ScalingCoeff.Freq == 0
         msg='ScalingCoeff calc failed! Freq is 0!';
         db_inplace(mfilename,msg);
@@ -507,7 +417,7 @@ for necho = 1:nechoes
     %%one_echo=open_nii(raw_img_file,necho);
     % NOT certain that raw is the same here!
     % however, the output looks correct.
-    one_echo=squeeze(raw(:,:,:,necho));
+    one_echo=squeeze(raw(:,:,:,e));
     UnwrapPhase = LaplacianPhaseUnwrap( ...
         (single(angle(one_echo))),'padsize',prepadsize);
     if nnz(UnwrapPhase)==0
@@ -525,8 +435,8 @@ for necho = 1:nechoes
         db_inplace(mfilename,msg);
         warning(msg);
     end
-    TissuePhase_all(:,:,:,necho) = TissuePhase;
-    Freq_v(:,:,:,necho) = (TissuePhase)*ScalingCoeff.Freq;
+    TissuePhase_all(:,:,:,e) = TissuePhase;
+    Freq_v(:,:,:,e) = (TissuePhase)*ScalingCoeff.Freq;
     %figure;imshow(Freq_v(:,:,160,necho),[])
     %drawnow;
 end
@@ -564,8 +474,9 @@ else
     load MEWeight
 end
 clear T2 T2pix TissuePhase maskE2 raw T2mask
-
+warning('THIS WAS FORCED TO MAX OF 2 ECHOS PREVIOUSLY.')
 max_echo = 2;
+max_echo = nechoes;
 % meanT2 = open_nii('T2');
 % combine frequency data
 if ~exist('FreqC_v.nii.gz','file') && ~exist('FreqC_v.nii','file')
@@ -578,15 +489,18 @@ else
     FreqC_v=open_nii('FreqC_v');
 end
 clear Freq_v
-% Star QSM
 
-if ~exist('star_qsm.nii.gz','file') && ~exist('star_qsm.nii','file')
+%% Star QSM
+if ~exist([default_out '.gz'],'file') && ~exist(default_out,'file') ...
+    && ~exist([out_qsm, '.gz'],'file') && ~exist(out_qsm,'file')
     %QSM_star = QSM_STI_Star(FreqC_v,single(mask2),9.4,[0 0 1],[1 1 1],[12 12 12],10,0.6);
     FreqC_v_sc = FreqC_v/ (1./mean(TE_ms(1:max_echo))./2./pi)*2*pi/1000;
     star_qsm = QSM_star(FreqC_v_sc ,single(mask2),'H',H, 'voxelsize',vox,'padsize', prepadsize,'TE',mean(TE_ms(1:max_echo)),'B0',B0,'tau',0.000001);
     %star_qsm = star_qsm*2*pi/1000;
-    mat2nii(star_qsm)
+    mat2nii(star_qsm);
 end
-
+if exist(default_out,'file')
+    movefile(default_out,out_qsm);
+end
 close all;
 
